@@ -3,6 +3,7 @@ export type ProjectCommand = {
   positionMs: number;
   startMs: number;
   endMs: number;
+  volume?: number;
 };
 
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -48,12 +49,16 @@ export class Project {
         positionMs: timeStringToMs(row[1]) || 0,
         startMs: timeStringToMs(row[2]) || 0,
         endMs: timeStringToMs(row[3]) || 0,
+        volume: row[4] !== undefined ? Number(row[4]) : 100,
       }));
     return new Project(title, id, commands);
   }
 
   static fromJSON(json: string): Project {
     const data = JSON.parse(json);
-    return new Project(data.title, data.id, data.commands);
+    return new Project(data.title, data.id, (data.commands as ProjectCommand[]).map(cmd => ({
+      ...cmd,
+      volume: cmd.volume ?? 100,
+    })));
   }
 }

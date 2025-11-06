@@ -10,14 +10,39 @@
   - Idea 3: add some transition to black screen
 - How to make the recording from an extension easier
   - Have a countdown
-  - Open a window that has the right size (1080x720)
+  - Open a window
   - For preview, we can use a smaller window
 - Make editing easier
   - Anchor the position to the end of another asset (may be start with a static impl)
   - Display the video title instead of the link.
 
-# M1 implementation
+# M2 implementation
+Get it working with a 2-minute video
 
+## M2a
+- Add a column for volume, which will be a value from 0 to 100
+  - During playback, set the volume based on that value
+- Currently, I to have reload for this change to reflect, but it's okay due to some complex preloading logic
+
+## M2b
+- Currently, we can handle 2 non-overlapping asset. But we need to handle overlapping assets.
+  - E.g. if asset 1 has position 0ms and ends at 8000ms, while asset 2 has position 3000ms and ends at 5000ms, then you will show the iframe for asset 1 from 0ms to 3000ms, asset 2 from 3000ms to 5000ms and then asset 1 again from 5000ms to 8000ms
+  - When 2 assets overlap, pick the lower one in the table to show the iframe when replaying, but once the overlap is done, display the iframe
+  - Even though only 1 iframe is displayed, both still need to keep playing, since we may need the audio going in the background.
+- To make it easier to debug, have an intermediate step to generate a plan of the actions to be taken and then have the ReplayManager execute the actions. 
+
+## M2c
+- The action plan architecture is done, but there are bugs, so let me clarify how to generate the plan.
+- Each command has a position field, which indicates when things will start in absolute term in ms.
+- Each command will also indicates when things will end via position + end - start
+- So each command provides an interval.
+- Given the list of intervals [a0, b0], [a1, b1], ..., first figure out all the points of changes in ascending order, and for each point of change, determine which YT player/iframe should be the visible one (for the very last point of change, use idx -1 and interpret that as a black screen)
+  - Given a point of change c, go through the list of intervals in reverse and let's say the interval of interest is [ai, bi], see if c >= ai and c < bi. If so, then that should be the visible TY player/iframe
+
+## Wishlist
+
+# M1 implementation
+Goal: have something that I can play back to see something
 ## M1a
 - A table that consists of 4 columns
   - Asset
@@ -64,5 +89,4 @@
   - positionMs tells you when to start playing the specified video in the iframe and startMs tells you where the video should be set to when you play it, and endMs tells you when to stop the video, so you will be playing the video for duration, endMs - startMs.
   - Repeat this for all commands, using setTimeout to start the command based on positionMs
 
-# M1f
 

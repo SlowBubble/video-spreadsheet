@@ -1,22 +1,29 @@
 import './style.css';
 import { Project } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
+import { ReplayManager } from './replay';
 
-const columns = ['Asset', 'Position', 'Start', 'End'];
+const columns = ['Asset', 'Position', 'Start', 'End', 'Volume'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
 // Similarly 1:2:3 is 60*60*1+60*2+3
 function msToTimeString(ms: number): string {
   const seconds = Math.floor(ms / 1000);
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
+  const h = Math.floor(seconds / 4800);
+  const m = Math.floor((seconds % 4800) / 60);
   const s = seconds % 60;
   if (h > 0) {
     return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   } else {
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
+}
+
+// Helper to extract YouTube video ID from a URL
+function getYouTubeId(url: string): string | null {
+  const match = url.match(/(?:v=|youtu.be\/|embed\/)([\w-]{11})/);
+  return match ? match[1] : null;
 }
 
 class Editor {
@@ -26,8 +33,7 @@ class Editor {
   selectedRow: number = 0;
   selectedCol: number = 0;
   projectTitle: string;
-  _replayIframes: HTMLIFrameElement[] = [];
-  _replayCommands: any[] = [];
+  replayManager: ReplayManager | null = null;
 
   constructor() {
     // Create persistent replay container at the top of the body
@@ -43,54 +49,21 @@ class Editor {
     this.tableData = this.projectToTableData(this.project);
     this.projectTitle = this.project.title;
     this.renderTable();
-    this.preloadReplayIframes();
+    this.initReplayManager();
     window.addEventListener('keydown', (e) => this.handleKey(e));
     window.addEventListener('hashchange', () => this.handleHashChange());
   }
 
-  preloadReplayIframes() {
+  initReplayManager() {
     let replayDiv = document.getElementById('replay-container') as HTMLDivElement;
     if (!replayDiv) return;
-    replayDiv.innerHTML = '';
-    const proj = Project.deserializeFromSpreadsheet(
+    this.replayManager = new ReplayManager(
+      replayDiv,
       this.projectId,
       this.projectTitle,
-      this.tableData
+      this.tableData,
+      getYouTubeId
     );
-    if (!proj.commands.length) return;
-    const commands = [...proj.commands].sort((a, b) => a.positionMs - b.positionMs);
-    function getYouTubeId(url: string): string | null {
-      const match = url.match(/(?:v=|youtu.be\/|embed\/)([\w-]{11})/);
-      return match ? match[1] : null;
-    }
-    // Container for iframes
-    const container = document.createElement('div');
-    container.style.position = 'relative';
-    container.style.width = '1280px';
-    container.style.height = '720px';
-    container.style.margin = '0 auto';
-    replayDiv.appendChild(container);
-    // Preload all iframes (hidden except first)
-    this._replayIframes = commands.map((cmd, idx) => {
-      const ytId = getYouTubeId(cmd.asset);
-      const startSec = Math.floor(cmd.startMs / 1000);
-      const endSec = Math.floor(cmd.endMs / 1000);
-      const iframe = document.createElement('iframe');
-      iframe.width = '1280';
-      iframe.height = '720';
-      iframe.style.border = 'none';
-      iframe.style.display = idx === 0 ? 'block' : 'none';
-      iframe.setAttribute('allow', 'autoplay; encrypted-media');
-      iframe.setAttribute('allowfullscreen', '');
-      if (ytId) {
-        iframe.src = `https://www.youtube.com/embed/${ytId}?start=${startSec}&end=${endSec}&controls=0&modestbranding=1&rel=0`;
-      } else {
-        iframe.src = '';
-      }
-      container.appendChild(iframe);
-      return iframe;
-    });
-    this._replayCommands = commands;
   }
 
   getProjectIdFromHash(): string | null {
@@ -109,15 +82,16 @@ class Editor {
   }
 
   projectToTableData(project: Project): string[][] {
-    if (!project.commands.length) return [['', '', '', '']];
+    if (!project.commands.length) return [['', '', '', '', '']];
     return [
       ...project.commands.map(cmd => [
         cmd.asset,
         msToTimeString(cmd.positionMs),
         msToTimeString(cmd.startMs),
         msToTimeString(cmd.endMs),
+        (cmd.volume ?? 100).toString(),
       ]),
-      ['', '', '', ''],
+      ['', '', '', '', ''],
     ];
   }
 
@@ -172,7 +146,7 @@ class Editor {
 
   ensureEmptyRow() {
     if (!this.isRowEmpty(this.tableData[this.tableData.length - 1])) {
-      this.tableData.push(['', '', '', '']);
+      this.tableData.push(['', '', '', '', '']);
     }
   }
 
@@ -199,56 +173,13 @@ class Editor {
     } else if (matchKey(e, 'cmd+s')) {
       this.saveProject();
     } else if (matchKey(e, 'space')) {
-      this.startReplay();
+      if (!this.replayManager) return;
+      this.replayManager.startReplay();
     } else {
       return;
     }
     e.preventDefault();
     this.renderTable();
-  }
-
-  startReplay() {
-    let replayDiv = document.getElementById('replay-container') as HTMLDivElement;
-    if (!replayDiv) return;
-    if (!this._replayIframes || !this._replayCommands) return;
-    // Hide all iframes
-    this._replayIframes.forEach(iframe => (iframe.style.display = 'none'));
-    // Play sequence
-    const commands = this._replayCommands;
-    const iframes = this._replayIframes;
-    function getYouTubeId(url: string): string | null {
-      const match = url.match(/(?:v=|youtu.be\/|embed\/)([\w-]{11})/);
-      return match ? match[1] : null;
-    }
-    function showIframe(idx: number) {
-      iframes.forEach((iframe, i) => {
-        iframe.style.display = i === idx ? 'block' : 'none';
-        if (i === idx) {
-          const cmd = commands[i];
-          const ytId = getYouTubeId(cmd.asset);
-          const startSec = Math.floor(cmd.startMs / 1000);
-          const endSec = Math.floor(cmd.endMs / 1000);
-          if (ytId) {
-            iframe.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&start=${startSec}&end=${endSec}&controls=0&modestbranding=1&rel=0`;
-          } else {
-            iframe.src = '';
-          }
-        }
-      });
-    }
-    function playCommand(idx: number) {
-      if (idx >= commands.length) return;
-      showIframe(idx);
-      const duration = commands[idx].endMs - commands[idx].startMs;
-      setTimeout(() => {
-        playCommand(idx + 1);
-      }, Math.max(0, duration));
-    }
-    commands.forEach((cmd, idx) => {
-      setTimeout(() => {
-        playCommand(idx);
-      }, Math.max(0, cmd.positionMs - commands[0].positionMs));
-    });
   }
 
   saveProject() {
