@@ -16,8 +16,17 @@
   - Anchor the position to the end of another asset (may be start with a static impl)
   - Display the video title instead of the link.
 
+# M3 implementation
+Make it easier to edit a 2-minute video
+
+## M3a
+- Display the position in seconds when replaying (so that I know the position when adding extra assets)
+
+## M3b
+- `space` works fine for starting replay, but can you implement stop when `space` is hit while it is replaying, which will reset everything back to 0 seconds.
+ 
 # M2 implementation
-Get it working with a 2-minute video
+Get it working with a 1 small overlap
 
 ## M2a
 - Add a column for volume, which will be a value from 0 to 100

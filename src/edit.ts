@@ -26,7 +26,7 @@ function getYouTubeId(url: string): string | null {
   return match ? match[1] : null;
 }
 
-class Editor {
+export class Editor {
   projectId: string;
   project: Project;
   tableData: string[][];
@@ -174,7 +174,11 @@ class Editor {
       this.saveProject();
     } else if (matchKey(e, 'space')) {
       if (!this.replayManager) return;
-      this.replayManager.startReplay();
+      if (this.replayManager.replaying) {
+        this.replayManager.stopReplay();
+      } else {
+        this.replayManager.startReplay();
+      }
     } else {
       return;
     }
@@ -209,4 +213,3 @@ class Editor {
   }
 }
 
-new Editor();

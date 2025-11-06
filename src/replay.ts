@@ -5,6 +5,9 @@ export class ReplayManager {
   commands: any[] = [];
   blackDiv: HTMLDivElement | null = null;
   container: HTMLDivElement | null = null;
+  replaying: boolean = false;
+  _intervalId: any = null;
+  _stepTimeoutId: any = null;
 
   constructor(replayDiv: HTMLDivElement, projectId: string, projectTitle: string, tableData: string[][], getYouTubeId: (url: string) => string | null) {
     replayDiv.innerHTML = '';
@@ -128,56 +131,104 @@ export class ReplayManager {
     return plan;
   }
 
+  stopReplay() {
+    this.replaying = false;
+    this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
+    this._intervalId && clearInterval(this._intervalId);
+    this._stepTimeoutId = null;
+    this._intervalId = null;
+    this.hideAllPlayers();
+    if (this.blackDiv) this.blackDiv.style.display = 'block';
+    const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
+    if (posDiv) posDiv.style.display = 'none';
+  }
+
+  hideAllPlayers() {
+    this.players.forEach((player, idx) => {
+      const div = document.getElementById(`yt-player-edit-${idx}`);
+      if (div) div.style.display = 'none';
+      if (player) player.pauseVideo();
+    });
+  }
+
+  showPlayer(idx: number, resume: boolean) {
+    this.players.forEach((player, i) => {
+      const div = document.getElementById(`yt-player-edit-${i}`);
+      if (div) div.style.display = i === idx ? 'block' : 'none';
+      if (i === idx && player) {
+        if (!resume) {
+          const cmd = this.commands[i];
+          const startSec = Math.floor(cmd.startMs / 1000);
+          player.seekTo(startSec);
+          player.setVolume(typeof cmd.volume === 'number' ? cmd.volume : 100);
+          player.playVideo();
+        }
+      }
+    });
+  }
+
   startReplay() {
+    if (this.replaying) return;
+    this.replaying = true;
     const players = this.players;
     const commands = this.commands;
     const blackDiv = this.blackDiv;
     if (!players || !commands || !blackDiv) return;
     const plan = this.generateReplayPlan();
-    console.log(JSON.stringify(plan));
-    function showPlayer(idx: number, resume: boolean) {
-      players.forEach((player, i) => {
-        const div = document.getElementById(`yt-player-edit-${i}`);
-        if (div) div.style.display = i === idx ? 'block' : 'none';
-        if (i === idx && player) {
-          if (!resume) {
-            const cmd = commands[i];
-            const startSec = Math.floor(cmd.startMs / 1000);
-            player.seekTo(startSec);
-            player.setVolume(typeof cmd.volume === 'number' ? cmd.volume : 100);
-            player.playVideo();
-          }
-          // If resume, just show the iframe, let it keep playing
-        }
-      });
+    // Create or get position display div (fixed at top right of browser)
+    let posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
+    if (!posDiv) {
+      posDiv = document.createElement('div');
+      posDiv.id = 'replay-pos-div';
+      posDiv.style.position = 'fixed';
+      posDiv.style.top = '12px';
+      posDiv.style.right = '24px';
+      posDiv.style.background = 'rgba(0,0,0,0.7)';
+      posDiv.style.color = 'white';
+      posDiv.style.fontSize = '2em';
+      posDiv.style.padding = '8px 16px';
+      posDiv.style.borderRadius = '8px';
+      posDiv.style.zIndex = '9999';
+      document.body.appendChild(posDiv);
     }
-    function hideAllPlayers() {
-      players.forEach((player, idx) => {
-        const div = document.getElementById(`yt-player-edit-${idx}`);
-        if (div) div.style.display = 'none';
-        if (player) player.pauseVideo();
-      });
+    let replayStart = Date.now();
+    let replayOffset = plan.length > 0 ? plan[0].start : 0;
+    function updatePositionDisplay() {
+      const elapsed = Date.now() - replayStart;
+      const posMs = replayOffset + elapsed;
+      posDiv.textContent = `Position: ${(posMs / 1000).toFixed(1)}s`;
+      posDiv.style.display = 'block';
     }
-    // Execute plan
     let step = 0;
+    const self = this;
     function nextStep() {
+      if (!self.replaying) return;
       if (step >= plan.length) {
-        hideAllPlayers();
+        self.hideAllPlayers();
         if (blackDiv) blackDiv.style.display = 'block';
+        if (posDiv) posDiv.style.display = 'none';
+        self._intervalId && clearInterval(self._intervalId);
+        self._intervalId = null;
+        self.replaying = false;
         return;
       }
       const { start, end, idx, resume } = plan[step];
+      replayStart = Date.now();
+      replayOffset = start;
       if (blackDiv) blackDiv.style.display = idx === -1 ? 'block' : 'none';
-      if (idx !== -1) showPlayer(idx, resume);
-      setTimeout(() => {
+      if (idx !== -1) self.showPlayer(idx, resume);
+      self._intervalId && clearInterval(self._intervalId);
+      self._intervalId = setInterval(updatePositionDisplay, 500);
+      updatePositionDisplay();
+      self._stepTimeoutId = setTimeout(() => {
         step++;
         nextStep();
       }, Math.max(0, end - start));
     }
-    hideAllPlayers();
+    this.hideAllPlayers();
     if (blackDiv) blackDiv.style.display = 'block';
     if (plan.length > 0) {
-      setTimeout(() => {
+      this._stepTimeoutId = setTimeout(() => {
         nextStep();
       }, Math.max(0, plan[0].start));
     }

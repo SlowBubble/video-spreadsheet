@@ -1,3 +1,4 @@
+import { Editor } from './edit';
 import './style.css';
 
 function getProjects(): { id: string, title: string }[] {
@@ -45,7 +46,8 @@ function renderHome() {
 
 function main() {
   if (window.location.hash.startsWith('#id=')) {
-    import('./edit');
+    new Editor();
+
     return;
   }
   renderHome();
