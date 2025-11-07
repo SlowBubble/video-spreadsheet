@@ -1,10 +1,27 @@
-export type ProjectCommand = {
+export class ProjectCommand {
   asset: string;
   positionMs: number;
   startMs: number;
   endMs: number;
-  volume?: number;
-};
+  volume: number;
+  speed: number;
+
+  constructor(
+    asset: string,
+    positionMs: number,
+    startMs: number,
+    endMs: number,
+    volume?: number,
+    speed?: number
+  ) {
+    this.asset = asset;
+    this.positionMs = positionMs;
+    this.startMs = startMs;
+    this.endMs = endMs;
+    this.volume = volume !== undefined && volume >= 0 ? volume : 100;
+    this.speed = speed !== undefined && speed > 0 ? speed : 1;
+  }
+}
 
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
 // Similarly 1:2:3 is 60*60*1+60*2+3
@@ -49,22 +66,29 @@ export class Project {
         const positionStr = row[1] || '';
         const positionStartTime = positionStr.split('-')[0].trim();
         
-        return {
-          asset: row[0] || '',
-          positionMs: timeStringToMs(positionStartTime) || 0,
-          startMs: timeStringToMs(row[2]) || 0,
-          endMs: timeStringToMs(row[3]) || 0,
-          volume: row[4] !== undefined ? Number(row[4]) : 100,
-        };
+        return new ProjectCommand(
+          row[0] || '',
+          timeStringToMs(positionStartTime) || 0,
+          timeStringToMs(row[2]) || 0,
+          timeStringToMs(row[3]) || 0,
+          row[4] !== undefined && row[4].trim() !== '' ? Number(row[4]) : undefined,
+          row[5] !== undefined && row[5].trim() !== '' ? Number(row[5]) : undefined
+        );
       });
     return new Project(title, id, commands);
   }
 
   static fromJSON(json: string): Project {
     const data = JSON.parse(json);
-    return new Project(data.title, data.id, (data.commands as ProjectCommand[]).map(cmd => ({
-      ...cmd,
-      volume: cmd.volume ?? 100,
-    })));
+    return new Project(data.title, data.id, data.commands.map((cmd: any) => 
+      new ProjectCommand(
+        cmd.asset,
+        cmd.positionMs,
+        cmd.startMs,
+        cmd.endMs,
+        cmd.volume,
+        cmd.speed
+      )
+    ));
   }
 }

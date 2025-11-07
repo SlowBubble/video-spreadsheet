@@ -67,9 +67,11 @@ export class ReplayManager {
             },
             events: {
               onReady: (event: any) => {
+                console.log(`[Init ${idx}] onReady - Setting speed: ${cmd.speed}, volume: ${cmd.volume}`);
                 event.target.seekTo(startSec);
                 event.target.pauseVideo();
-                event.target.setVolume(typeof cmd.volume === 'number' ? cmd.volume : 100);
+                event.target.setVolume(cmd.volume);
+                event.target.setPlaybackRate(cmd.speed);
               }
             }
           });
@@ -95,23 +97,27 @@ export class ReplayManager {
     const cmds = this.commands;
     if (!cmds || !cmds.length) return [];
     // Collect all change points (start and end of intervals)
+    // Account for playback speed: slower speed = longer actual duration
     const points: number[] = [];
     cmds.forEach((cmd: any) => {
       const a = cmd.positionMs;
-      const b = cmd.positionMs + (cmd.endMs - cmd.startMs);
+      const videoDuration = cmd.endMs - cmd.startMs;
+      const actualDuration = videoDuration / cmd.speed;
+      const b = cmd.positionMs + actualDuration;
       points.push(a, b);
     });
     // Remove duplicates and sort
     const uniquePoints = Array.from(new Set(points)).sort((a, b) => a - b);
     const plan: { start: number, end: number, idx: number, resume: boolean }[] = [];
-    let prevIdx = -1;
     let lastVisible: { [idx: number]: number } = {};
     for (let i = 0; i < uniquePoints.length - 1; i++) {
       const c = uniquePoints[i];
       let idx = -1;
       for (let j = cmds.length - 1; j >= 0; j--) {
         const a = cmds[j].positionMs;
-        const b = cmds[j].positionMs + (cmds[j].endMs - cmds[j].startMs);
+        const videoDuration = cmds[j].endMs - cmds[j].startMs;
+        const actualDuration = videoDuration / cmds[j].speed;
+        const b = cmds[j].positionMs + actualDuration;
         if (c >= a && c < b) {
           idx = j;
           break;
@@ -124,7 +130,6 @@ export class ReplayManager {
         lastVisible[idx] = c;
       }
       plan.push({ start: c, end: uniquePoints[i + 1], idx, resume });
-      prevIdx = idx;
     }
     // For the last change point, show black screen
     plan.push({ start: uniquePoints[uniquePoints.length - 1], end: uniquePoints[uniquePoints.length - 1] + 1000, idx: -1, resume: false });
@@ -159,9 +164,13 @@ export class ReplayManager {
         if (!resume) {
           const cmd = this.commands[i];
           const startSec = Math.floor(cmd.startMs / 1000);
+          console.log(`[Action ${idx}] Setting speed: ${cmd.speed}, volume: ${cmd.volume}, startSec: ${startSec}`);
           player.seekTo(startSec);
-          player.setVolume(typeof cmd.volume === 'number' ? cmd.volume : 100);
+          player.setVolume(cmd.volume);
+          player.setPlaybackRate(cmd.speed);
           player.playVideo();
+        } else {
+          console.log(`[Action ${idx}] Resuming playback (no speed change)`);
         }
       }
     });
@@ -213,6 +222,7 @@ export class ReplayManager {
         return;
       }
       const { start, end, idx, resume } = plan[step];
+      console.log(`[Plan ${step}] start: ${start}ms, end: ${end}ms, idx: ${idx}, resume: ${resume}`);
       replayStart = Date.now();
       replayOffset = start;
       if (blackDiv) blackDiv.style.display = idx === -1 ? 'block' : 'none';

@@ -4,7 +4,7 @@ import type { ProjectCommand } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 
-const columns = ['Asset', 'Position', 'Start', 'End', 'Volume'];
+const columns = ['Asset', 'Position', 'Start', 'End', 'Volume', 'Speed'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -28,9 +28,11 @@ function getYouTubeId(url: string): string | null {
 }
 
 // Compute the absolute end time in ms for a command
+// Takes into account playback speed: slower speed = longer duration
 function computeCommandEndTimeMs(cmd: ProjectCommand): number {
-  const duration = cmd.endMs - cmd.startMs;
-  return cmd.positionMs + duration;
+  const videoDuration = cmd.endMs - cmd.startMs;
+  const actualDuration = videoDuration / cmd.speed;
+  return cmd.positionMs + actualDuration;
 }
 
 export class Editor {
@@ -89,7 +91,7 @@ export class Editor {
   }
 
   projectToTableData(project: Project): string[][] {
-    if (!project.commands.length) return [['', '', '', '', '']];
+    if (!project.commands.length) return [['', '', '', '', '', '']];
     return [
       ...project.commands.map(cmd => {
         const startTime = msToTimeString(cmd.positionMs);
@@ -99,10 +101,11 @@ export class Editor {
           `${startTime}-${endTime}`,
           msToTimeString(cmd.startMs),
           msToTimeString(cmd.endMs),
-          (cmd.volume ?? 100).toString(),
+          cmd.volume.toString(),
+          cmd.speed.toString(),
         ];
       }),
-      ['', '', '', '', ''],
+      ['', '', '', '', '', ''],
     ];
   }
 
