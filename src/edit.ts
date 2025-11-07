@@ -3,6 +3,7 @@ import { Project } from './project';
 import type { ProjectCommand } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
+import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
 
 const columns = ['Asset', 'Position', 'Start', 'End', 'Volume', 'Speed'];
 
@@ -37,11 +38,11 @@ function computeCommandEndTimeMs(cmd: ProjectCommand): number {
 
 export class Editor {
   projectId: string;
-  project: Project;
-  tableData: string[][];
+  project!: Project;
+  tableData!: string[][];
   selectedRow: number = 0;
   selectedCol: number = 0;
-  projectTitle: string;
+  projectTitle!: string;
   replayManager: ReplayManager | null = null;
 
   constructor() {
@@ -54,13 +55,19 @@ export class Editor {
       document.body.insertBefore(replayDiv, document.body.firstChild);
     }
     this.projectId = this.getProjectIdFromHash()!;
-    this.project = this.loadProject(this.projectId);
-    this.tableData = this.projectToTableData(this.project);
-    this.projectTitle = this.project.title;
-    this.renderTable();
-    this.initReplayManager();
+    this.loadEditor(this.loadProject(this.projectId));
     window.addEventListener('keydown', (e) => this.handleKey(e));
     window.addEventListener('hashchange', () => this.handleHashChange());
+  }
+
+  private loadEditor(project: Project) {
+    this.project = project;
+    this.projectTitle = project.title;
+    this.tableData = this.projectToTableData(project);
+    this.selectedRow = 0;
+    this.selectedCol = 0;
+    this.renderTable();
+    this.initReplayManager();
   }
 
   initReplayManager() {
@@ -142,8 +149,9 @@ export class Editor {
             ${tableRows}
           </tbody>
         </table>
-        <p style="color: #888;">Use arrow keys or Tab to move, Enter to edit. Cmd+S to save.</p>
+        <button id="shortcuts-btn" style="margin-top: 12px; padding: 8px 16px; cursor: pointer;">Shortcuts</button>
       </div>
+      ${getShortcutsModalHtml()}
     `;
 
     const editBtn = document.getElementById('edit-title');
@@ -156,6 +164,8 @@ export class Editor {
         }
       };
     }
+
+    setupShortcutsModal();
   }
 
   ensureEmptyRow() {
@@ -193,6 +203,8 @@ export class Editor {
       } else {
         this.replayManager.startReplay();
       }
+    } else if (matchKey(e, 'x')) {
+      this.handleExportImport();
     } else {
       return;
     }
@@ -207,6 +219,66 @@ export class Editor {
       this.tableData
     );
     localStorage.setItem('project-' + this.projectId, proj.serialize());
+    this.showSaveBanner();
+  }
+
+  showSaveBanner() {
+    // Remove existing banner if any
+    const existingBanner = document.getElementById('save-banner');
+    if (existingBanner) {
+      existingBanner.remove();
+    }
+
+    // Create banner
+    const banner = document.createElement('div');
+    banner.id = 'save-banner';
+    banner.textContent = 'Saved!';
+    banner.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4caf50;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-weight: bold;
+      z-index: 2000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    `;
+    
+    document.body.appendChild(banner);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+      banner.remove();
+    }, 700);
+  }
+
+  handleExportImport() {
+    // Save current state first
+    this.saveProject();
+    
+    // Get serialized project data
+    const serializedData = localStorage.getItem('project-' + this.projectId);
+    if (!serializedData) return;
+    
+    // Open prompt with serialized data selected
+    const userInput = prompt('Export/Import project data:', serializedData);
+    
+    // If cancelled, do nothing
+    if (userInput === null) return;
+    
+    // If confirmed, deserialize and load the data
+    try {
+      const importedProject = Project.fromJSON(userInput);
+      // Save the imported project
+      localStorage.setItem('project-' + this.projectId, importedProject.serialize());
+      this.loadEditor(importedProject);
+    } catch (error) {
+      alert('Failed to import project data. Please check the format.');
+      console.error('Import error:', error);
+    }
   }
 
   handleHashChange() {
@@ -217,12 +289,7 @@ export class Editor {
     }
     if (newId !== this.projectId) {
       this.projectId = newId;
-      this.project = this.loadProject(this.projectId);
-      this.tableData = this.projectToTableData(this.project);
-      this.selectedRow = 0;
-      this.selectedCol = 0;
-      this.projectTitle = this.project.title;
-      this.renderTable();
+      this.loadEditor(this.loadProject(this.projectId));
     }
   }
 }
