@@ -21,6 +21,7 @@ P1:
 - Instead of stopping with `space`, let's stop with `shift+space`, and instead have `space` pause, but the tricky bit is to figure out how to resume with the plan-based architecture (plan generation need to happen based on the current time)
 - Name each row with an id and display that instead of the asset link
   - When you press enter, it should display 2 prompt; 1 for the name and 1 for the link (if the name is not "@id"); if the name is blank, then just use the entire link as the name.
+- Design subcommands
 
 P2:
 - Design slow motion start and stop
@@ -51,6 +52,11 @@ Make it easier to edit a 2-minute video
 - Export: When the user press `x`, open up a prompt with the serialized project data selected, so that the user can copy it.
   - If the user then press cancel, then nothing happens
   - If the user press enter in the prompt (after possibly changing it), then the editor should treat that as serialized project data and deserialize and load it as the current project.
+
+# M3f
+- Add a name (string) field for the command that defaults to ''.
+  - When a user press enter on the asset column, and the asset field is already populated, then open a prompt to edit the name field instead.
+  - If the name field is non-empty, then display the name instead of the asset in the asset column.
 
 # M2 implementation
 Get it working with a 1 small overlap

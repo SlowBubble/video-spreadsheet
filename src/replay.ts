@@ -1,5 +1,3 @@
-import { Project } from './project';
-
 export class ReplayManager {
   players: any[] = [];
   commands: any[] = [];
@@ -9,15 +7,10 @@ export class ReplayManager {
   _intervalId: any = null;
   _stepTimeoutId: any = null;
 
-  constructor(replayDiv: HTMLDivElement, projectId: string, projectTitle: string, tableData: string[][], getYouTubeId: (url: string) => string | null) {
+  constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
     replayDiv.innerHTML = '';
-    const proj = Project.deserializeFromSpreadsheet(
-      projectId,
-      projectTitle,
-      tableData
-    );
-    if (!proj.commands.length) return;
-    const commands = [...proj.commands].sort((a, b) => a.positionMs - b.positionMs);
+    if (!commands.length) return;
+    commands = [...commands].sort((a, b) => a.positionMs - b.positionMs);
     // Container for players and black screen
     const container = document.createElement('div');
     container.style.position = 'relative';

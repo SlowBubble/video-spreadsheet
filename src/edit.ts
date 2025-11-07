@@ -1,6 +1,5 @@
 import './style.css';
-import { Project } from './project';
-import type { ProjectCommand } from './project';
+import { Project, ProjectCommand } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
@@ -39,10 +38,8 @@ function computeCommandEndTimeMs(cmd: ProjectCommand): number {
 export class Editor {
   projectId: string;
   project!: Project;
-  tableData!: string[][];
   selectedRow: number = 0;
   selectedCol: number = 0;
-  projectTitle!: string;
   replayManager: ReplayManager | null = null;
 
   constructor() {
@@ -62,8 +59,6 @@ export class Editor {
 
   private loadEditor(project: Project) {
     this.project = project;
-    this.projectTitle = project.title;
-    this.tableData = this.projectToTableData(project);
     this.selectedRow = 0;
     this.selectedCol = 0;
     this.renderTable();
@@ -75,9 +70,7 @@ export class Editor {
     if (!replayDiv) return;
     this.replayManager = new ReplayManager(
       replayDiv,
-      this.projectId,
-      this.projectTitle,
-      this.tableData,
+      this.project.commands,
       getYouTubeId
     );
   }
@@ -97,44 +90,57 @@ export class Editor {
     return new Project('Untitled Project', id, []);
   }
 
-  projectToTableData(project: Project): string[][] {
-    if (!project.commands.length) return [['', '', '', '', '', '']];
-    return [
-      ...project.commands.map(cmd => {
+  getDisplayValue(rowIdx: number, colIdx: number): string {
+    // Empty row at the end
+    if (rowIdx >= this.project.commands.length) return '';
+    
+    const cmd = this.project.commands[rowIdx];
+    
+    switch (colIdx) {
+      case 0: // Asset
+        return cmd.name ? cmd.name : cmd.asset;
+      case 1: // Position
         const startTime = msToTimeString(cmd.positionMs);
         const endTime = msToTimeString(computeCommandEndTimeMs(cmd));
-        return [
-          cmd.asset,
-          `${startTime}-${endTime}`,
-          msToTimeString(cmd.startMs),
-          msToTimeString(cmd.endMs),
-          cmd.volume.toString(),
-          cmd.speed.toString(),
-        ];
-      }),
-      ['', '', '', '', '', ''],
-    ];
+        return `${startTime}-${endTime}`;
+      case 2: // Start
+        return msToTimeString(cmd.startMs);
+      case 3: // End
+        return msToTimeString(cmd.endMs);
+      case 4: // Volume
+        return cmd.volume.toString();
+      case 5: // Speed
+        return cmd.speed.toString();
+      default:
+        return '';
+    }
   }
 
-  isRowEmpty(row: string[]) {
-    return row.every(cell => cell.trim() === '');
+  getRowCount(): number {
+    // Always show at least one empty row
+    return Math.max(1, this.project.commands.length + 1);
   }
 
   renderTable() {
     const editIcon = `<span id="edit-title" style="cursor:pointer; margin-right:8px;" title="Edit title">✏️</span>`;
     const titleHtml = `<div style="display:flex; align-items:center; font-size:2em; font-weight:bold;">
-      ${editIcon}<span>${this.projectTitle}</span>
+      ${editIcon}<span>${this.project.title}</span>
     </div>`;
 
-    const tableRows = this.tableData.map((row, rowIndex) => {
-      const cells = row.map((cell, colIndex) => {
-        const isSelected = rowIndex === this.selectedRow && colIndex === this.selectedCol;
-        return `<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px;">
-          ${cell || '&nbsp;'}
-        </td>`;
-      }).join('');
-      return `<tr>${cells}</tr>`;
-    }).join('');
+    const rowCount = this.getRowCount();
+    const tableRows: string[] = [];
+    
+    for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+      const cells: string[] = [];
+      for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+        const isSelected = rowIdx === this.selectedRow && colIdx === this.selectedCol;
+        const cellValue = this.getDisplayValue(rowIdx, colIdx);
+        cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px;">
+          ${cellValue || '&nbsp;'}
+        </td>`);
+      }
+      tableRows.push(`<tr>${cells.join('')}</tr>`);
+    }
 
     document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div>
@@ -146,7 +152,7 @@ export class Editor {
             </tr>
           </thead>
           <tbody>
-            ${tableRows}
+            ${tableRows.join('')}
           </tbody>
         </table>
         <button id="shortcuts-btn" style="margin-top: 12px; padding: 8px 16px; cursor: pointer;">Shortcuts</button>
@@ -157,9 +163,10 @@ export class Editor {
     const editBtn = document.getElementById('edit-title');
     if (editBtn) {
       editBtn.onclick = () => {
-        const newTitle = prompt('Edit project title:', this.projectTitle);
+        const newTitle = prompt('Edit project title:', this.project.title);
         if (newTitle !== null) {
-          this.projectTitle = newTitle.trim() || 'Untitled Project';
+          this.project.title = newTitle.trim() || 'Untitled Project';
+          this.saveProject();
           this.renderTable();
         }
       };
@@ -168,17 +175,15 @@ export class Editor {
     setupShortcutsModal();
   }
 
-  ensureEmptyRow() {
-    if (!this.isRowEmpty(this.tableData[this.tableData.length - 1])) {
-      this.tableData.push(['', '', '', '', '']);
-    }
-  }
+
 
   handleKey(e: KeyboardEvent) {
+    const rowCount = this.getRowCount();
+    
     if (matchKey(e, 'up')) {
       this.selectedRow = Math.max(0, this.selectedRow - 1);
     } else if (matchKey(e, 'down')) {
-      this.selectedRow = Math.min(this.tableData.length - 1, this.selectedRow + 1);
+      this.selectedRow = Math.min(rowCount - 1, this.selectedRow + 1);
     } else if (matchKey(e, 'left')) {
       this.selectedCol = Math.max(0, this.selectedCol - 1);
     } else if (matchKey(e, 'right')) {
@@ -188,12 +193,7 @@ export class Editor {
     } else if (matchKey(e, 'shift+tab')) {
       this.selectedCol = Math.max(0, this.selectedCol - 1);
     } else if (matchKey(e, 'enter')) {
-      const newValue = prompt(`Edit ${columns[this.selectedCol]}:`, this.tableData[this.selectedRow][this.selectedCol] || '');
-      if (newValue !== null) {
-        this.tableData[this.selectedRow][this.selectedCol] = newValue;
-        this.ensureEmptyRow();
-        this.saveProject();
-      }
+      this.handleEnterKey();
     } else if (matchKey(e, 'cmd+s')) {
       this.saveProject();
     } else if (matchKey(e, 'space')) {
@@ -212,14 +212,107 @@ export class Editor {
     this.renderTable();
   }
 
+  handleEnterKey() {
+    const isExistingCommand = this.selectedRow < this.project.commands.length;
+    
+    if (this.selectedCol === 0) {
+      // Asset column
+      if (isExistingCommand) {
+        // Edit name
+        const cmd = this.project.commands[this.selectedRow];
+        const newName = prompt('Edit name:', cmd.name);
+        if (newName !== null) {
+          cmd.name = newName;
+          this.saveProject();
+        }
+      } else {
+        // Create new command with asset URL
+        const assetUrl = prompt('Edit Asset URL:', '');
+        if (assetUrl !== null && assetUrl.trim() !== '') {
+          const newCmd = new ProjectCommand(assetUrl.trim(), 0, 0, 0, 100, 1, '');
+          this.project.commands.push(newCmd);
+          this.saveProject();
+          this.initReplayManager();
+        }
+      }
+    } else if (this.selectedCol === 1) {
+      // Position column - edit position start time
+      if (isExistingCommand) {
+        const cmd = this.project.commands[this.selectedRow];
+        const currentValue = msToTimeString(cmd.positionMs);
+        const newValue = prompt('Edit Position:', currentValue);
+        if (newValue !== null) {
+          cmd.positionMs = this.timeStringToMs(newValue);
+          this.saveProject();
+        }
+      }
+    } else if (this.selectedCol === 2) {
+      // Start column
+      if (isExistingCommand) {
+        const cmd = this.project.commands[this.selectedRow];
+        const currentValue = msToTimeString(cmd.startMs);
+        const newValue = prompt('Edit Start:', currentValue);
+        if (newValue !== null) {
+          cmd.startMs = this.timeStringToMs(newValue);
+          this.saveProject();
+        }
+      }
+    } else if (this.selectedCol === 3) {
+      // End column
+      if (isExistingCommand) {
+        const cmd = this.project.commands[this.selectedRow];
+        const currentValue = msToTimeString(cmd.endMs);
+        const newValue = prompt('Edit End:', currentValue);
+        if (newValue !== null) {
+          cmd.endMs = this.timeStringToMs(newValue);
+          this.saveProject();
+        }
+      }
+    } else if (this.selectedCol === 4) {
+      // Volume column
+      if (isExistingCommand) {
+        const cmd = this.project.commands[this.selectedRow];
+        const newValue = prompt('Edit Volume:', cmd.volume.toString());
+        if (newValue !== null) {
+          const volume = Number(newValue);
+          if (!isNaN(volume)) {
+            cmd.volume = volume;
+            this.saveProject();
+          }
+        }
+      }
+    } else if (this.selectedCol === 5) {
+      // Speed column
+      if (isExistingCommand) {
+        const cmd = this.project.commands[this.selectedRow];
+        const newValue = prompt('Edit Speed:', cmd.speed.toString());
+        if (newValue !== null) {
+          const speed = Number(newValue);
+          if (!isNaN(speed) && speed > 0) {
+            cmd.speed = speed;
+            this.saveProject();
+          }
+        }
+      }
+    }
+  }
+
   saveProject() {
-    const proj = Project.deserializeFromSpreadsheet(
-      this.projectId,
-      this.projectTitle,
-      this.tableData
-    );
-    localStorage.setItem('project-' + this.projectId, proj.serialize());
+    localStorage.setItem('project-' + this.projectId, this.project.serialize());
     this.showSaveBanner();
+  }
+
+  timeStringToMs(str: string): number {
+    if (!str) return 0;
+    const parts = str.trim().split(/[: ]/).map(Number).filter(n => !isNaN(n));
+    if (parts.length === 0) return 0;
+    let total = 0;
+    let multiplier = 1;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      total += parts[i] * multiplier;
+      multiplier *= 60;
+    }
+    return total * 1000;
   }
 
   showSaveBanner() {
