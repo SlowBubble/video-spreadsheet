@@ -1,5 +1,6 @@
 import './style.css';
 import { Project } from './project';
+import type { ProjectCommand } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 
@@ -24,6 +25,12 @@ function msToTimeString(ms: number): string {
 function getYouTubeId(url: string): string | null {
   const match = url.match(/(?:v=|youtu.be\/|embed\/)([\w-]{11})/);
   return match ? match[1] : null;
+}
+
+// Compute the absolute end time in ms for a command
+function computeCommandEndTimeMs(cmd: ProjectCommand): number {
+  const duration = cmd.endMs - cmd.startMs;
+  return cmd.positionMs + duration;
 }
 
 export class Editor {
@@ -84,13 +91,17 @@ export class Editor {
   projectToTableData(project: Project): string[][] {
     if (!project.commands.length) return [['', '', '', '', '']];
     return [
-      ...project.commands.map(cmd => [
-        cmd.asset,
-        msToTimeString(cmd.positionMs),
-        msToTimeString(cmd.startMs),
-        msToTimeString(cmd.endMs),
-        (cmd.volume ?? 100).toString(),
-      ]),
+      ...project.commands.map(cmd => {
+        const startTime = msToTimeString(cmd.positionMs);
+        const endTime = msToTimeString(computeCommandEndTimeMs(cmd));
+        return [
+          cmd.asset,
+          `${startTime}-${endTime}`,
+          msToTimeString(cmd.startMs),
+          msToTimeString(cmd.endMs),
+          (cmd.volume ?? 100).toString(),
+        ];
+      }),
       ['', '', '', '', ''],
     ];
   }

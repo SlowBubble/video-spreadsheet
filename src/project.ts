@@ -44,13 +44,19 @@ export class Project {
 
   static deserializeFromSpreadsheet(id: string, title: string, tableData: string[][]): Project {
     const commands: ProjectCommand[] = tableData.filter(row => row.some(cell => cell.trim() !== ''))
-      .map(row => ({
-        asset: row[0] || '',
-        positionMs: timeStringToMs(row[1]) || 0,
-        startMs: timeStringToMs(row[2]) || 0,
-        endMs: timeStringToMs(row[3]) || 0,
-        volume: row[4] !== undefined ? Number(row[4]) : 100,
-      }));
+      .map(row => {
+        // Extract start time from position column (format: "0:00-1:12" or just "0:00")
+        const positionStr = row[1] || '';
+        const positionStartTime = positionStr.split('-')[0].trim();
+        
+        return {
+          asset: row[0] || '',
+          positionMs: timeStringToMs(positionStartTime) || 0,
+          startMs: timeStringToMs(row[2]) || 0,
+          endMs: timeStringToMs(row[3]) || 0,
+          volume: row[4] !== undefined ? Number(row[4]) : 100,
+        };
+      });
     return new Project(title, id, commands);
   }
 

@@ -16,6 +16,22 @@
   - Anchor the position to the end of another asset (may be start with a static impl)
   - Display the video title instead of the link.
 
+# Wishlist
+P1:
+- Display the absolute end time of the asset in the table (but won't be editable as it will be computed)
+- console log the YT player operations so that I can understand what's happening
+- Instead of stopping with `space`, let's stop with `shift+space`, and instead have `space` pause, but the tricky bit is to figure out how to resume with the plan-based architecture (plan generation need to happen based on the current time)
+- Add a speed column
+- Name each row with an id and display that instead of the asset link
+  - When you press enter, it should display 2 prompt; 1 for the name and 1 for the link (if the name is not "@id"); if the name is blank, then just use the entire link as the name.
+
+P2:
+- Design slow motion start and stop
+  - For row "main", we want to slow-mo from 1:12 to 1:14
+  - In a new row, we will set the asset to "@main", set position to "", set start to "1:12" and end to "1:14", set speed to "0.2".
+- Design mute volume start and stop
+  - In a new row, we will set the asset to "@main", set position to "", set start to "1:12" and end to "1:14", set volume to "0".
+
 # M3 implementation
 Make it easier to edit a 2-minute video
 
@@ -24,7 +40,12 @@ Make it easier to edit a 2-minute video
 
 ## M3b
 - `space` works fine for starting replay, but can you implement stop when `space` is hit while it is replaying, which will reset everything back to 0 seconds.
- 
+
+## M3c
+- In the position column, also render the end time (e.g. "0:00-1:12") by computing it via position + (end - start)
+
+## M3d
+
 # M2 implementation
 Get it working with a 1 small overlap
 
@@ -47,8 +68,6 @@ Get it working with a 1 small overlap
 - So each command provides an interval.
 - Given the list of intervals [a0, b0], [a1, b1], ..., first figure out all the points of changes in ascending order, and for each point of change, determine which YT player/iframe should be the visible one (for the very last point of change, use idx -1 and interpret that as a black screen)
   - Given a point of change c, go through the list of intervals in reverse and let's say the interval of interest is [ai, bi], see if c >= ai and c < bi. If so, then that should be the visible TY player/iframe
-
-## Wishlist
 
 # M1 implementation
 Goal: have something that I can play back to see something
