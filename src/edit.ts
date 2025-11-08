@@ -214,6 +214,9 @@ export class Editor {
     } else if (matchKey(e, 'j')) {
       if (!this.replayManager) return;
       this.replayManager.rewind(4000);
+    } else if (matchKey(e, 'l')) {
+      if (!this.replayManager) return;
+      this.replayManager.fastForward(4000);
     } else {
       return;
     }

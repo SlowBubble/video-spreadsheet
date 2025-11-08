@@ -225,30 +225,24 @@ export class ReplayManager {
     }
   }
 
-  rewind(rewindMs: number) {
-    // Calculate current position
-    let currentMs: number;
+  getCurrentPosition(): number | null {
     if (this.replaying) {
-      currentMs = this.replayOffset + (Date.now() - this.replayStart);
+      return this.replayOffset + (Date.now() - this.replayStart);
     } else if (this.paused && this.pausedAtMs !== undefined) {
-      currentMs = this.pausedAtMs;
-    } else {
-      // Not playing or paused, nothing to rewind
-      return;
+      return this.pausedAtMs;
     }
-    
-    // Calculate new position (don't go below 0)
-    const newMs = Math.max(0, currentMs - rewindMs);
-    console.log(`[Rewind] From ${(currentMs / 1000).toFixed(1)}s to ${(newMs / 1000).toFixed(1)}s`);
-    
+    return null;
+  }
+
+  seekToTime(newMs: number) {
     // If currently playing, pause first
     const wasPlaying = this.replaying;
     if (wasPlaying) {
       this.pauseReplay();
     }
     
-    // Update paused position
-    this.pausedAtMs = newMs;
+    // Update paused position (don't go below 0)
+    this.pausedAtMs = Math.max(0, newMs);
     
     // Update position display
     const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
@@ -261,6 +255,26 @@ export class ReplayManager {
     if (wasPlaying) {
       this.startReplay(this.pausedAtMs);
     }
+  }
+
+  rewind(rewindMs: number) {
+    const currentMs = this.getCurrentPosition();
+    if (currentMs === null) return;
+    
+    const newMs = currentMs - rewindMs;
+    console.log(`[Rewind] From ${(currentMs / 1000).toFixed(1)}s to ${(newMs / 1000).toFixed(1)}s`);
+    
+    this.seekToTime(newMs);
+  }
+
+  fastForward(forwardMs: number) {
+    const currentMs = this.getCurrentPosition();
+    if (currentMs === null) return;
+    
+    const newMs = currentMs + forwardMs;
+    console.log(`[FastForward] From ${(currentMs / 1000).toFixed(1)}s to ${(newMs / 1000).toFixed(1)}s`);
+    
+    this.seekToTime(newMs);
   }
 
   hideAllPlayers() {
