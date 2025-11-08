@@ -72,7 +72,7 @@
     - Else call `startReplay()` to start from beginning
     - _Requirements: 1.1, 2.1, 4.1_
 
-- [ ] 7. Add console logging for debugging
+- [x] 7. Add console logging for debugging
   - Log pause events with the pause position
   - Log resume events with the resume position
   - Log when resuming from end (restarting from beginning)

@@ -64,7 +64,8 @@ export class ReplayManager {
             },
             events: {
               onReady: (event: any) => {
-                console.log(`[Init ${idx}] onReady - Setting speed: ${cmd.speed}, volume: ${cmd.volume}`);
+                const name = cmd.name || `[${idx}]`;
+                console.log(`[Init ${name}] onReady - Setting speed: ${cmd.speed}, volume: ${cmd.volume}`);
                 event.target.seekTo(startSec);
                 event.target.pauseVideo();
                 event.target.setVolume(cmd.volume);
@@ -88,6 +89,12 @@ export class ReplayManager {
     self.commands = commands;
     // Show black screen initially
     blackDiv.style.display = 'block';
+  }
+
+  getCommandName(idx: number): string {
+    if (idx < 0 || idx >= this.commands.length) return `[${idx}]`;
+    const cmd = this.commands[idx];
+    return cmd.name || `[${idx}]`;
   }
 
   generateReplayPlan() {
@@ -134,6 +141,7 @@ export class ReplayManager {
   }
 
   stopReplay() {
+    console.log('[Stop] Stopping replay');
     this.replaying = false;
     this.paused = false;
     this.pausedAtMs = undefined;
@@ -163,8 +171,10 @@ export class ReplayManager {
     this._intervalId = null;
     
     // Subtask 2.3: Pause all YouTube players without hiding them
-    this.players.forEach((player) => {
+    this.players.forEach((player, idx) => {
       if (player) {
+        const name = this.getCommandName(idx);
+        console.log(`[Pause ${name}] User paused - pausing player`);
         player.pauseVideo();
       }
     });
@@ -177,14 +187,20 @@ export class ReplayManager {
   }
 
   hideAllPlayers() {
+    console.log('[hideAllPlayers] Hiding and pausing all players');
     this.players.forEach((player, idx) => {
       const div = document.getElementById(`yt-player-edit-${idx}`);
       if (div) div.style.display = 'none';
-      if (player) player.pauseVideo();
+      if (player) {
+        const name = this.getCommandName(idx);
+        console.log(`[Pause ${name}] Pausing player`);
+        player.pauseVideo();
+      }
     });
   }
 
   showPlayer(idx: number, resume: boolean) {
+    const visibleName = this.getCommandName(idx);
     this.players.forEach((player, i) => {
       const div = document.getElementById(`yt-player-edit-${i}`);
       if (div) div.style.display = i === idx ? 'block' : 'none';
@@ -192,13 +208,13 @@ export class ReplayManager {
         if (!resume) {
           const cmd = this.commands[i];
           const startSec = Math.floor(cmd.startMs / 1000);
-          console.log(`[Action ${idx}] Setting speed: ${cmd.speed}, volume: ${cmd.volume}, startSec: ${startSec}`);
+          console.log(`[Action ${visibleName}] Setting speed: ${cmd.speed}, volume: ${cmd.volume}, startSec: ${startSec}`);
           player.seekTo(startSec);
           player.setVolume(cmd.volume);
           player.setPlaybackRate(cmd.speed);
           player.playVideo();
         } else {
-          console.log(`[Action ${idx}] Resuming playback (no speed change)`);
+          console.log(`[Action ${visibleName}] Resuming playback (no seek, just play)`);
           player.playVideo();
         }
       }
@@ -315,8 +331,6 @@ export class ReplayManager {
       if (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) {
         stepDuration = end - resumeFromMs;
         console.log(`[Plan ${step}] Resuming mid-step: start: ${start}ms, resumeFrom: ${resumeFromMs}ms, end: ${end}ms, idx: ${idx}, remaining: ${stepDuration}ms`);
-      } else {
-        console.log(`[Plan ${step}] start: ${start}ms, end: ${end}ms, idx: ${idx}, resume: ${resume}`);
       }
       
       self.replayStart = Date.now();
@@ -325,36 +339,58 @@ export class ReplayManager {
       if (blackDiv) blackDiv.style.display = idx === -1 ? 'block' : 'none';
       
       // Subtask 3.4: Implement video seeking for resume
+      // M3h Fix: When resuming, identify ALL assets that should be playing at this time
       if (idx !== -1) {
         if (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) {
-          // Calculate elapsed time within the current step
-          const elapsedInStep = resumeFromMs - start;
-          const cmd = commands[idx];
+          // Find all commands that should be playing at resumeFromMs
+          const activeCommands: number[] = [];
+          for (let j = 0; j < commands.length; j++) {
+            const cmd = commands[j];
+            const cmdStart = cmd.positionMs;
+            const videoDuration = cmd.endMs - cmd.startMs;
+            const actualDuration = videoDuration / cmd.speed;
+            const cmdEnd = cmd.positionMs + actualDuration;
+            
+            // Check if this command overlaps with resumeFromMs
+            if (resumeFromMs >= cmdStart && resumeFromMs < cmdEnd) {
+              activeCommands.push(j);
+            }
+          }
           
-          // Determine if this is a resume scenario (video was already playing)
-          // Check if the video started before the pause point
-          const videoStartInTimeline = cmd.positionMs;
-          const isResumeScenario = resumeFromMs > videoStartInTimeline;
+          const activeNames = activeCommands.map(i => self.getCommandName(i)).join(', ');
+          const visibleName = self.getCommandName(idx);
+          console.log(`[Resume] Active commands at ${(resumeFromMs / 1000).toFixed(2)}s: [${activeNames}], visible: ${visibleName}`);
           
-          // Calculate video seek position accounting for playback speed
-          const videoElapsed = elapsedInStep;
-          const seekToMs = cmd.startMs + videoElapsed;
-          const seekToSec = seekToMs / 1000;
-          
-          console.log(`[Action ${idx}] Seeking to ${seekToSec.toFixed(2)}s (elapsed in step: ${(elapsedInStep / 1000).toFixed(2)}s, isResume: ${isResumeScenario})`);
-          
-          // Show the player and seek to the correct position
+          // Seek and play all active commands
           self.players.forEach((player, i) => {
             const div = document.getElementById(`yt-player-edit-${i}`);
-            if (div) div.style.display = i === idx ? 'block' : 'none';
-            if (i === idx && player) {
+            const name = self.getCommandName(i);
+            
+            if (activeCommands.includes(i) && player) {
+              const cmd = commands[i];
+              const cmdStart = cmd.positionMs;
+              const elapsedInCmd = resumeFromMs - cmdStart;
+              const videoElapsed = elapsedInCmd;
+              const seekToMs = cmd.startMs + videoElapsed;
+              const seekToSec = seekToMs / 1000;
+              
+              console.log(`[Action ${name}] Seeking to ${seekToSec.toFixed(2)}s, speed: ${cmd.speed}, volume: ${cmd.volume}, visible: ${i === idx}`);
+              
+              // Show only the visible player's div
+              if (div) div.style.display = i === idx ? 'block' : 'none';
+              
+              // But seek and play all active players
               player.seekTo(seekToSec);
-              if (!isResumeScenario) {
-                // Fresh start - set volume and speed
-                player.setVolume(cmd.volume);
-                player.setPlaybackRate(cmd.speed);
-              }
+              player.setVolume(cmd.volume);
+              player.setPlaybackRate(cmd.speed);
               player.playVideo();
+            } else {
+              // Hide and pause inactive players
+              if (div) div.style.display = 'none';
+              if (player) {
+                console.log(`[Pause ${name}] Pausing inactive player (not in active commands)`);
+                player.pauseVideo();
+              }
             }
           });
         } else {
