@@ -33,6 +33,22 @@ P2:
   - warm up all the assets
   - display the first YT player's screen
 
+# m4 impl
+Make it easy to screen-record a good-looking video
+- Final recording mode
+  - open a window of the correct size
+  - warm up all the assets
+  - display the first YT player's screen
+
+
+## m4a
+
+1. Add a button next to shortcuts that says "Present", which will open the same url but with present=1 added to the hash but in a new window of size 480px by 854px.
+2. Add a present mode that is triggered when url hash has the param present=1
+  - We can assume debug mode will not be enabled so don't worry about weird interactions between the 2 things
+  - In this mode, only show the YT players or the black screen and don't show anything else (we can assume only 1 of these will be shown at the 1 time)
+3. The result of 1 and 2 will be that a new window will be open and there should not be anything overflowing, so no scroll-bar should be visible
+
 # M3 implementation
 Make it easier to edit a 2-minute video
 

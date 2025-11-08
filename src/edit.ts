@@ -44,17 +44,28 @@ export class Editor {
   replayManager: ReplayManager | null = null;
 
   constructor() {
+    const params = getHashParams();
+    const isPresentMode = params.get('present') === '1';
+    
     // Create persistent replay container at the top of the body
     let replayDiv = document.getElementById('replay-container') as HTMLDivElement;
     if (!replayDiv) {
       replayDiv = document.createElement('div');
       replayDiv.id = 'replay-container';
-      replayDiv.style.marginBottom = '24px';
+      if (!isPresentMode) {
+        replayDiv.style.marginBottom = '24px';
+      }
       document.body.insertBefore(replayDiv, document.body.firstChild);
     }
+    
     this.projectId = this.getProjectIdFromHash()!;
     this.loadEditor(this.loadProject(this.projectId));
-    window.addEventListener('keydown', (e) => this.handleKey(e));
+    
+    window.addEventListener('keydown', (e) => {
+      const params = getHashParams();
+      const isPresentMode = params.get('present') === '1';
+      this.handleKey(e, isPresentMode);
+    });
     window.addEventListener('hashchange', () => this.handleHashChange());
   }
 
@@ -134,6 +145,18 @@ export class Editor {
   }
 
   renderTable() {
+    const params = getHashParams();
+    const isPresentMode = params.get('present') === '1';
+    
+    // In present mode, hide everything except the replay container
+    if (isPresentMode) {
+      document.querySelector<HTMLDivElement>('#app')!.innerHTML = '';
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+    
     const editIcon = `<span id="edit-title" style="cursor:pointer; margin-right:8px;" title="Edit title">✏️</span>`;
     const titleHtml = `<div style="display:flex; align-items:center; font-size:2em; font-weight:bold;">
       ${editIcon}<span>${this.project.title}</span>
@@ -167,7 +190,10 @@ export class Editor {
             ${tableRows.join('')}
           </tbody>
         </table>
-        <button id="shortcuts-btn" style="margin-top: 12px; padding: 8px 16px; cursor: pointer;">Shortcuts</button>
+        <div style="margin-top: 12px;">
+          <button id="shortcuts-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Shortcuts</button>
+          <button id="present-btn" style="padding: 8px 16px; cursor: pointer;">Present</button>
+        </div>
       </div>
       ${getShortcutsModalHtml()}
     `;
@@ -184,12 +210,40 @@ export class Editor {
       };
     }
 
+    const presentBtn = document.getElementById('present-btn');
+    if (presentBtn) {
+      presentBtn.onclick = () => {
+        const currentHash = window.location.hash;
+        const newHash = `${currentHash}&present=1`;
+        window.open(newHash, '_blank', 'width=854,height=480');
+      };
+    }
+
     setupShortcutsModal();
   }
 
 
 
-  handleKey(e: KeyboardEvent) {
+  handleKey(e: KeyboardEvent, isPresentMode: boolean = false) {
+    // In present mode, only allow space and 0 keys
+    if (isPresentMode) {
+      if (matchKey(e, '0')) {
+        if (!this.replayManager) return;
+        this.replayManager.stopReplay();
+        e.preventDefault();
+      } else if (matchKey(e, 'space')) {
+        if (!this.replayManager) return;
+        if (this.replayManager.isPlaying) {
+          this.replayManager.pauseReplay();
+        } else {
+          this.replayManager.startReplay(this.replayManager.pausedAtMs);
+        }
+        e.preventDefault();
+      }
+      return;
+    }
+    
+    // Normal editor mode - all keys work
     const rowCount = this.getRowCount();
     
     if (matchKey(e, 'up')) {

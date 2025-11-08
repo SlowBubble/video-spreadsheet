@@ -33,10 +33,18 @@ export class ReplayManager {
     return params.get('debug') === '1';
   }
 
+  isPresentMode(): boolean {
+    const params = getHashParams();
+    return params.get('present') === '1';
+  }
+
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
     replayDiv.innerHTML = '';
     if (!commands.length) return;
     commands = [...commands].sort((a, b) => a.positionMs - b.positionMs);
+    
+    const isPresentMode = this.isPresentMode();
+    
     // Container for players and black screen
     const container = document.createElement('div');
     container.style.position = 'relative';
@@ -47,7 +55,16 @@ export class ReplayManager {
     } else {
       container.style.height = '480px';
     }
-    container.style.margin = '0 auto';
+    
+    // In present mode, remove margin and make it fill the window
+    if (isPresentMode) {
+      container.style.margin = '0';
+      replayDiv.style.margin = '0';
+      replayDiv.style.padding = '0';
+    } else {
+      container.style.margin = '0 auto';
+    }
+    
     replayDiv.appendChild(container);
     this.container = container;
     // Black screen div
@@ -215,10 +232,12 @@ export class ReplayManager {
       }
     });
     // Keep position display visible showing the paused time
-    const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
-    if (posDiv) {
-      posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused)`;
-      posDiv.style.display = 'block';
+    if (this.isPresentMode()) {
+      const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
+      if (posDiv) {
+        posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused)`;
+        posDiv.style.display = 'block';
+      }
     }
   }
 
@@ -241,10 +260,12 @@ export class ReplayManager {
     this.pausedAtMs = Math.max(0, newMs);
     
     // Update position display
-    const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
-    if (posDiv) {
-      posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused)`;
-      posDiv.style.display = 'block';
+    if (this.isPresentMode()) {
+      const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
+      if (posDiv) {
+        posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused)`;
+        posDiv.style.display = 'block';
+      }
     }
     
     // If was playing, resume from new position
@@ -426,8 +447,9 @@ export class ReplayManager {
     this.isPlaying = true;
     
     // Create or get position display div (fixed at top right of browser)
+    const hideTime = this.isPresentMode();
     let posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
-    if (!posDiv) {
+    if (!posDiv && !hideTime) {
       posDiv = document.createElement('div');
       posDiv.id = 'replay-pos-div';
       posDiv.style.position = 'fixed';
@@ -442,11 +464,12 @@ export class ReplayManager {
       document.body.appendChild(posDiv);
     }
     
-    // Subtask 3.5: Update replayStart and replayOffset for position tracking
+    // Update replayStart and replayOffset for position tracking
     this.replayStart = Date.now();
     this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (plan.length > 0 ? plan[0].start : 0);
     
     const updatePositionDisplay = () => {
+      if (hideTime) return;
       const elapsed = Date.now() - this.replayStart;
       const posMs = this.replayOffset + elapsed;
       posDiv.textContent = `Position: ${(posMs / 1000).toFixed(1)}s`;
@@ -460,7 +483,7 @@ export class ReplayManager {
       if (step >= plan.length) {
         this.hideAllPlayers();
         if (blackDiv) blackDiv.style.display = 'block';
-        if (posDiv) posDiv.style.display = 'none';
+        if (!hideTime && posDiv) posDiv.style.display = 'none';
         this._intervalId && clearInterval(this._intervalId);
         this._intervalId = null;
         this.isPlaying = false;
@@ -481,7 +504,7 @@ export class ReplayManager {
         this._intervalId = null;
         
         // Update position display to show paused at end
-        if (posDiv) {
+        if (!hideTime && posDiv) {
           posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused at end)`;
           posDiv.style.display = 'block';
         }
