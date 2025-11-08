@@ -18,6 +18,7 @@
 
 # Wishlist
 P1:
+
 - Design subcommands
   - Add a subcommands field to the ProjectCommand class which will have type (ProjectCommand[] vs Subcommand[]) and default to an empty list.
     - Think about the use case before deciding
@@ -71,6 +72,10 @@ Make it easier to edit a 2-minute video
 Debugged:
 - Just realized that things are stopped automatically by how we initiate YT player
 - Need to decide if that's a good design and see if we need to name things better for PlanAction
+
+# M3j
+- implement the keyboard shortcut j to rewind 4 seconds for the replay
+  - if the replayer is not paused, pause it first, rewind and then resume
 
 # M2 implementation
 Get it working with a 1 small overlap

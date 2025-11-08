@@ -195,7 +195,7 @@ export class Editor {
       this.handleEnterKey();
     } else if (matchKey(e, 'cmd+s')) {
       this.saveProject();
-    } else if (matchKey(e, 'shift+space')) {
+    } else if (matchKey(e, '0')) {
       if (!this.replayManager) return;
       if (this.replayManager.replaying || this.replayManager.paused) {
         this.replayManager.stopReplay();
