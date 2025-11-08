@@ -4,6 +4,10 @@ export class ReplayManager {
   blackDiv: HTMLDivElement | null = null;
   container: HTMLDivElement | null = null;
   replaying: boolean = false;
+  paused: boolean = false;
+  pausedAtMs: number | undefined = undefined;
+  replayStart: number = 0;
+  replayOffset: number = 0;
   _intervalId: any = null;
   _stepTimeoutId: any = null;
 
@@ -131,6 +135,8 @@ export class ReplayManager {
 
   stopReplay() {
     this.replaying = false;
+    this.paused = false;
+    this.pausedAtMs = undefined;
     this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
     this._intervalId && clearInterval(this._intervalId);
     this._stepTimeoutId = null;
@@ -139,6 +145,35 @@ export class ReplayManager {
     if (this.blackDiv) this.blackDiv.style.display = 'block';
     const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
     if (posDiv) posDiv.style.display = 'none';
+  }
+
+  pauseReplay() {
+    if (!this.replaying) return;
+    
+    // Subtask 2.1: Calculate current position
+    this.pausedAtMs = this.replayOffset + (Date.now() - this.replayStart);
+    console.log(`[Pause] Paused at position: ${(this.pausedAtMs / 1000).toFixed(1)}s`);
+    
+    // Subtask 2.2: Update state flags and clear timers
+    this.paused = true;
+    this.replaying = false;
+    this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
+    this._intervalId && clearInterval(this._intervalId);
+    this._stepTimeoutId = null;
+    this._intervalId = null;
+    
+    // Subtask 2.3: Pause all YouTube players without hiding them
+    this.players.forEach((player) => {
+      if (player) {
+        player.pauseVideo();
+      }
+    });
+    // Keep position display visible showing the paused time
+    const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
+    if (posDiv) {
+      posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused)`;
+      posDiv.style.display = 'block';
+    }
   }
 
   hideAllPlayers() {
@@ -164,19 +199,53 @@ export class ReplayManager {
           player.playVideo();
         } else {
           console.log(`[Action ${idx}] Resuming playback (no speed change)`);
+          player.playVideo();
         }
       }
     });
   }
 
-  startReplay() {
+  startReplay(resumeFromMs?: number) {
     if (this.replaying) return;
-    this.replaying = true;
+    
     const players = this.players;
     const commands = this.commands;
     const blackDiv = this.blackDiv;
     if (!players || !commands || !blackDiv) return;
+    
+    // Subtask 3.2: Generate the full replay plan and detect resume-from-end
     const plan = this.generateReplayPlan();
+    if (plan.length === 0) return;
+    
+    const endTime = plan[plan.length - 1].start;
+    
+    // If resuming from or past the end, restart from beginning
+    if (resumeFromMs !== undefined && resumeFromMs >= endTime) {
+      console.log(`[Resume] Position ${(resumeFromMs / 1000).toFixed(1)}s is at or past end ${(endTime / 1000).toFixed(1)}s, restarting from beginning`);
+      resumeFromMs = 0;
+    }
+    
+    // Subtask 3.3: Find the starting step for resume
+    let startStep = 0;
+    let initialDelay = plan.length > 0 ? plan[0].start : 0;
+    
+    if (resumeFromMs !== undefined && resumeFromMs > 0) {
+      console.log(`[Resume] Resuming from position: ${(resumeFromMs / 1000).toFixed(1)}s`);
+      
+      // Find the plan step where resumeFromMs falls
+      for (let i = 0; i < plan.length; i++) {
+        if (plan[i].start <= resumeFromMs && resumeFromMs < plan[i].end) {
+          startStep = i;
+          initialDelay = 0; // Start immediately when resuming
+          break;
+        }
+      }
+    }
+    
+    // Subtask 3.5: Update state flags for resume
+    this.paused = false;
+    this.replaying = true;
+    
     // Create or get position display div (fixed at top right of browser)
     let posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
     if (!posDiv) {
@@ -193,16 +262,21 @@ export class ReplayManager {
       posDiv.style.zIndex = '9999';
       document.body.appendChild(posDiv);
     }
-    let replayStart = Date.now();
-    let replayOffset = plan.length > 0 ? plan[0].start : 0;
+    
+    // Subtask 3.5: Update replayStart and replayOffset for position tracking
+    this.replayStart = Date.now();
+    this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (plan.length > 0 ? plan[0].start : 0);
+    
     function updatePositionDisplay() {
-      const elapsed = Date.now() - replayStart;
-      const posMs = replayOffset + elapsed;
+      const elapsed = Date.now() - self.replayStart;
+      const posMs = self.replayOffset + elapsed;
       posDiv.textContent = `Position: ${(posMs / 1000).toFixed(1)}s`;
       posDiv.style.display = 'block';
     }
-    let step = 0;
+    
+    let step = startStep;
     const self = this;
+    
     function nextStep() {
       if (!self.replaying) return;
       if (step >= plan.length) {
@@ -215,25 +289,98 @@ export class ReplayManager {
         return;
       }
       const { start, end, idx, resume } = plan[step];
-      console.log(`[Plan ${step}] start: ${start}ms, end: ${end}ms, idx: ${idx}, resume: ${resume}`);
-      replayStart = Date.now();
-      replayOffset = start;
+      
+      // Task 5: Handle automatic pause at playback end
+      // When reaching the final black screen step, transition to paused state
+      if (step >= plan.length - 1 && idx === -1) {
+        console.log(`[Playback End] Reached end at ${(end / 1000).toFixed(1)}s, transitioning to paused state`);
+        self.pausedAtMs = end;
+        self.paused = true;
+        self.replaying = false;
+        self._stepTimeoutId && clearTimeout(self._stepTimeoutId);
+        self._intervalId && clearInterval(self._intervalId);
+        self._stepTimeoutId = null;
+        self._intervalId = null;
+        
+        // Update position display to show paused at end
+        if (posDiv) {
+          posDiv.textContent = `Position: ${(self.pausedAtMs / 1000).toFixed(1)}s (Paused at end)`;
+          posDiv.style.display = 'block';
+        }
+        return;
+      }
+      
+      // Subtask 3.3: Calculate remaining duration for the current step when resuming
+      let stepDuration = end - start;
+      if (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) {
+        stepDuration = end - resumeFromMs;
+        console.log(`[Plan ${step}] Resuming mid-step: start: ${start}ms, resumeFrom: ${resumeFromMs}ms, end: ${end}ms, idx: ${idx}, remaining: ${stepDuration}ms`);
+      } else {
+        console.log(`[Plan ${step}] start: ${start}ms, end: ${end}ms, idx: ${idx}, resume: ${resume}`);
+      }
+      
+      self.replayStart = Date.now();
+      self.replayOffset = (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) ? resumeFromMs : start;
+      
       if (blackDiv) blackDiv.style.display = idx === -1 ? 'block' : 'none';
-      if (idx !== -1) self.showPlayer(idx, resume);
+      
+      // Subtask 3.4: Implement video seeking for resume
+      if (idx !== -1) {
+        if (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) {
+          // Calculate elapsed time within the current step
+          const elapsedInStep = resumeFromMs - start;
+          const cmd = commands[idx];
+          
+          // Determine if this is a resume scenario (video was already playing)
+          // Check if the video started before the pause point
+          const videoStartInTimeline = cmd.positionMs;
+          const isResumeScenario = resumeFromMs > videoStartInTimeline;
+          
+          // Calculate video seek position accounting for playback speed
+          const videoElapsed = elapsedInStep;
+          const seekToMs = cmd.startMs + videoElapsed;
+          const seekToSec = seekToMs / 1000;
+          
+          console.log(`[Action ${idx}] Seeking to ${seekToSec.toFixed(2)}s (elapsed in step: ${(elapsedInStep / 1000).toFixed(2)}s, isResume: ${isResumeScenario})`);
+          
+          // Show the player and seek to the correct position
+          self.players.forEach((player, i) => {
+            const div = document.getElementById(`yt-player-edit-${i}`);
+            if (div) div.style.display = i === idx ? 'block' : 'none';
+            if (i === idx && player) {
+              player.seekTo(seekToSec);
+              if (!isResumeScenario) {
+                // Fresh start - set volume and speed
+                player.setVolume(cmd.volume);
+                player.setPlaybackRate(cmd.speed);
+              }
+              player.playVideo();
+            }
+          });
+        } else {
+          self.showPlayer(idx, resume);
+        }
+      }
+      
       self._intervalId && clearInterval(self._intervalId);
       self._intervalId = setInterval(updatePositionDisplay, 500);
       updatePositionDisplay();
+      
       self._stepTimeoutId = setTimeout(() => {
         step++;
         nextStep();
-      }, Math.max(0, end - start));
+      }, Math.max(0, stepDuration));
     }
+    
     this.hideAllPlayers();
     if (blackDiv) blackDiv.style.display = 'block';
-    if (plan.length > 0) {
+    
+    if (initialDelay > 0) {
       this._stepTimeoutId = setTimeout(() => {
         nextStep();
-      }, Math.max(0, plan[0].start));
+      }, Math.max(0, initialDelay));
+    } else {
+      nextStep();
     }
   }
 }

@@ -18,17 +18,19 @@
 
 # Wishlist
 P1:
-- Instead of stopping with `space`, let's stop with `shift+space`, and instead have `space` pause, but the tricky bit is to figure out how to resume with the plan-based architecture (plan generation need to happen based on the current time)
-- Name each row with an id and display that instead of the asset link
-  - When you press enter, it should display 2 prompt; 1 for the name and 1 for the link (if the name is not "@id"); if the name is blank, then just use the entire link as the name.
 - Design subcommands
+  - Add a subcommands field to the ProjectCommand class which will have type (ProjectCommand[] vs Subcommand[]) and default to an empty list.
+    - Think about the use case before deciding
+      - slow-mo a certain segment
+      - silenced a certain segment
+      - Do we want to use this to chop things up (like cut away a segment by silencing and fast-forwarding)
+  - Press `shift+enter` on a row will add a subcommand to the command.
 
 P2:
-- Design slow motion start and stop
-  - For row "main", we want to slow-mo from 1:12 to 1:14
-  - In a new row, we will set the asset to "@main", set position to "", set start to "1:12" and end to "1:14", set speed to "0.2".
-- Design mute volume start and stop
-  - In a new row, we will set the asset to "@main", set position to "", set start to "1:12" and end to "1:14", set volume to "0".
+- Final recording mode
+  - open a window of the correct size
+  - warm up all the assets
+  - display the first YT player's screen
 
 # M3 implementation
 Make it easier to edit a 2-minute video
@@ -57,6 +59,13 @@ Make it easier to edit a 2-minute video
 - Add a name (string) field for the command that defaults to ''.
   - When a user press enter on the asset column, and the asset field is already populated, then open a prompt to edit the name field instead.
   - If the name field is non-empty, then display the name instead of the asset in the asset column.
+
+# M3g
+- Instead of stopping with `space`, let's stop with `shift+space`, and instead have `space` be pause, but the tricky part is to then play from the time when things are paused; to do that we need to account for that in the generated plan.
+
+# M3h
+- M3g has various issues. 
+- When just the first asset is playing, resume works correctly, but when there is an overlap of 2 assets, then resume needs to handle it by generating a plan that starts both assets, so the plan generation need to account for this overlap
 
 # M2 implementation
 Get it working with a 1 small overlap

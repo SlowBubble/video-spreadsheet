@@ -196,10 +196,17 @@ export class Editor {
       this.handleEnterKey();
     } else if (matchKey(e, 'cmd+s')) {
       this.saveProject();
+    } else if (matchKey(e, 'shift+space')) {
+      if (!this.replayManager) return;
+      if (this.replayManager.replaying || this.replayManager.paused) {
+        this.replayManager.stopReplay();
+      }
     } else if (matchKey(e, 'space')) {
       if (!this.replayManager) return;
       if (this.replayManager.replaying) {
-        this.replayManager.stopReplay();
+        this.replayManager.pauseReplay();
+      } else if (this.replayManager.paused) {
+        this.replayManager.startReplay(this.replayManager.pausedAtMs);
       } else {
         this.replayManager.startReplay();
       }
