@@ -120,6 +120,19 @@ export class Editor {
     return Math.max(1, this.project.commands.length + 1);
   }
 
+  seekToSelectedRow() {
+    if (!this.replayManager) return;
+    
+    // Only seek if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    const positionMs = cmd.positionMs;
+    
+    console.log(`[Editor] Seeking to row ${this.selectedRow} position: ${(positionMs / 1000).toFixed(1)}s`);
+    this.replayManager.seekToTime(positionMs);
+  }
+
   renderTable() {
     const editIcon = `<span id="edit-title" style="cursor:pointer; margin-right:8px;" title="Edit title">✏️</span>`;
     const titleHtml = `<div style="display:flex; align-items:center; font-size:2em; font-weight:bold;">
@@ -181,8 +194,10 @@ export class Editor {
     
     if (matchKey(e, 'up')) {
       this.selectedRow = Math.max(0, this.selectedRow - 1);
+      this.seekToSelectedRow();
     } else if (matchKey(e, 'down')) {
       this.selectedRow = Math.min(rowCount - 1, this.selectedRow + 1);
+      this.seekToSelectedRow();
     } else if (matchKey(e, 'left')) {
       this.selectedCol = Math.max(0, this.selectedCol - 1);
     } else if (matchKey(e, 'right')) {
@@ -256,6 +271,7 @@ export class Editor {
         if (newValue !== null) {
           cmd.positionMs = this.timeStringToMs(newValue);
           this.saveProject();
+          this.seekToSelectedRow();
         }
       }
     } else if (this.selectedCol === 2) {
