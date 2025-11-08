@@ -1,5 +1,6 @@
 import { Editor } from './edit';
 import './style.css';
+import { getHashParams } from './urlUtil';
 
 function getProjects(): { id: string, title: string }[] {
   const projects: { id: string, title: string }[] = [];
@@ -45,9 +46,9 @@ function renderHome() {
 }
 
 function main() {
-  if (window.location.hash.startsWith('#id=')) {
+  const params = getHashParams();
+  if (params.has('id')) {
     new Editor();
-
     return;
   }
   renderHome();

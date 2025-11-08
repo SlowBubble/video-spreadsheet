@@ -1,3 +1,5 @@
+import { getHashParams } from './urlUtil';
+
 export class ReplayManager {
   players: any[] = [];
   commands: any[] = [];
@@ -11,6 +13,11 @@ export class ReplayManager {
   _intervalId: any = null;
   _stepTimeoutId: any = null;
 
+  isDebugMode(): boolean {
+    const params = getHashParams();
+    return params.get('debug') === '1';
+  }
+
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
     replayDiv.innerHTML = '';
     if (!commands.length) return;
@@ -19,7 +26,12 @@ export class ReplayManager {
     const container = document.createElement('div');
     container.style.position = 'relative';
     container.style.width = '854px';
-    container.style.height = '480px';
+    // In debug mode, allow container to grow vertically for multiple players
+    if (this.isDebugMode()) {
+      container.style.minHeight = '480px';
+    } else {
+      container.style.height = '480px';
+    }
     container.style.margin = '0 auto';
     replayDiv.appendChild(container);
     this.container = container;
@@ -44,10 +56,17 @@ export class ReplayManager {
         const endSec = Math.floor(cmd.endMs / 1000);
         const div = document.createElement('div');
         div.id = `yt-player-edit-${idx}`;
-        div.style.position = 'absolute';
-        div.style.top = '0';
-        div.style.left = '0';
-        div.style.display = 'none';
+        // In debug mode, position players vertically; otherwise stack them
+        if (self.isDebugMode()) {
+          div.style.position = 'relative';
+          div.style.marginBottom = '20px';
+          div.style.display = 'block';
+        } else {
+          div.style.position = 'absolute';
+          div.style.top = '0';
+          div.style.left = '0';
+          div.style.display = 'none';
+        }
         container.appendChild(div);
         if (ytId) {
           const player = new (window as any).YT.Player(div.id, {
@@ -187,10 +206,12 @@ export class ReplayManager {
   }
 
   hideAllPlayers() {
-    console.log('[hideAllPlayers] Hiding and pausing all players');
+    const debugMode = this.isDebugMode();
+    console.log(debugMode ? '[hideAllPlayers] Debug mode: NOT hiding players, only pausing' : '[hideAllPlayers] Hiding and pausing all players');
     this.players.forEach((player, idx) => {
       const div = document.getElementById(`yt-player-edit-${idx}`);
-      if (div) div.style.display = 'none';
+      // In debug mode, keep players visible; otherwise hide them
+      if (div && !debugMode) div.style.display = 'none';
       if (player) {
         const name = this.getCommandName(idx);
         console.log(`[Pause ${name}] Pausing player`);
@@ -201,9 +222,17 @@ export class ReplayManager {
 
   showPlayer(idx: number, resume: boolean) {
     const visibleName = this.getCommandName(idx);
+    const debugMode = this.isDebugMode();
     this.players.forEach((player, i) => {
       const div = document.getElementById(`yt-player-edit-${i}`);
-      if (div) div.style.display = i === idx ? 'block' : 'none';
+      // In debug mode, show all players; otherwise show only the active one
+      if (div) {
+        if (debugMode) {
+          div.style.display = 'block';
+        } else {
+          div.style.display = i === idx ? 'block' : 'none';
+        }
+      }
       if (i === idx && player) {
         if (!resume) {
           const cmd = this.commands[i];
@@ -336,7 +365,14 @@ export class ReplayManager {
       self.replayStart = Date.now();
       self.replayOffset = (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) ? resumeFromMs : start;
       
-      if (blackDiv) blackDiv.style.display = idx === -1 ? 'block' : 'none';
+      // In debug mode, hide black div; otherwise show it when idx is -1
+      if (blackDiv) {
+        if (self.isDebugMode()) {
+          blackDiv.style.display = 'none';
+        } else {
+          blackDiv.style.display = idx === -1 ? 'block' : 'none';
+        }
+      }
       
       // Subtask 3.4: Implement video seeking for resume
       // M3h Fix: When resuming, identify ALL assets that should be playing at this time
@@ -376,8 +412,14 @@ export class ReplayManager {
               
               console.log(`[Action ${name}] Seeking to ${seekToSec.toFixed(2)}s, speed: ${cmd.speed}, volume: ${cmd.volume}, visible: ${i === idx}`);
               
-              // Show only the visible player's div
-              if (div) div.style.display = i === idx ? 'block' : 'none';
+              // In debug mode, show all players; otherwise show only the visible one
+              if (div) {
+                if (self.isDebugMode()) {
+                  div.style.display = 'block';
+                } else {
+                  div.style.display = i === idx ? 'block' : 'none';
+                }
+              }
               
               // But seek and play all active players
               player.seekTo(seekToSec);
@@ -385,8 +427,14 @@ export class ReplayManager {
               player.setPlaybackRate(cmd.speed);
               player.playVideo();
             } else {
-              // Hide and pause inactive players
-              if (div) div.style.display = 'none';
+              // In debug mode, keep inactive players visible; otherwise hide them
+              if (div) {
+                if (self.isDebugMode()) {
+                  div.style.display = 'block';
+                } else {
+                  div.style.display = 'none';
+                }
+              }
               if (player) {
                 console.log(`[Pause ${name}] Pausing inactive player (not in active commands)`);
                 player.pauseVideo();

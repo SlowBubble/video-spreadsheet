@@ -3,6 +3,7 @@ import { Project, ProjectCommand } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
+import { getHashParams } from './urlUtil';
 
 const columns = ['Asset', 'Position', 'Start', 'End', 'Volume', 'Speed'];
 
@@ -76,10 +77,8 @@ export class Editor {
   }
 
   getProjectIdFromHash(): string | null {
-    if (window.location.hash.startsWith('#id=')) {
-      return window.location.hash.replace('#id=', '');
-    }
-    return null;
+    const params = getHashParams();
+    return params.get('id');
   }
 
   loadProject(id: string): Project {
