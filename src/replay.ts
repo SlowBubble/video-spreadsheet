@@ -21,9 +21,8 @@ export class ReplayManager {
   commands: any[] = [];
   blackDiv: HTMLDivElement | null = null;
   container: HTMLDivElement | null = null;
-  replaying: boolean = false;
-  paused: boolean = false;
-  pausedAtMs: number | undefined = undefined;
+  isPlaying: boolean = false;
+  pausedAtMs: number = 0;
   replayStart: number = 0;
   replayOffset: number = 0;
   _intervalId: any = null;
@@ -180,10 +179,9 @@ export class ReplayManager {
   }
 
   stopReplay() {
-    console.log('[Stop] Stopping replay');
-    this.replaying = false;
-    this.paused = false;
-    this.pausedAtMs = undefined;
+    console.log('[Stop] Stopping replay - pausing at 0');
+    this.isPlaying = false;
+    this.pausedAtMs = 0;
     this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
     this._intervalId && clearInterval(this._intervalId);
     this._stepTimeoutId = null;
@@ -195,21 +193,20 @@ export class ReplayManager {
   }
 
   pauseReplay() {
-    if (!this.replaying) return;
+    if (!this.isPlaying) return;
     
-    // Subtask 2.1: Calculate current position
+    // Calculate current position
     this.pausedAtMs = this.replayOffset + (Date.now() - this.replayStart);
     console.log(`[Pause] Paused at position: ${(this.pausedAtMs / 1000).toFixed(1)}s`);
     
-    // Subtask 2.2: Update state flags and clear timers
-    this.paused = true;
-    this.replaying = false;
+    // Update state and clear timers
+    this.isPlaying = false;
     this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
     this._intervalId && clearInterval(this._intervalId);
     this._stepTimeoutId = null;
     this._intervalId = null;
     
-    // Subtask 2.3: Pause all YouTube players without hiding them
+    // Pause all YouTube players without hiding them
     this.players.forEach((player, idx) => {
       if (player) {
         const name = this.getCommandName(idx);
@@ -226,17 +223,16 @@ export class ReplayManager {
   }
 
   getCurrentPosition(): number | null {
-    if (this.replaying) {
+    if (this.isPlaying) {
       return this.replayOffset + (Date.now() - this.replayStart);
-    } else if (this.paused && this.pausedAtMs !== undefined) {
+    } else {
       return this.pausedAtMs;
     }
-    return null;
   }
 
   seekToTime(newMs: number) {
     // If currently playing, pause first
-    const wasPlaying = this.replaying;
+    const wasPlaying = this.isPlaying;
     if (wasPlaying) {
       this.pauseReplay();
     }
@@ -390,7 +386,7 @@ export class ReplayManager {
   }
 
   startReplay(resumeFromMs?: number) {
-    if (this.replaying) return;
+    if (this.isPlaying) return;
     
     const players = this.players;
     const commands = this.commands;
@@ -426,9 +422,8 @@ export class ReplayManager {
       }
     }
     
-    // Subtask 3.5: Update state flags for resume
-    this.paused = false;
-    this.replaying = true;
+    // Update state to playing
+    this.isPlaying = true;
     
     // Create or get position display div (fixed at top right of browser)
     let posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
@@ -461,25 +456,25 @@ export class ReplayManager {
     let step = startStep;
     
     const nextStep = () => {
-      if (!this.replaying) return;
+      if (!this.isPlaying) return;
       if (step >= plan.length) {
         this.hideAllPlayers();
         if (blackDiv) blackDiv.style.display = 'block';
         if (posDiv) posDiv.style.display = 'none';
         this._intervalId && clearInterval(this._intervalId);
         this._intervalId = null;
-        this.replaying = false;
+        this.isPlaying = false;
+        this.pausedAtMs = 0;
         return;
       }
       const action = plan[step];
       
-      // Task 5: Handle automatic pause at playback end
-      // When reaching the final black screen step, transition to paused state
+      // Handle automatic pause at playback end
+      // When reaching the final black screen step, pause at that position
       if (step >= plan.length - 1 && action.idx === -1) {
-        console.log(`[Playback End] Reached end at ${(action.end / 1000).toFixed(1)}s, transitioning to paused state`);
+        console.log(`[Playback End] Reached end at ${(action.end / 1000).toFixed(1)}s, pausing`);
         this.pausedAtMs = action.end;
-        this.paused = true;
-        this.replaying = false;
+        this.isPlaying = false;
         this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
         this._intervalId && clearInterval(this._intervalId);
         this._stepTimeoutId = null;

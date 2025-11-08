@@ -85,6 +85,10 @@ Debugged:
 - In editor, implement a function that sets the replayer to the start position of the selected row.
   - Call this function after up or down or the position column is updated.
 
+# M3m
+- pausedAtMs should never be undefined; it should default to 0
+  - Is there a good reason why it can be undefined? If not, remove it and logic that checks it being undefined
+
 # M2 implementation
 Get it working with a 1 small overlap
 

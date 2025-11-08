@@ -212,17 +212,13 @@ export class Editor {
       this.saveProject();
     } else if (matchKey(e, '0')) {
       if (!this.replayManager) return;
-      if (this.replayManager.replaying || this.replayManager.paused) {
-        this.replayManager.stopReplay();
-      }
+      this.replayManager.stopReplay();
     } else if (matchKey(e, 'space')) {
       if (!this.replayManager) return;
-      if (this.replayManager.replaying) {
+      if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
-      } else if (this.replayManager.paused) {
-        this.replayManager.startReplay(this.replayManager.pausedAtMs);
       } else {
-        this.replayManager.startReplay();
+        this.replayManager.startReplay(this.replayManager.pausedAtMs);
       }
     } else if (matchKey(e, 'x')) {
       this.handleExportImport();
