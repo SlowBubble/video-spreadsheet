@@ -211,6 +211,9 @@ export class Editor {
       }
     } else if (matchKey(e, 'x')) {
       this.handleExportImport();
+    } else if (matchKey(e, 'j')) {
+      if (!this.replayManager) return;
+      this.replayManager.rewind(4000);
     } else {
       return;
     }

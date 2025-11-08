@@ -77,6 +77,10 @@ Debugged:
 - implement the keyboard shortcut j to rewind 4 seconds for the replay
   - if the replayer is not paused, pause it first, rewind and then resume
 
+# M3k
+- Refactor rewind to call a common function that set the time (and if not paused, pause first and resume after) and then:
+  - implement the keyboard shortcut l to fast-forward 4 seconds similar to rewind
+
 # M2 implementation
 Get it working with a 1 small overlap
 

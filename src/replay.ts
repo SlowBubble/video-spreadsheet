@@ -225,6 +225,44 @@ export class ReplayManager {
     }
   }
 
+  rewind(rewindMs: number) {
+    // Calculate current position
+    let currentMs: number;
+    if (this.replaying) {
+      currentMs = this.replayOffset + (Date.now() - this.replayStart);
+    } else if (this.paused && this.pausedAtMs !== undefined) {
+      currentMs = this.pausedAtMs;
+    } else {
+      // Not playing or paused, nothing to rewind
+      return;
+    }
+    
+    // Calculate new position (don't go below 0)
+    const newMs = Math.max(0, currentMs - rewindMs);
+    console.log(`[Rewind] From ${(currentMs / 1000).toFixed(1)}s to ${(newMs / 1000).toFixed(1)}s`);
+    
+    // If currently playing, pause first
+    const wasPlaying = this.replaying;
+    if (wasPlaying) {
+      this.pauseReplay();
+    }
+    
+    // Update paused position
+    this.pausedAtMs = newMs;
+    
+    // Update position display
+    const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
+    if (posDiv) {
+      posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused)`;
+      posDiv.style.display = 'block';
+    }
+    
+    // If was playing, resume from new position
+    if (wasPlaying) {
+      this.startReplay(this.pausedAtMs);
+    }
+  }
+
   hideAllPlayers() {
     const debugMode = this.isDebugMode();
     console.log(debugMode ? '[hideAllPlayers] Debug mode: NOT hiding players, only pausing' : '[hideAllPlayers] Hiding and pausing all players');
