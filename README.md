@@ -67,6 +67,11 @@ Make it easier to edit a 2-minute video
 - M3g has various issues. 
 - When just the first asset is playing, resume works correctly, but when there is an overlap of 2 assets, then resume needs to handle it by generating a plan that starts both assets, so the plan generation need to account for this overlap
 
+# M3i
+Debugged:
+- Just realized that things are stopped automatically by how we initiate YT player
+- Need to decide if that's a good design and see if we need to name things better for PlanAction
+
 # M2 implementation
 Get it working with a 1 small overlap
 

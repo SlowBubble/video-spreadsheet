@@ -1,5 +1,21 @@
 import { getHashParams } from './urlUtil';
 
+export class PlanAction {
+  start: number;
+  end: number;
+  idx: number;
+  resume: boolean;
+  assetName: string;
+
+  constructor(start: number, end: number, idx: number, resume: boolean, assetName: string) {
+    this.start = start;
+    this.end = end;
+    this.idx = idx;
+    this.resume = resume;
+    this.assetName = assetName;
+  }
+}
+
 export class ReplayManager {
   players: any[] = [];
   commands: any[] = [];
@@ -47,9 +63,8 @@ export class ReplayManager {
     container.appendChild(blackDiv);
     this.blackDiv = blackDiv;
     // Wait for YT API
-    const self = this;
-    function onYouTubeIframeAPIReady() {
-      self.players = [];
+    const onYouTubeIframeAPIReady = () => {
+      this.players = [];
       commands.forEach((cmd: any, idx: number) => {
         const ytId = getYouTubeId(cmd.asset);
         const startSec = Math.floor(cmd.startMs / 1000);
@@ -57,7 +72,7 @@ export class ReplayManager {
         const div = document.createElement('div');
         div.id = `yt-player-edit-${idx}`;
         // In debug mode, position players vertically; otherwise stack them
-        if (self.isDebugMode()) {
+        if (this.isDebugMode()) {
           div.style.position = 'relative';
           div.style.marginBottom = '20px';
           div.style.display = 'block';
@@ -92,20 +107,20 @@ export class ReplayManager {
               }
             }
           });
-          self.players.push(player);
+          this.players.push(player);
         } else {
-          self.players.push(null);
+          this.players.push(null);
         }
       });
       // Show black screen initially
       blackDiv.style.display = 'block';
-    }
+    };
     if ((window as any).YT && (window as any).YT.Player) {
       onYouTubeIframeAPIReady();
     } else {
       (window as any).onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
     }
-    self.commands = commands;
+    this.commands = commands;
     // Show black screen initially
     blackDiv.style.display = 'block';
   }
@@ -116,7 +131,7 @@ export class ReplayManager {
     return cmd.name || `[${idx}]`;
   }
 
-  generateReplayPlan() {
+  generateReplayPlan(): PlanAction[] {
     const cmds = this.commands;
     if (!cmds || !cmds.length) return [];
     // Collect all change points (start and end of intervals)
@@ -131,7 +146,7 @@ export class ReplayManager {
     });
     // Remove duplicates and sort
     const uniquePoints = Array.from(new Set(points)).sort((a, b) => a - b);
-    const plan: { start: number, end: number, idx: number, resume: boolean }[] = [];
+    const plan: PlanAction[] = [];
     let lastVisible: { [idx: number]: number } = {};
     for (let i = 0; i < uniquePoints.length - 1; i++) {
       const c = uniquePoints[i];
@@ -152,10 +167,15 @@ export class ReplayManager {
         resume = lastVisible[idx] !== undefined && lastVisible[idx] < c;
         lastVisible[idx] = c;
       }
-      plan.push({ start: c, end: uniquePoints[i + 1], idx, resume });
+      const assetName = idx !== -1 ? this.getCommandName(idx) : '[Black Screen]';
+      plan.push(new PlanAction(c, uniquePoints[i + 1], idx, resume, assetName));
     }
     // For the last change point, show black screen
-    plan.push({ start: uniquePoints[uniquePoints.length - 1], end: uniquePoints[uniquePoints.length - 1] + 1000, idx: -1, resume: false });
+    const lastPoint = uniquePoints[uniquePoints.length - 1];
+    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, '[Black Screen]'));
+    
+    console.log('[Plan Generated] Replay plan:', JSON.stringify(plan, null, 2));
+    
     return plan;
   }
 
@@ -250,6 +270,73 @@ export class ReplayManager {
     });
   }
 
+  seekAndPlayAllActiveVideos(resumeFromMs: number, visibleIdx: number) {
+    const commands = this.commands;
+    // Find all commands that should be playing at resumeFromMs
+    const activeCommands: number[] = [];
+    for (let j = 0; j < commands.length; j++) {
+      const cmd = commands[j];
+      const cmdStart = cmd.positionMs;
+      const videoDuration = cmd.endMs - cmd.startMs;
+      const actualDuration = videoDuration / cmd.speed;
+      const cmdEnd = cmd.positionMs + actualDuration;
+      
+      // Check if this command overlaps with resumeFromMs
+      if (resumeFromMs >= cmdStart && resumeFromMs < cmdEnd) {
+        activeCommands.push(j);
+      }
+    }
+    
+    const activeNames = activeCommands.map(i => this.getCommandName(i)).join(', ');
+    const visibleName = this.getCommandName(visibleIdx);
+    console.log(`[Resume] Active commands at ${(resumeFromMs / 1000).toFixed(2)}s: [${activeNames}], visible: ${visibleName}`);
+    
+    // Seek and play all active commands
+    this.players.forEach((player, i) => {
+      const div = document.getElementById(`yt-player-edit-${i}`);
+      const name = this.getCommandName(i);
+      
+      if (activeCommands.includes(i) && player) {
+        const cmd = commands[i];
+        const cmdStart = cmd.positionMs;
+        const elapsedInCmd = resumeFromMs - cmdStart;
+        const videoElapsed = elapsedInCmd;
+        const seekToMs = cmd.startMs + videoElapsed;
+        const seekToSec = seekToMs / 1000;
+        
+        console.log(`[Action ${name}] Seeking to ${seekToSec.toFixed(2)}s, speed: ${cmd.speed}, volume: ${cmd.volume}, visible: ${i === visibleIdx}`);
+        
+        // In debug mode, show all players; otherwise show only the visible one
+        if (div) {
+          if (this.isDebugMode()) {
+            div.style.display = 'block';
+          } else {
+            div.style.display = i === visibleIdx ? 'block' : 'none';
+          }
+        }
+        
+        // But seek and play all active players
+        player.seekTo(seekToSec);
+        player.setVolume(cmd.volume);
+        player.setPlaybackRate(cmd.speed);
+        player.playVideo();
+      } else {
+        // In debug mode, keep inactive players visible; otherwise hide them
+        if (div) {
+          if (this.isDebugMode()) {
+            div.style.display = 'block';
+          } else {
+            div.style.display = 'none';
+          }
+        }
+        if (player) {
+          console.log(`[Pause ${name}] Pausing inactive player (not in active commands)`);
+          player.pauseVideo();
+        }
+      }
+    });
+  }
+
   startReplay(resumeFromMs?: number) {
     if (this.replaying) return;
     
@@ -312,149 +399,87 @@ export class ReplayManager {
     this.replayStart = Date.now();
     this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (plan.length > 0 ? plan[0].start : 0);
     
-    function updatePositionDisplay() {
-      const elapsed = Date.now() - self.replayStart;
-      const posMs = self.replayOffset + elapsed;
+    const updatePositionDisplay = () => {
+      const elapsed = Date.now() - this.replayStart;
+      const posMs = this.replayOffset + elapsed;
       posDiv.textContent = `Position: ${(posMs / 1000).toFixed(1)}s`;
       posDiv.style.display = 'block';
-    }
+    };
     
     let step = startStep;
-    const self = this;
     
-    function nextStep() {
-      if (!self.replaying) return;
+    const nextStep = () => {
+      if (!this.replaying) return;
       if (step >= plan.length) {
-        self.hideAllPlayers();
+        this.hideAllPlayers();
         if (blackDiv) blackDiv.style.display = 'block';
         if (posDiv) posDiv.style.display = 'none';
-        self._intervalId && clearInterval(self._intervalId);
-        self._intervalId = null;
-        self.replaying = false;
+        this._intervalId && clearInterval(this._intervalId);
+        this._intervalId = null;
+        this.replaying = false;
         return;
       }
-      const { start, end, idx, resume } = plan[step];
+      const action = plan[step];
       
       // Task 5: Handle automatic pause at playback end
       // When reaching the final black screen step, transition to paused state
-      if (step >= plan.length - 1 && idx === -1) {
-        console.log(`[Playback End] Reached end at ${(end / 1000).toFixed(1)}s, transitioning to paused state`);
-        self.pausedAtMs = end;
-        self.paused = true;
-        self.replaying = false;
-        self._stepTimeoutId && clearTimeout(self._stepTimeoutId);
-        self._intervalId && clearInterval(self._intervalId);
-        self._stepTimeoutId = null;
-        self._intervalId = null;
+      if (step >= plan.length - 1 && action.idx === -1) {
+        console.log(`[Playback End] Reached end at ${(action.end / 1000).toFixed(1)}s, transitioning to paused state`);
+        this.pausedAtMs = action.end;
+        this.paused = true;
+        this.replaying = false;
+        this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
+        this._intervalId && clearInterval(this._intervalId);
+        this._stepTimeoutId = null;
+        this._intervalId = null;
         
         // Update position display to show paused at end
         if (posDiv) {
-          posDiv.textContent = `Position: ${(self.pausedAtMs / 1000).toFixed(1)}s (Paused at end)`;
+          posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused at end)`;
           posDiv.style.display = 'block';
         }
         return;
       }
       
       // Subtask 3.3: Calculate remaining duration for the current step when resuming
-      let stepDuration = end - start;
-      if (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) {
-        stepDuration = end - resumeFromMs;
-        console.log(`[Plan ${step}] Resuming mid-step: start: ${start}ms, resumeFrom: ${resumeFromMs}ms, end: ${end}ms, idx: ${idx}, remaining: ${stepDuration}ms`);
+      const isResumingMidStep = step === startStep && resumeFromMs !== undefined && resumeFromMs > action.start;
+      let stepDuration = action.end - action.start;
+      if (isResumingMidStep && resumeFromMs !== undefined) {
+        stepDuration = action.end - resumeFromMs;
+        console.log(`[Plan ${step}] Resuming mid-step: start: ${action.start}ms, resumeFrom: ${resumeFromMs}ms, end: ${action.end}ms, idx: ${action.idx}, remaining: ${stepDuration}ms`);
       }
       
-      self.replayStart = Date.now();
-      self.replayOffset = (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) ? resumeFromMs : start;
+      this.replayStart = Date.now();
+      this.replayOffset = (isResumingMidStep && resumeFromMs !== undefined) ? resumeFromMs : action.start;
       
       // In debug mode, hide black div; otherwise show it when idx is -1
       if (blackDiv) {
-        if (self.isDebugMode()) {
+        if (this.isDebugMode()) {
           blackDiv.style.display = 'none';
         } else {
-          blackDiv.style.display = idx === -1 ? 'block' : 'none';
+          blackDiv.style.display = action.idx === -1 ? 'block' : 'none';
         }
       }
       
       // Subtask 3.4: Implement video seeking for resume
       // M3h Fix: When resuming, identify ALL assets that should be playing at this time
-      if (idx !== -1) {
-        if (step === startStep && resumeFromMs !== undefined && resumeFromMs > start) {
-          // Find all commands that should be playing at resumeFromMs
-          const activeCommands: number[] = [];
-          for (let j = 0; j < commands.length; j++) {
-            const cmd = commands[j];
-            const cmdStart = cmd.positionMs;
-            const videoDuration = cmd.endMs - cmd.startMs;
-            const actualDuration = videoDuration / cmd.speed;
-            const cmdEnd = cmd.positionMs + actualDuration;
-            
-            // Check if this command overlaps with resumeFromMs
-            if (resumeFromMs >= cmdStart && resumeFromMs < cmdEnd) {
-              activeCommands.push(j);
-            }
-          }
-          
-          const activeNames = activeCommands.map(i => self.getCommandName(i)).join(', ');
-          const visibleName = self.getCommandName(idx);
-          console.log(`[Resume] Active commands at ${(resumeFromMs / 1000).toFixed(2)}s: [${activeNames}], visible: ${visibleName}`);
-          
-          // Seek and play all active commands
-          self.players.forEach((player, i) => {
-            const div = document.getElementById(`yt-player-edit-${i}`);
-            const name = self.getCommandName(i);
-            
-            if (activeCommands.includes(i) && player) {
-              const cmd = commands[i];
-              const cmdStart = cmd.positionMs;
-              const elapsedInCmd = resumeFromMs - cmdStart;
-              const videoElapsed = elapsedInCmd;
-              const seekToMs = cmd.startMs + videoElapsed;
-              const seekToSec = seekToMs / 1000;
-              
-              console.log(`[Action ${name}] Seeking to ${seekToSec.toFixed(2)}s, speed: ${cmd.speed}, volume: ${cmd.volume}, visible: ${i === idx}`);
-              
-              // In debug mode, show all players; otherwise show only the visible one
-              if (div) {
-                if (self.isDebugMode()) {
-                  div.style.display = 'block';
-                } else {
-                  div.style.display = i === idx ? 'block' : 'none';
-                }
-              }
-              
-              // But seek and play all active players
-              player.seekTo(seekToSec);
-              player.setVolume(cmd.volume);
-              player.setPlaybackRate(cmd.speed);
-              player.playVideo();
-            } else {
-              // In debug mode, keep inactive players visible; otherwise hide them
-              if (div) {
-                if (self.isDebugMode()) {
-                  div.style.display = 'block';
-                } else {
-                  div.style.display = 'none';
-                }
-              }
-              if (player) {
-                console.log(`[Pause ${name}] Pausing inactive player (not in active commands)`);
-                player.pauseVideo();
-              }
-            }
-          });
+      if (action.idx !== -1) {
+        if (isResumingMidStep && resumeFromMs !== undefined) {
+          this.seekAndPlayAllActiveVideos(resumeFromMs, action.idx);
         } else {
-          self.showPlayer(idx, resume);
+          this.showPlayer(action.idx, action.resume);
         }
       }
       
-      self._intervalId && clearInterval(self._intervalId);
-      self._intervalId = setInterval(updatePositionDisplay, 500);
+      this._intervalId && clearInterval(this._intervalId);
+      this._intervalId = setInterval(updatePositionDisplay, 500);
       updatePositionDisplay();
       
-      self._stepTimeoutId = setTimeout(() => {
+      this._stepTimeoutId = setTimeout(() => {
         step++;
         nextStep();
       }, Math.max(0, stepDuration));
-    }
+    };
     
     this.hideAllPlayers();
     if (blackDiv) blackDiv.style.display = 'block';
