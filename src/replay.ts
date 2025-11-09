@@ -615,7 +615,10 @@ export class ReplayManager {
       // Subtask 3.4: Implement video seeking for resume
       // M3h Fix: When resuming, identify ALL assets that should be playing at this time
       if (action.idx !== -1) {
-        if (isResumingMidStep && resumeFromMs !== undefined) {
+        // When resuming from any non-zero position (including step boundaries),
+        // we need to check for all active videos, not just the visible one
+        const isResuming = step === startStep && resumeFromMs !== undefined && resumeFromMs > 0;
+        if (isResuming && resumeFromMs !== undefined) {
           this.seekAndPlayAllActiveVideos(resumeFromMs, action.idx);
         } else {
           this.showPlayer(action.idx, action.resume);
