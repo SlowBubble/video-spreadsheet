@@ -6,11 +6,25 @@ export class FullScreenFilter {
   }
 }
 
+export class BorderFilter {
+  topMarginPct: number;
+  bottomMarginPct: number;
+  fillStyle: string;
+
+  constructor(topMarginPct: number, bottomMarginPct: number, fillStyle: string) {
+    this.topMarginPct = topMarginPct;
+    this.bottomMarginPct = bottomMarginPct;
+    this.fillStyle = fillStyle;
+  }
+}
+
 export class Overlay {
   fullScreenFilter: FullScreenFilter | null;
+  borderFilter: BorderFilter | null;
 
-  constructor(fullScreenFilter?: FullScreenFilter | null) {
+  constructor(fullScreenFilter?: FullScreenFilter | null, borderFilter?: BorderFilter | null) {
     this.fullScreenFilter = fullScreenFilter || null;
+    this.borderFilter = borderFilter || null;
   }
 }
 
@@ -73,11 +87,17 @@ export class Project {
         if (cmd.overlay.fullScreenFilter) {
           fullScreenFilter = new FullScreenFilter(cmd.overlay.fullScreenFilter.fillStyle);
         }
-        // Support legacy borderFilter field
+        
+        let borderFilter = null;
         if (cmd.overlay.borderFilter) {
-          fullScreenFilter = new FullScreenFilter(cmd.overlay.borderFilter.fillStyle);
+          borderFilter = new BorderFilter(
+            cmd.overlay.borderFilter.topMarginPct,
+            cmd.overlay.borderFilter.bottomMarginPct,
+            cmd.overlay.borderFilter.fillStyle
+          );
         }
-        overlay = new Overlay(fullScreenFilter);
+        
+        overlay = new Overlay(fullScreenFilter, borderFilter);
       }
       return new ProjectCommand(
         cmd.asset,

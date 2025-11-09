@@ -57,7 +57,13 @@ Overlay and subcommands
   - Overlay will be a class will just one field called `fullScreenFilter` of type FullScreenFilter (will add more fields later).
   - FullScreenFilter will have just one field called the fillStyle, that default to 'rgba(255, 0, 0, 0.15)'.
   - Propagate the `overlay` in the PlanAction so that the replayer will know to enable the filter.
-- Keyboard shortcut `r` on the selected row will add the red filter; `g` for green filter.
+- Keyboard shortcut `f` on the selected row will add the red filter or green filter.
+
+## m5c
+
+- Implement a borderFilter in Overlay, where BorderFilter has the field topMarginPct and bottomMarginPct default them to 8 for now and a fillStyle field that defaults to 'rgba(0, 0, 0, 0.4)'
+- Implement it by drawing top and bottom rectangles based on the specified percentage and fillStyle
+- Enable it via `b` on the selected row.
 
 # m4 impl
 Make it easy to screen-record a good-looking video

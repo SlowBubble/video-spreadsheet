@@ -55,21 +55,48 @@ export class ReplayManager {
     const ctx = this.overlayCanvas.getContext('2d');
     if (!ctx) return;
     
-    // Clear canvas first
-    ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-    
     // Draw filter covering entire canvas
     ctx.fillStyle = fillStyle;
     ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
   }
 
+  drawBorderFilter(topMarginPct: number, bottomMarginPct: number, fillStyle: string) {
+    if (!this.overlayCanvas) return;
+    const ctx = this.overlayCanvas.getContext('2d');
+    if (!ctx) return;
+    
+    const canvasHeight = this.overlayCanvas.height;
+    const canvasWidth = this.overlayCanvas.width;
+    
+    // Draw top rectangle
+    const topHeight = (canvasHeight * topMarginPct) / 100;
+    ctx.fillStyle = fillStyle;
+    ctx.fillRect(0, 0, canvasWidth, topHeight);
+    
+    // Draw bottom rectangle
+    const bottomHeight = (canvasHeight * bottomMarginPct) / 100;
+    ctx.fillRect(0, canvasHeight - bottomHeight, canvasWidth, bottomHeight);
+  }
+
   updateOverlay(overlay: Overlay | null) {
-    if (!overlay || !overlay.fullScreenFilter) {
-      this.clearOverlay();
-      return;
+    // Clear canvas first
+    this.clearOverlay();
+    
+    if (!overlay) return;
+    
+    // Draw fullScreenFilter if present
+    if (overlay.fullScreenFilter) {
+      this.drawFullScreenFilter(overlay.fullScreenFilter.fillStyle);
     }
     
-    this.drawFullScreenFilter(overlay.fullScreenFilter.fillStyle);
+    // Draw borderFilter if present (on top of fullScreenFilter if both exist)
+    if (overlay.borderFilter) {
+      this.drawBorderFilter(
+        overlay.borderFilter.topMarginPct,
+        overlay.borderFilter.bottomMarginPct,
+        overlay.borderFilter.fillStyle
+      );
+    }
   }
 
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {

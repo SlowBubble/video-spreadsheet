@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, ProjectCommand, FullScreenFilter } from './project';
+import { Project, ProjectCommand, FullScreenFilter, BorderFilter } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
@@ -282,10 +282,10 @@ export class Editor {
     } else if (matchKey(e, 'l')) {
       if (!this.replayManager) return;
       this.replayManager.fastForward(4000);
-    } else if (matchKey(e, 'r')) {
-      this.toggleFullScreenFilter('rgba(255, 0, 0, 0.15)');
-    } else if (matchKey(e, 'g')) {
-      this.toggleFullScreenFilter('rgba(0, 100, 100, 0.1)');
+    } else if (matchKey(e, 'f')) {
+      this.cycleFullScreenFilter();
+    } else if (matchKey(e, 'b')) {
+      this.toggleBorderFilter();
     } else {
       return;
     }
@@ -293,19 +293,69 @@ export class Editor {
     this.renderTable();
   }
 
-  toggleFullScreenFilter(fillStyle: string) {
+  cycleFullScreenFilter() {
     // Only toggle if we have a valid command selected
     if (this.selectedRow >= this.project.commands.length) return;
     
     const cmd = this.project.commands[this.selectedRow];
     
-    // If filter exists and matches the fillStyle, remove it; otherwise set/update it
-    if (cmd.overlay.fullScreenFilter && cmd.overlay.fullScreenFilter.fillStyle === fillStyle) {
+    // Cycle through: red -> green -> off
+    const redFilter = 'rgba(255, 0, 0, 0.15)';
+    const greenFilter = 'rgba(0, 100, 100, 0.15)';
+    
+    if (!cmd.overlay.fullScreenFilter) {
+      // Start with red
+      cmd.overlay.fullScreenFilter = new FullScreenFilter(redFilter);
+      console.log(`[Editor] Set fullscreen filter to red on row ${this.selectedRow}`);
+      this.showFilterBanner('Fullscreen Filter: Red');
+    } else if (cmd.overlay.fullScreenFilter.fillStyle === redFilter) {
+      // Move to green
+      cmd.overlay.fullScreenFilter = new FullScreenFilter(greenFilter);
+      console.log(`[Editor] Set fullscreen filter to green on row ${this.selectedRow}`);
+      this.showFilterBanner('Fullscreen Filter: Green');
+    } else {
+      // Remove filter
       cmd.overlay.fullScreenFilter = null;
       console.log(`[Editor] Removed fullscreen filter from row ${this.selectedRow}`);
+      this.showFilterBanner('Fullscreen Filter: OFF');
+    }
+    
+    this.saveProject();
+    this.initReplayManager();
+  }
+
+  toggleBorderFilter() {
+    // Only toggle if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    // Cycle through percentage options, then remove
+    const percentageOptions = [7, 10, 13, 16, 19];
+    const fillStyle = 'rgba(0, 0, 0, 0.85)';
+    
+    if (!cmd.overlay.borderFilter) {
+      // Start with first option
+      cmd.overlay.borderFilter = new BorderFilter(percentageOptions[0], percentageOptions[0], fillStyle);
+      console.log(`[Editor] Added border filter ${percentageOptions[0]}% to row ${this.selectedRow}`);
+      this.showFilterBanner(`Border Filter: ${percentageOptions[0]}%`);
     } else {
-      cmd.overlay.fullScreenFilter = new FullScreenFilter(fillStyle);
-      console.log(`[Editor] Set fullscreen filter to ${fillStyle} on row ${this.selectedRow}`);
+      // Find current percentage and move to next
+      const currentPct = cmd.overlay.borderFilter.topMarginPct;
+      const currentIndex = percentageOptions.indexOf(currentPct);
+      
+      if (currentIndex === -1 || currentIndex === percentageOptions.length - 1) {
+        // If not found or at last option, remove filter
+        cmd.overlay.borderFilter = null;
+        console.log(`[Editor] Removed border filter from row ${this.selectedRow}`);
+        this.showFilterBanner('Border Filter: OFF');
+      } else {
+        // Move to next option
+        const nextPct = percentageOptions[currentIndex + 1];
+        cmd.overlay.borderFilter = new BorderFilter(nextPct, nextPct, fillStyle);
+        console.log(`[Editor] Updated border filter to ${nextPct}% on row ${this.selectedRow}`);
+        this.showFilterBanner(`Border Filter: ${nextPct}%`);
+      }
     }
     
     this.saveProject();
@@ -414,6 +464,39 @@ export class Editor {
       multiplier *= 60;
     }
     return total * 1000;
+  }
+
+  showFilterBanner(message: string) {
+    // Remove existing banner if any
+    const existingBanner = document.getElementById('filter-banner');
+    if (existingBanner) {
+      existingBanner.remove();
+    }
+
+    // Create banner
+    const banner = document.createElement('div');
+    banner.id = 'filter-banner';
+    banner.textContent = message;
+    banner.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2196f3;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-weight: bold;
+      z-index: 2000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    `;
+    
+    document.body.appendChild(banner);
+
+    // Remove after 1.5 seconds
+    setTimeout(() => {
+      banner.remove();
+    }, 1500);
   }
 
   showSaveBanner() {
