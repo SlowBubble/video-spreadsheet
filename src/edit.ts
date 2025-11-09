@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, ProjectCommand } from './project';
+import { Project, ProjectCommand, FullScreenFilter } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
@@ -282,11 +282,34 @@ export class Editor {
     } else if (matchKey(e, 'l')) {
       if (!this.replayManager) return;
       this.replayManager.fastForward(4000);
+    } else if (matchKey(e, 'r')) {
+      this.toggleFullScreenFilter('rgba(255, 0, 0, 0.15)');
+    } else if (matchKey(e, 'g')) {
+      this.toggleFullScreenFilter('rgba(0, 100, 100, 0.1)');
     } else {
       return;
     }
     e.preventDefault();
     this.renderTable();
+  }
+
+  toggleFullScreenFilter(fillStyle: string) {
+    // Only toggle if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    // If filter exists and matches the fillStyle, remove it; otherwise set/update it
+    if (cmd.overlay.fullScreenFilter && cmd.overlay.fullScreenFilter.fillStyle === fillStyle) {
+      cmd.overlay.fullScreenFilter = null;
+      console.log(`[Editor] Removed fullscreen filter from row ${this.selectedRow}`);
+    } else {
+      cmd.overlay.fullScreenFilter = new FullScreenFilter(fillStyle);
+      console.log(`[Editor] Set fullscreen filter to ${fillStyle} on row ${this.selectedRow}`);
+    }
+    
+    this.saveProject();
+    this.initReplayManager();
   }
 
   handleEnterKey() {

@@ -1,18 +1,22 @@
 import { getHashParams } from './urlUtil';
 
+import { Overlay } from './project';
+
 export class PlanAction {
   start: number;
   end: number;
   idx: number;
   resume: boolean;
   assetName: string;
+  overlay: Overlay | null;
 
-  constructor(start: number, end: number, idx: number, resume: boolean, assetName: string) {
+  constructor(start: number, end: number, idx: number, resume: boolean, assetName: string, overlay: Overlay | null = null) {
     this.start = start;
     this.end = end;
     this.idx = idx;
     this.resume = resume;
     this.assetName = assetName;
+    this.overlay = overlay;
   }
 }
 
@@ -39,7 +43,14 @@ export class ReplayManager {
     return params.get('present') === '1';
   }
 
-  drawRedFilter() {
+  clearOverlay() {
+    if (!this.overlayCanvas) return;
+    const ctx = this.overlayCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+  }
+
+  drawFullScreenFilter(fillStyle: string) {
     if (!this.overlayCanvas) return;
     const ctx = this.overlayCanvas.getContext('2d');
     if (!ctx) return;
@@ -47,9 +58,18 @@ export class ReplayManager {
     // Clear canvas first
     ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
     
-    // Draw red filter covering entire canvas
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+    // Draw filter covering entire canvas
+    ctx.fillStyle = fillStyle;
     ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+  }
+
+  updateOverlay(overlay: Overlay | null) {
+    if (!overlay || !overlay.fullScreenFilter) {
+      this.clearOverlay();
+      return;
+    }
+    
+    this.drawFullScreenFilter(overlay.fullScreenFilter.fillStyle);
   }
 
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
@@ -107,8 +127,6 @@ export class ReplayManager {
     container.appendChild(overlayCanvas);
     this.overlayCanvas = overlayCanvas;
     
-    // Draw red filter for testing
-    this.drawRedFilter();
     // Wait for YT API
     const onYouTubeIframeAPIReady = () => {
       this.players = [];
@@ -209,17 +227,19 @@ export class ReplayManager {
         }
       }
       let resume = false;
+      let overlay = null;
       if (idx !== -1) {
         // Resume if this idx was visible before and not restarting
         resume = lastVisible[idx] !== undefined && lastVisible[idx] < c;
         lastVisible[idx] = c;
+        overlay = cmds[idx].overlay;
       }
       const assetName = idx !== -1 ? this.getCommandName(idx) : '[Black Screen]';
-      plan.push(new PlanAction(c, uniquePoints[i + 1], idx, resume, assetName));
+      plan.push(new PlanAction(c, uniquePoints[i + 1], idx, resume, assetName, overlay));
     }
     // For the last change point, show black screen
     const lastPoint = uniquePoints[uniquePoints.length - 1];
-    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, '[Black Screen]'));
+    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, '[Black Screen]', null));
     
     console.log('[Plan Generated] Replay plan:', JSON.stringify(plan, null, 2));
     
@@ -235,6 +255,7 @@ export class ReplayManager {
     this._stepTimeoutId = null;
     this._intervalId = null;
     this.hideAllPlayers();
+    this.clearOverlay();
     if (this.blackDiv) this.blackDiv.style.display = 'block';
     const posDiv = document.getElementById('replay-pos-div') as HTMLDivElement;
     if (posDiv) posDiv.style.display = 'none';
@@ -513,6 +534,7 @@ export class ReplayManager {
       if (!this.isPlaying) return;
       if (step >= plan.length) {
         this.hideAllPlayers();
+        this.clearOverlay();
         if (blackDiv) blackDiv.style.display = 'block';
         if (!hideTime && posDiv) posDiv.style.display = 'none';
         this._intervalId && clearInterval(this._intervalId);
@@ -533,6 +555,7 @@ export class ReplayManager {
         this._intervalId && clearInterval(this._intervalId);
         this._stepTimeoutId = null;
         this._intervalId = null;
+        this.clearOverlay();
         
         // Update position display to show paused at end
         if (!hideTime && posDiv) {
@@ -571,6 +594,9 @@ export class ReplayManager {
           this.showPlayer(action.idx, action.resume);
         }
       }
+      
+      // Update overlay based on current action
+      this.updateOverlay(action.overlay);
       
       this._intervalId && clearInterval(this._intervalId);
       this._intervalId = setInterval(updatePositionDisplay, 500);

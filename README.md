@@ -51,6 +51,14 @@ Overlay and subcommands
   - The purpose is that we want to add different things to the canvas, such as text and filters.
   - For testing purpose, just add a red filter by drawing a rectangle that covers the entire canvas with 'rgba(255, 0, 0, 0.2)' as the fillStyle.
 
+## m5b
+
+- Only enable the red filter based on a new field called `overlay` in ProjectCommand of type Overlay
+  - Overlay will be a class will just one field called `fullScreenFilter` of type FullScreenFilter (will add more fields later).
+  - FullScreenFilter will have just one field called the fillStyle, that default to 'rgba(255, 0, 0, 0.15)'.
+  - Propagate the `overlay` in the PlanAction so that the replayer will know to enable the filter.
+- Keyboard shortcut `r` on the selected row will add the red filter; `g` for green filter.
+
 # m4 impl
 Make it easy to screen-record a good-looking video
 - Present mode
