@@ -18,28 +18,43 @@
 
 # Wishlist
 P1:
-
 - Design subcommands
   - Add a subcommands field to the ProjectCommand class which will have type (ProjectCommand[] vs Subcommand[]) and default to an empty list.
-    - Think about the use case before deciding
-      - slow-mo a certain segment
-      - silenced a certain segment
-      - Do we want to use this to chop things up (like cut away a segment by silencing and fast-forwarding)
+    - Think about the use case before deciding; see `Other subcommands`
   - Press `shift+enter` on a row will add a subcommand to the command.
 
 P2:
-- Final recording mode
-  - open a window of the correct size
+- Other subcommands
+  - slow-mo a certain segment
+  - silence a certain segment
+  - skip a certain segment
+  - pause a certain segment  (may need to slo-mo and repeat instead due to unwanted recommendations showing up)
+  - Add text
+  - Add arrow or box at a certain location
+  - Add filter (likely the full segment)
+  - Zooming in may be hard
+    - Instead, put a border around to block stuff
+
+P3:
+- Present mode
   - warm up all the assets
   - display the first YT player's screen
+
+# m5 impl
+
+Overlay and subcommands
+
+## m5a
+
+- Implement overlay over the iframe that is replaying (don't worry about debug mode where multiple iframes will be showing)
+  - The overlay will just be a canvas with a higher z-index
+  - The purpose is that we want to add different things to the canvas, such as text and filters.
+  - For testing purpose, just add a red filter by drawing a rectangle that covers the entire canvas with 'rgba(255, 0, 0, 0.8)' as the fillStyle.
 
 # m4 impl
 Make it easy to screen-record a good-looking video
-- Final recording mode
+- Present mode
   - open a window of the correct size
-  - warm up all the assets
-  - display the first YT player's screen
-
 
 ## m4a
 
