@@ -21,6 +21,7 @@ export class ReplayManager {
   commands: any[] = [];
   blackDiv: HTMLDivElement | null = null;
   container: HTMLDivElement | null = null;
+  overlayCanvas: HTMLCanvasElement | null = null;
   isPlaying: boolean = false;
   pausedAtMs: number = 0;
   replayStart: number = 0;
@@ -36,6 +37,19 @@ export class ReplayManager {
   isPresentMode(): boolean {
     const params = getHashParams();
     return params.get('present') === '1';
+  }
+
+  drawRedFilter() {
+    if (!this.overlayCanvas) return;
+    const ctx = this.overlayCanvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas first
+    ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+    
+    // Draw red filter covering entire canvas
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+    ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
   }
 
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
@@ -78,6 +92,23 @@ export class ReplayManager {
     blackDiv.style.display = 'block';
     container.appendChild(blackDiv);
     this.blackDiv = blackDiv;
+    
+    // Overlay canvas for filters, text, etc.
+    const overlayCanvas = document.createElement('canvas');
+    overlayCanvas.width = 854;
+    overlayCanvas.height = 480;
+    overlayCanvas.style.position = 'absolute';
+    overlayCanvas.style.top = '0';
+    overlayCanvas.style.left = '0';
+    overlayCanvas.style.width = '854px';
+    overlayCanvas.style.height = '480px';
+    overlayCanvas.style.pointerEvents = 'none'; // Allow clicks to pass through
+    overlayCanvas.style.zIndex = '10'; // Higher than iframes
+    container.appendChild(overlayCanvas);
+    this.overlayCanvas = overlayCanvas;
+    
+    // Draw red filter for testing
+    this.drawRedFilter();
     // Wait for YT API
     const onYouTubeIframeAPIReady = () => {
       this.players = [];

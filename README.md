@@ -49,7 +49,7 @@ Overlay and subcommands
 - Implement overlay over the iframe that is replaying (don't worry about debug mode where multiple iframes will be showing)
   - The overlay will just be a canvas with a higher z-index
   - The purpose is that we want to add different things to the canvas, such as text and filters.
-  - For testing purpose, just add a red filter by drawing a rectangle that covers the entire canvas with 'rgba(255, 0, 0, 0.8)' as the fillStyle.
+  - For testing purpose, just add a red filter by drawing a rectangle that covers the entire canvas with 'rgba(255, 0, 0, 0.2)' as the fillStyle.
 
 # m4 impl
 Make it easy to screen-record a good-looking video
