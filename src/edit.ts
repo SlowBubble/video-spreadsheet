@@ -253,9 +253,19 @@ export class Editor {
       this.selectedRow = Math.min(rowCount - 1, this.selectedRow + 1);
       this.seekToSelectedRow();
     } else if (matchKey(e, 'left')) {
-      this.selectedCol = Math.max(0, this.selectedCol - 1);
+      // If replayer is playing, rewind instead of changing column
+      if (this.replayManager && this.replayManager.isPlaying) {
+        this.replayManager.rewind(3000);
+      } else {
+        this.selectedCol = Math.max(0, this.selectedCol - 1);
+      }
     } else if (matchKey(e, 'right')) {
-      this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
+      // If replayer is playing, fast-forward instead of changing column
+      if (this.replayManager && this.replayManager.isPlaying) {
+        this.replayManager.fastForward(2000);
+      } else {
+        this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
+      }
     } else if (matchKey(e, 'tab')) {
       this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
     } else if (matchKey(e, 'shift+tab')) {
@@ -267,7 +277,7 @@ export class Editor {
     } else if (matchKey(e, '0')) {
       if (!this.replayManager) return;
       this.replayManager.stopReplay();
-    } else if (matchKey(e, 'space')) {
+    } else if (matchKey(e, 'space') || matchKey(e, 'k')) {
       if (!this.replayManager) return;
       if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
@@ -278,7 +288,7 @@ export class Editor {
       this.handleExportImport();
     } else if (matchKey(e, 'j')) {
       if (!this.replayManager) return;
-      this.replayManager.rewind(4000);
+      this.replayManager.rewind(6000);
     } else if (matchKey(e, 'l')) {
       if (!this.replayManager) return;
       this.replayManager.fastForward(4000);
