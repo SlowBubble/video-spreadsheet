@@ -18,6 +18,10 @@
 
 # Wishlist
 
+P2:
+- May need to increase the load length both ways for smoother loading
+  - If so, need to include pause in the Plan Action
+
 P1:
 - Design subcommands
   - Add a subcommands field to the ProjectCommand class which will have type (ProjectCommand[] vs Subcommand[]) and default to an empty list.

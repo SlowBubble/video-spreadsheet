@@ -223,15 +223,6 @@ export class Editor {
     return Math.max(1, this.project.commands.length + 1);
   }
 
-  seekToSelectedRow() {
-    // Only seek if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
-    
-    const cmd = this.project.commands[this.selectedRow];
-    const positionMs = cmd.positionMs;
-    this.replayManager.seekToTime(positionMs);
-  }
-
   renderTable() {
     const params = getHashParams();
     const isPresentMode = params.get('present') === '1';
@@ -340,7 +331,19 @@ export class Editor {
         if (this.replayManager.isPlaying) {
           this.replayManager.pauseReplay();
         } else {
-          this.replayManager.startReplay(this.replayManager.pausedAtMs);
+          // Check if selected cell is on Pos 0 or Pos 1
+          let resumeTime = this.replayManager.pausedAtMs;
+          if (this.selectedRow < this.project.commands.length && (this.selectedCol === 1 || this.selectedCol === 2)) {
+            const cmd = this.project.commands[this.selectedRow];
+            if (this.selectedCol === 1) {
+              // Pos 0 column - use positionMs
+              resumeTime = cmd.positionMs;
+            } else if (this.selectedCol === 2) {
+              // Pos 1 column - use computed end time
+              resumeTime = computeCommandEndTimeMs(cmd);
+            }
+          }
+          this.replayManager.startReplay(resumeTime);
         }
         e.preventDefault();
       }
@@ -353,30 +356,12 @@ export class Editor {
     
     if (matchKey(e, 'up')) {
       this.selectedRow = Math.max(0, this.selectedRow - 1);
-      // Only seek if replayer is not playing
-      if (!this.replayManager.isPlaying) {
-        this.seekToSelectedRow();
-      }
     } else if (matchKey(e, 'down')) {
       this.selectedRow = Math.min(rowCount - 1, this.selectedRow + 1);
-      // Only seek if replayer is not playing
-      if (!this.replayManager.isPlaying) {
-        this.seekToSelectedRow();
-      }
     } else if (matchKey(e, 'left')) {
-      // If replayer is playing, rewind instead of changing column
-      if (this.replayManager.isPlaying) {
-        this.replayManager.rewind(3000);
-      } else {
-        this.selectedCol = Math.max(0, this.selectedCol - 1);
-      }
+      this.selectedCol = Math.max(0, this.selectedCol - 1);
     } else if (matchKey(e, 'right')) {
-      // If replayer is playing, fast-forward instead of changing column
-      if (this.replayManager.isPlaying) {
-        this.replayManager.fastForward(2000);
-      } else {
-        this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
-      }
+      this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
     } else if (matchKey(e, 'tab')) {
       this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
     } else if (matchKey(e, 'shift+tab')) {
@@ -389,14 +374,26 @@ export class Editor {
       if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
       } else {
-        this.replayManager.startReplay(this.replayManager.pausedAtMs);
+        // Check if selected cell is on Pos 0 or Pos 1
+        let resumeTime = this.replayManager.pausedAtMs;
+        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 1 || this.selectedCol === 2)) {
+          const cmd = this.project.commands[this.selectedRow];
+          if (this.selectedCol === 1) {
+            // Pos 0 column - use positionMs
+            resumeTime = cmd.positionMs;
+          } else if (this.selectedCol === 2) {
+            // Pos 1 column - use computed end time
+            resumeTime = computeCommandEndTimeMs(cmd);
+          }
+        }
+        this.replayManager.startReplay(resumeTime);
       }
     } else if (matchKey(e, 'x')) {
       this.handleExportImport();
     } else if (matchKey(e, 'j')) {
-      this.replayManager.rewind(6000);
+      this.replayManager.rewind(3000);
     } else if (matchKey(e, 'l')) {
-      this.replayManager.fastForward(4000);
+      this.replayManager.fastForward(3000);
     } else if (matchKey(e, 'f')) {
       this.cycleFullScreenFilter();
     } else if (matchKey(e, 'b')) {
@@ -728,7 +725,6 @@ export class Editor {
         return;
       }
       cmd.positionMs = Math.max(0, value);
-      this.seekToSelectedRow();
     } else if (this.selectedCol === 2) {
       // Pos 1 column - not editable, disallow paste
       showBanner('Cannot paste: Pos 1 is not editable', {
@@ -843,7 +839,6 @@ export class Editor {
         const newValue = prompt('Edit Position:', currentValue);
         if (newValue !== null) {
           cmd.positionMs = this.timeStringToMs(newValue);
-          this.seekToSelectedRow();
         }
       }
     } else if (this.selectedCol === 2) {
