@@ -25,7 +25,7 @@ export class Surrounding {
 export class PlanAction {
   start: number;
   end: number;
-  idx: number; // Video index (-1 for black screen)
+  cmdIdx: number; // Command index in original project commands array (-1 for black screen)
   playFromStart: boolean; // Start this video from beginning
   showVideo: boolean; // Show this video's iframe
   assetName: string;
@@ -34,7 +34,7 @@ export class PlanAction {
   constructor(
     start: number,
     end: number,
-    idx: number,
+    cmdIdx: number,
     playFromStart: boolean,
     showVideo: boolean,
     assetName: string,
@@ -42,7 +42,7 @@ export class PlanAction {
   ) {
     this.start = start;
     this.end = end;
-    this.idx = idx;
+    this.cmdIdx = cmdIdx;
     this.playFromStart = playFromStart;
     this.showVideo = showVideo;
     this.assetName = assetName;
@@ -209,7 +209,8 @@ export class ReplayManager {
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
     replayDiv.innerHTML = '';
     if (!commands.length) return;
-    commands = [...commands].sort((a, b) => a.positionMs - b.positionMs);
+    // Keep commands in original order - cmdIdx refers to position in this array
+    commands = [...commands];
     
     const isPresentMode = this.isPresentMode();
     
@@ -567,7 +568,7 @@ export class ReplayManager {
     // Process each player
     this.players.forEach((player, i) => {
       const div = document.getElementById(`yt-player-edit-${i}`);
-      const action = actions.find(a => a.idx === i);
+      const action = actions.find(a => a.cmdIdx === i);
       
       if (action) {
         // This video should be active
@@ -783,7 +784,7 @@ export class ReplayManager {
       
       // Handle automatic pause at playback end
       // When reaching the final black screen step, pause at that position
-      if (step >= plan.length && action.idx === -1) {
+      if (step >= plan.length && action.cmdIdx === -1) {
         this.pausedAtMs = action.end;
         this.isPlaying = false;
         this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
@@ -812,8 +813,8 @@ export class ReplayManager {
       
       // Find which video should be visible and check for black screen
       const visibleAction = actions.find(a => a.showVideo);
-      const isBlackScreen = !visibleAction || visibleAction.idx === -1 || 
-        (visibleAction.idx >= 0 && this.commands[visibleAction.idx].asset === '');
+      const isBlackScreen = !visibleAction || visibleAction.cmdIdx === -1 || 
+        (visibleAction.cmdIdx >= 0 && this.commands[visibleAction.cmdIdx].asset === '');
       
       // In debug mode, hide black div; otherwise show it for black screens
       if (blackDiv) {
@@ -828,7 +829,7 @@ export class ReplayManager {
       const isResuming = isStartingStep && resumeFromMs !== undefined && resumeFromMs > 0;
       if (isResuming && resumeFromMs !== undefined) {
         // When resuming mid-playback, seek all active videos to the correct position
-        const visibleIdx = visibleAction ? visibleAction.idx : -1;
+        const visibleIdx = visibleAction ? visibleAction.cmdIdx : -1;
         this.seekAndPlayAllActiveVideos(resumeFromMs, visibleIdx);
       } else {
         // Normal playback: execute all actions

@@ -126,7 +126,7 @@ Overlay and subcommands
 - in maybeSave, do a fine-grain check to see if we actually need to call initReplayManager
   - yes only if a new asset has been added or if startMs or endMs has changed.
 
-# wip: m5n
+# m5n
 Design plan action fields to be cleaner and more explicit so that the plan generation can also be cleaner. PlanAction should have:
 - playVideoFromStart (opposite of resume; let's just get rid of resume, which is a confusing term)
 - resumeVisual (all other videos will be hidden except for this one)
