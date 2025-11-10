@@ -46,9 +46,18 @@ P3:
   - display the first YT player's screen
 - alt-up: move row up
 
+- volume fade-out to be too laggy
+  - consider a field that allows audio to keep playing for longer
+
+# m6 impl
+
+## m6a
+
+
+
 # m5 impl
 
-Overlay and subcommands
+Overlay
 
 ## m5a
 
