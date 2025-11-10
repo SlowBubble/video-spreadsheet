@@ -1,11 +1,11 @@
 import './style.css';
-import { Project, ProjectCommand, FullScreenFilter, BorderFilter } from './project';
+import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
 import { getHashParams } from './urlUtil';
 
-const columns = ['Asset', 'Position', 'Start', 'End', 'Volume', 'Speed'];
+const columns = ['Asset', 'Position', 'Start', 'End', 'Volume', 'Speed', 'Text'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -121,6 +121,8 @@ export class Editor {
         return cmd.volume.toString();
       case 5: // Speed
         return cmd.speed.toString();
+      case 6: // Text
+        return cmd.overlay.textDisplay?.content || '';
       default:
         return '';
     }
@@ -453,6 +455,23 @@ export class Editor {
             cmd.speed = speed;
             this.saveProject();
           }
+        }
+      }
+    } else if (this.selectedCol === 6) {
+      // Text column
+      if (isExistingCommand) {
+        const cmd = this.project.commands[this.selectedRow];
+        const currentText = cmd.overlay.textDisplay?.content || '';
+        const newValue = prompt('Edit Text:', currentText);
+        if (newValue !== null) {
+          // Update overlay textDisplay
+          if (newValue.trim() !== '') {
+            cmd.overlay.textDisplay = new TextDisplay(newValue);
+          } else {
+            cmd.overlay.textDisplay = null;
+          }
+          this.saveProject();
+          this.initReplayManager();
         }
       }
     }

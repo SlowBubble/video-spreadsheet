@@ -1,3 +1,11 @@
+export class TextDisplay {
+  content: string;
+
+  constructor(content: string) {
+    this.content = content;
+  }
+}
+
 export class FullScreenFilter {
   fillStyle: string;
 
@@ -21,10 +29,12 @@ export class BorderFilter {
 export class Overlay {
   fullScreenFilter: FullScreenFilter | null;
   borderFilter: BorderFilter | null;
+  textDisplay: TextDisplay | null;
 
-  constructor(fullScreenFilter?: FullScreenFilter | null, borderFilter?: BorderFilter | null) {
+  constructor(fullScreenFilter?: FullScreenFilter | null, borderFilter?: BorderFilter | null, textDisplay?: TextDisplay | null) {
     this.fullScreenFilter = fullScreenFilter || null;
     this.borderFilter = borderFilter || null;
+    this.textDisplay = textDisplay || null;
   }
 }
 
@@ -97,7 +107,12 @@ export class Project {
           );
         }
         
-        overlay = new Overlay(fullScreenFilter, borderFilter);
+        let textDisplay = null;
+        if (cmd.overlay.textDisplay) {
+          textDisplay = new TextDisplay(cmd.overlay.textDisplay.content);
+        }
+        
+        overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
       }
       return new ProjectCommand(
         cmd.asset,

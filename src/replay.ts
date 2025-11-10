@@ -78,6 +78,31 @@ export class ReplayManager {
     ctx.fillRect(0, canvasHeight - bottomHeight, canvasWidth, bottomHeight);
   }
 
+  drawText(content: string) {
+    if (!this.overlayCanvas) return;
+    const ctx = this.overlayCanvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Set text properties
+    ctx.font = '36px sans-serif';
+    ctx.fillStyle = 'white';
+    ctx.textBaseline = 'top';
+    
+    // Measure text to create background
+    const textMetrics = ctx.measureText(content);
+    const textWidth = textMetrics.width;
+    const textHeight = 36; // Font size
+    const padding = 10;
+    
+    // Draw black background with opacity
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(10, 10, textWidth + padding * 2, textHeight + padding * 2);
+    
+    // Draw text
+    ctx.fillStyle = 'white';
+    ctx.fillText(content, 10 + padding, 10 + padding);
+  }
+
   updateOverlay(overlay: Overlay | null) {
     // Clear canvas first
     this.clearOverlay();
@@ -96,6 +121,11 @@ export class ReplayManager {
         overlay.borderFilter.bottomMarginPct,
         overlay.borderFilter.fillStyle
       );
+    }
+    
+    // Draw text if present (on top of filters)
+    if (overlay.textDisplay && overlay.textDisplay.content) {
+      this.drawText(overlay.textDisplay.content);
     }
   }
 

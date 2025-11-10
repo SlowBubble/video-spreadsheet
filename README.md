@@ -61,9 +61,18 @@ Overlay and subcommands
 
 ## m5c
 
-- Implement a borderFilter in Overlay, where BorderFilter has the field topMarginPct and bottomMarginPct default them to 8 for now and a fillStyle field that defaults to 'rgba(0, 0, 0, 0.4)'
+- Implement a borderFilter in Overlay, where BorderFilter has the field topMarginPct and bottomMarginPct default them to 8 for now and a fillStyle field that defaults to 'rgba(0, 0, 0, 0.85)'
 - Implement it by drawing top and bottom rectangles based on the specified percentage and fillStyle
 - Enable it via `b` on the selected row.
+
+## m5d
+
+- Add a text field to the ProjectCommand
+- Add a column in the table to edit it.
+- If it's non-empty:
+  - Propagate it to the overlay as a new field called `textDisplay` with type TextDisplay which has the field called `content`
+  - Default to writing the text to the upper left of the canvas above the other filters
+  - Write the text in white with 36px with black background of opacity 0.6
 
 # m4 impl
 Make it easy to screen-record a good-looking video
