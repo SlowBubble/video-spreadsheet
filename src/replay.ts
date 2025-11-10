@@ -8,6 +8,20 @@ function speedToRate(speed: number): number {
   return speed / 100;
 }
 
+export class Surrounding {
+  starting: number[];
+  ongoing: number[];
+  ending: number[];
+  timeMs: number;
+
+  constructor(timeMs: number, starting: number[] = [], ongoing: number[] = [], ending: number[] = []) {
+    this.timeMs = timeMs;
+    this.starting = starting;
+    this.ongoing = ongoing;
+    this.ending = ending;
+  }
+}
+
 export class PlanAction {
   start: number;
   end: number;
@@ -326,90 +340,120 @@ export class ReplayManager {
     return cmd.name || `[${idx}]`;
   }
 
-  generateReplayPlan(): PlanAction[] {
+  getVisibleCommand(timeMs: number, surroundings: Surrounding[]): number {
+    // Find the surrounding for this timeMs
+    const surrounding = surroundings.find(s => s.timeMs === timeMs);
+    if (!surrounding) return -1;
+
+    // Get all active commands (starting + ongoing)
+    const activeCommands = [...surrounding.starting, ...surrounding.ongoing];
+    
+    // Return the max commandIdx (highest precedence)
+    if (activeCommands.length === 0) return -1;
+    return Math.max(...activeCommands);
+  }
+
+  generateReplayPlan2(): PlanAction[] {
     const cmds = this.commands;
     if (!cmds || !cmds.length) return [];
-    
-    // Create a sorted list with rowIdx (table row position)
-    // Commands are sorted by positionMs, then by array index
-    const sortedCommands = cmds
-      .map((cmd, idx) => ({ cmd, idx, positionMs: cmd.positionMs }))
-      .sort((a, b) => a.positionMs - b.positionMs || a.idx - b.idx);
-    
-    // Create a map from array index to rowIdx (table row position)
-    const idxToRowIdx = new Map<number, number>();
-    sortedCommands.forEach((item, rowIdx) => {
-      idxToRowIdx.set(item.idx, rowIdx);
-    });
-    
-    // Collect all change points (start and end of intervals)
-    // Account for playback speed: slower speed = longer actual duration
-    const points: number[] = [];
+
+    // Step 1: Find all important points (start and end of each command)
+    const points = new Set<number>();
     cmds.forEach((cmd: any) => {
-      const a = cmd.positionMs;
+      const startTime = cmd.positionMs;
       const videoDuration = cmd.endMs - cmd.startMs;
       const rate = speedToRate(cmd.speed);
       const actualDuration = videoDuration / rate;
-      const b = cmd.positionMs + actualDuration;
-      points.push(a, b);
+      const endTime = cmd.positionMs + actualDuration;
+      
+      points.add(startTime);
+      points.add(endTime);
     });
-    // Remove duplicates and sort
-    const uniquePoints = Array.from(new Set(points)).sort((a, b) => a - b);
-    const plan: PlanAction[] = [];
+
+    // Convert to sorted array
+    const sortedPoints = Array.from(points).sort((a, b) => a - b);
+
+    // Step 2: Create Surrounding objects for each time point
+    const surroundings: Surrounding[] = [];
     
-    // Track which videos are currently playing
-    let previouslyActive = new Set<number>();
-    
-    for (let i = 0; i < uniquePoints.length - 1; i++) {
-      const c = uniquePoints[i];
-      const nextPoint = uniquePoints[i + 1];
-      
-      // Find all videos that should be active (playing) at time c
-      const currentlyActive = new Set<number>();
-      for (let j = 0; j < cmds.length; j++) {
-        const a = cmds[j].positionMs;
-        const videoDuration = cmds[j].endMs - cmds[j].startMs;
-        const rate = speedToRate(cmds[j].speed);
+    sortedPoints.forEach((timeMs) => {
+      const starting: number[] = [];
+      const ongoing: number[] = [];
+      const ending: number[] = [];
+
+      cmds.forEach((cmd: any, idx: number) => {
+        const startTime = cmd.positionMs;
+        const videoDuration = cmd.endMs - cmd.startMs;
+        const rate = speedToRate(cmd.speed);
         const actualDuration = videoDuration / rate;
-        const b = cmds[j].positionMs + actualDuration;
-        if (c >= a && c < b) {
-          currentlyActive.add(j);
-        }
-      }
-      
-      // Find which video should be visible (pick the one with highest rowIdx - later in table)
-      let visibleIdx = -1;
-      let highestRowIdx = -1;
-      currentlyActive.forEach((idx) => {
-        const rowIdx = idxToRowIdx.get(idx) ?? -1;
-        if (rowIdx > highestRowIdx) {
-          highestRowIdx = rowIdx;
-          visibleIdx = idx;
+        const endTime = cmd.positionMs + actualDuration;
+
+        if (timeMs === startTime) {
+          starting.push(idx);
+        } else if (timeMs === endTime) {
+          ending.push(idx);
+        } else if (timeMs > startTime && timeMs < endTime) {
+          ongoing.push(idx);
         }
       });
+
+      surroundings.push(new Surrounding(timeMs, starting, ongoing, ending));
+    });
+
+    // Step 3: Generate Plan Actions based on surroundings
+    const plan: PlanAction[] = [];
+
+    for (let i = 0; i < surroundings.length - 1; i++) {
+      const current = surroundings[i];
+      const next = surroundings[i + 1];
       
-      // Create one action per active video
-      currentlyActive.forEach((idx) => {
-        const playFromStart = !previouslyActive.has(idx);
-        const showVideo = (idx === visibleIdx);
-        const overlay = showVideo ? cmds[idx].overlay : undefined;
-        const assetName = this.getCommandName(idx);
-        
-        plan.push(new PlanAction(c, nextPoint, idx, playFromStart, showVideo, assetName, overlay));
-      });
+      const visibleCmdIdx = this.getVisibleCommand(current.timeMs, surroundings);
       
-      // If no videos are active, add black screen action
-      if (currentlyActive.size === 0) {
-        plan.push(new PlanAction(c, nextPoint, -1, false, true, '[Black Screen]'));
+      // Get all active commands (starting + ongoing)
+      const activeCommands = [...current.starting, ...current.ongoing];
+
+      if (activeCommands.length === 0) {
+        // No active commands, show black screen
+        plan.push(new PlanAction(
+          current.timeMs,
+          next.timeMs,
+          -1,
+          false,
+          true,
+          '[Black Screen]'
+        ));
+      } else {
+        // Create actions for each active command
+        activeCommands.forEach((cmdIdx) => {
+          const playFromStart = current.starting.includes(cmdIdx);
+          const showVideo = (cmdIdx === visibleCmdIdx);
+          const overlay = showVideo ? cmds[cmdIdx].overlay : undefined;
+          const assetName = this.getCommandName(cmdIdx);
+
+          plan.push(new PlanAction(
+            current.timeMs,
+            next.timeMs,
+            cmdIdx,
+            playFromStart,
+            showVideo,
+            assetName,
+            overlay
+          ));
+        });
       }
-      
-      previouslyActive = currentlyActive;
     }
-    
-    // For the last change point, show black screen
-    const lastPoint = uniquePoints[uniquePoints.length - 1];
-    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, true, '[Black Screen]'));
-    
+
+    // Handle the last point - show black screen
+    const lastSurrounding = surroundings[surroundings.length - 1];
+    plan.push(new PlanAction(
+      lastSurrounding.timeMs,
+      lastSurrounding.timeMs + 1000,
+      -1,
+      false,
+      true,
+      '[Black Screen]'
+    ));
+
     console.log('[Plan Generated] Replay plan:', JSON.stringify(plan, null, 2));
     
     return plan;
@@ -637,7 +681,7 @@ export class ReplayManager {
     if (!players || !commands || !blackDiv) return;
     
     // Subtask 3.2: Generate the full replay plan and detect resume-from-end
-    const plan = this.generateReplayPlan();
+    const plan = this.generateReplayPlan2();
     if (plan.length === 0) return;
     
     const endTime = plan[plan.length - 1].start;
