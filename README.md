@@ -93,11 +93,18 @@ Overlay and subcommands
 
 - Separate the Position column into `Pos 0` and `Pos 1`, where `Pos 1` column that is not editable
 
-# wip: m5i
-- Make it easy to copy and paste the times so that we don't need to build an auto-update/snap system.
-  - Need to copy paste the ms.
+# m5i
+- Make it easy to copy cells.
+  - `cmd+c`: For the 4 column about time in ms, Implement it internally by storing the actual integer in ms as a string; for the asset column, copy the underlying asset link as a string; for the rest, store the string itself.
+  - `cmd+v`: Disallowed for `Pos 1` column. For asset, pasting will modify the asset link. For column of type number, you need to parse the string into number; if it's a NaN, then just display a banner "Failed: Invalid number" and return early.
 
-# m5j
+# wip: m5j
+
+- Link the start and end column values to the asset link with a slight modification
+  - Remove the "t=" url param from the link if it's there
+  - construst the "t=123s" based on the value of that cell.
+
+# m5k
 - Decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses

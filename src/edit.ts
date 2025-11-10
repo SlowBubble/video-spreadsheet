@@ -74,6 +74,7 @@ export class Editor {
   selectedCol: number = 0;
   replayManager!: ReplayManager;
   replayDiv: HTMLDivElement;
+  clipboard: string = '';
 
   constructor() {
     const params = getHashParams();
@@ -335,6 +336,10 @@ export class Editor {
       this.adjustTimeValue(500);
     } else if (matchKey(e, 'alt+left')) {
       this.adjustTimeValue(-500);
+    } else if (matchKey(e, 'cmd+c')) {
+      this.copyCell();
+    } else if (matchKey(e, 'cmd+v')) {
+      this.pasteCell();
     } else {
       return;
     }
@@ -515,6 +520,163 @@ export class Editor {
     }
     
     this.saveProject();
+  }
+
+  copyCell() {
+    // Only copy if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    // Store the value based on column type
+    if (this.selectedCol === 0) {
+      // Asset column - copy the underlying asset link
+      this.clipboard = cmd.asset;
+    } else if (this.selectedCol === 1) {
+      // Pos 0 column - store as ms integer string
+      this.clipboard = cmd.positionMs.toString();
+    } else if (this.selectedCol === 2) {
+      // Pos 1 column - store as ms integer string
+      this.clipboard = computeCommandEndTimeMs(cmd).toString();
+    } else if (this.selectedCol === 3) {
+      // Start column - store as ms integer string
+      this.clipboard = cmd.startMs.toString();
+    } else if (this.selectedCol === 4) {
+      // End column - store as ms integer string
+      this.clipboard = cmd.endMs.toString();
+    } else if (this.selectedCol === 5) {
+      // Volume column - store as string
+      this.clipboard = cmd.volume.toString();
+    } else if (this.selectedCol === 6) {
+      // Speed column - store as string
+      this.clipboard = cmd.speed.toString();
+    } else if (this.selectedCol === 7) {
+      // Text column - store as string
+      this.clipboard = cmd.overlay.textDisplay?.content || '';
+    }
+    
+    console.log(`[Editor] Copied: ${this.clipboard}`);
+    showBanner('Copied!', {
+      id: 'copy-banner',
+      position: 'bottom',
+      color: 'green',
+      duration: 500
+    });
+  }
+
+  pasteCell() {
+    // Only paste if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    // Don't paste if clipboard is empty
+    if (!this.clipboard) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    // Paste based on column type
+    if (this.selectedCol === 0) {
+      // Asset column - paste the asset link
+      cmd.asset = this.clipboard;
+      this.saveProject();
+      this.initReplayManager();
+    } else if (this.selectedCol === 1) {
+      // Pos 0 column - parse as number
+      const value = Number(this.clipboard);
+      if (isNaN(value)) {
+        showBanner('Failed: Invalid number', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
+      }
+      cmd.positionMs = Math.max(0, value);
+      this.saveProject();
+      this.seekToSelectedRow();
+    } else if (this.selectedCol === 2) {
+      // Pos 1 column - not editable, disallow paste
+      showBanner('Cannot paste: Pos 1 is not editable', {
+        id: 'paste-banner',
+        position: 'bottom',
+        color: 'red',
+        duration: 1500
+      });
+      return;
+    } else if (this.selectedCol === 3) {
+      // Start column - parse as number
+      const value = Number(this.clipboard);
+      if (isNaN(value)) {
+        showBanner('Failed: Invalid number', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
+      }
+      cmd.startMs = Math.max(0, value);
+      this.saveProject();
+    } else if (this.selectedCol === 4) {
+      // End column - parse as number
+      const value = Number(this.clipboard);
+      if (isNaN(value)) {
+        showBanner('Failed: Invalid number', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
+      }
+      cmd.endMs = Math.max(0, value);
+      this.saveProject();
+    } else if (this.selectedCol === 5) {
+      // Volume column - parse as number
+      const value = Number(this.clipboard);
+      if (isNaN(value)) {
+        showBanner('Failed: Invalid number', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
+      }
+      cmd.volume = value;
+      this.saveProject();
+    } else if (this.selectedCol === 6) {
+      // Speed column - parse as number
+      const value = Number(this.clipboard);
+      if (isNaN(value) || value <= 0) {
+        showBanner('Failed: Invalid number', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
+      }
+      cmd.speed = value;
+      this.saveProject();
+    } else if (this.selectedCol === 7) {
+      // Text column - paste as string
+      if (this.clipboard.trim() !== '') {
+        cmd.overlay.textDisplay = new TextDisplay(this.clipboard);
+      } else {
+        cmd.overlay.textDisplay = null;
+      }
+      this.saveProject();
+      this.initReplayManager();
+    }
+    
+    console.log(`[Editor] Pasted: ${this.clipboard}`);
+    showBanner('Pasted!', {
+      id: 'paste-banner',
+      position: 'bottom',
+      color: 'green',
+      duration: 500
+    });
   }
 
   handleEnterKey() {
