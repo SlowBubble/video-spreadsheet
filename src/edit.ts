@@ -7,7 +7,7 @@ import { getHashParams } from './urlUtil';
 import { showBanner } from './bannerUtil';
 import { UndoManager } from './undo';
 
-const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Volume', 'Speed', 'Text'];
+const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -315,6 +315,36 @@ export class Editor {
         this.replayManager.startReplay(timeMs);
       });
     });
+
+    // Add click event listeners to table cells for selection
+    const table = document.querySelector('table');
+    if (table) {
+      const tbody = table.querySelector('tbody');
+      if (tbody) {
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, rowIdx) => {
+          const cells = row.querySelectorAll('td');
+          cells.forEach((cell, colIdx) => {
+            cell.addEventListener('click', () => {
+              // Update selected cell
+              this.selectedRow = rowIdx;
+              this.selectedCol = colIdx;
+              this.renderTable();
+            });
+            
+            cell.addEventListener('dblclick', () => {
+              // Update selected cell
+              this.selectedRow = rowIdx;
+              this.selectedCol = colIdx;
+              // Trigger edit mode (same as pressing Enter)
+              this.handleEnterKey();
+              this.renderTable();
+              this.maybeSave();
+            });
+          });
+        });
+      }
+    }
 
     setupShortcutsModal();
   }

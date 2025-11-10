@@ -138,7 +138,7 @@ Design plan action fields to be cleaner and more explicit so that the plan gener
 E.g. playVideoFromStart without resumeVisual means the viewer will just hear the sound
 E.g. resumeVisual without playVideoFromStart means the video will be visible again, but not restarting because it is previously playing in the background
 
-# wip: m5o
+# m5o
 
 At this point it is simpler to rewrite generateReplayPlan in a separate method, called generateReplayPlan2
 - Given the commands from the project, we know the commandIdx for each command is 0, 1, 2, etc. This is used to determine precedence for what is visible (higher commandIdx, higher precendence when there is overlap)
@@ -162,7 +162,13 @@ Then call generateReplayPlan2 instead of generateReplayPlan.
 - shortcut: `backspace` will remove the asset. Add a confirm prompt
 - In a new row, when entering '' for asset link, create a new row as usual, but set the asset name to 'Black' and when replaying treat it as 'Black Screen'
 
-# m5p
+# m5q
+
+SUpport mouse click
+- clicking on a cell will move the selected cell to it (except for the header)
+- double-clicking will move to it and then have the same action as pressing enter (so refactor accordingly)
+
+# m5r
 - Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses
