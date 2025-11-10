@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay } from './project';
+import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay, Overlay } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
@@ -64,6 +64,14 @@ function extractTimeFromUrl(url: string): number | null {
 // Speed is stored as percentage (5-100), but YouTube API uses rate (0.05-1.0)
 function speedToRate(speed: number): number {
   return speed / 100;
+}
+
+// Ensure command has an overlay object (create if undefined)
+function ensureOverlay(cmd: ProjectCommand): Overlay {
+  if (!cmd.overlay) {
+    cmd.overlay = new Overlay();
+  }
+  return cmd.overlay;
 }
 
 // Compute the absolute end time in ms for a command
@@ -164,7 +172,7 @@ export class Editor {
       case 6: // Speed (display as percentage)
         return cmd.speed.toString();
       case 7: // Text
-        return cmd.overlay.textDisplay?.content || '';
+        return cmd.overlay?.textDisplay?.content || '';
       default:
         return '';
     }
@@ -439,19 +447,21 @@ export class Editor {
     const redFilter = 'rgba(255, 0, 0, 0.15)';
     const greenFilter = 'rgba(0, 100, 100, 0.15)';
     
-    if (!cmd.overlay.fullScreenFilter) {
+    const overlay = ensureOverlay(cmd);
+    
+    if (!overlay.fullScreenFilter) {
       // Start with red
-      cmd.overlay.fullScreenFilter = new FullScreenFilter(redFilter);
+      overlay.fullScreenFilter = new FullScreenFilter(redFilter);
       console.log(`[Editor] Set fullscreen filter to red on row ${this.selectedRow}`);
       this.showFilterBanner('Fullscreen Filter: Red');
-    } else if (cmd.overlay.fullScreenFilter.fillStyle === redFilter) {
+    } else if (overlay.fullScreenFilter.fillStyle === redFilter) {
       // Move to green
-      cmd.overlay.fullScreenFilter = new FullScreenFilter(greenFilter);
+      overlay.fullScreenFilter = new FullScreenFilter(greenFilter);
       console.log(`[Editor] Set fullscreen filter to green on row ${this.selectedRow}`);
       this.showFilterBanner('Fullscreen Filter: Green');
     } else {
       // Remove filter
-      cmd.overlay.fullScreenFilter = null;
+      overlay.fullScreenFilter = undefined;
       console.log(`[Editor] Removed fullscreen filter from row ${this.selectedRow}`);
       this.showFilterBanner('Fullscreen Filter: OFF');
     }
@@ -467,25 +477,27 @@ export class Editor {
     const percentageOptions = [7, 10, 13, 16, 19];
     const fillStyle = 'rgba(0, 0, 0, 0.85)';
     
-    if (!cmd.overlay.borderFilter) {
+    const overlay = ensureOverlay(cmd);
+    
+    if (!overlay.borderFilter) {
       // Start with first option
-      cmd.overlay.borderFilter = new BorderFilter(percentageOptions[0], percentageOptions[0], fillStyle);
+      overlay.borderFilter = new BorderFilter(percentageOptions[0], percentageOptions[0], fillStyle);
       console.log(`[Editor] Added border filter ${percentageOptions[0]}% to row ${this.selectedRow}`);
       this.showFilterBanner(`Border Filter: ${percentageOptions[0]}%`);
     } else {
       // Find current percentage and move to next
-      const currentPct = cmd.overlay.borderFilter.topMarginPct;
+      const currentPct = overlay.borderFilter.topMarginPct;
       const currentIndex = percentageOptions.indexOf(currentPct);
       
       if (currentIndex === -1 || currentIndex === percentageOptions.length - 1) {
         // If not found or at last option, remove filter
-        cmd.overlay.borderFilter = null;
+        overlay.borderFilter = undefined;
         console.log(`[Editor] Removed border filter from row ${this.selectedRow}`);
         this.showFilterBanner('Border Filter: OFF');
       } else {
         // Move to next option
         const nextPct = percentageOptions[currentIndex + 1];
-        cmd.overlay.borderFilter = new BorderFilter(nextPct, nextPct, fillStyle);
+        overlay.borderFilter = new BorderFilter(nextPct, nextPct, fillStyle);
         console.log(`[Editor] Updated border filter to ${nextPct}% on row ${this.selectedRow}`);
         this.showFilterBanner(`Border Filter: ${nextPct}%`);
       }
@@ -499,7 +511,7 @@ export class Editor {
     const cmd = this.project.commands[this.selectedRow];
     
     // Only toggle if there is text
-    if (!cmd.overlay.textDisplay || !cmd.overlay.textDisplay.content) {
+    if (!cmd.overlay?.textDisplay || !cmd.overlay.textDisplay.content) {
       return;
     }
     
@@ -652,7 +664,7 @@ export class Editor {
       this.clipboard = cmd.speed.toString();
     } else if (this.selectedCol === 7) {
       // Text column - store as string
-      this.clipboard = cmd.overlay.textDisplay?.content || '';
+      this.clipboard = cmd.overlay?.textDisplay?.content || '';
     }
     
     console.log(`[Editor] Copied: ${this.clipboard}`);
@@ -767,9 +779,10 @@ export class Editor {
     } else if (this.selectedCol === 7) {
       // Text column - paste as string
       if (this.clipboard.trim() !== '') {
-        cmd.overlay.textDisplay = new TextDisplay(this.clipboard);
-      } else {
-        cmd.overlay.textDisplay = null;
+        const overlay = ensureOverlay(cmd);
+        overlay.textDisplay = new TextDisplay(this.clipboard);
+      } else if (cmd.overlay) {
+        cmd.overlay.textDisplay = undefined;
       }
     }
     
@@ -871,14 +884,15 @@ export class Editor {
       // Text column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
-        const currentText = cmd.overlay.textDisplay?.content || '';
+        const currentText = cmd.overlay?.textDisplay?.content || '';
         const newValue = prompt('Edit Text:', currentText);
         if (newValue !== null) {
           // Update overlay textDisplay
           if (newValue.trim() !== '') {
-            cmd.overlay.textDisplay = new TextDisplay(newValue);
-          } else {
-            cmd.overlay.textDisplay = null;
+            const overlay = ensureOverlay(cmd);
+            overlay.textDisplay = new TextDisplay(newValue);
+          } else if (cmd.overlay) {
+            cmd.overlay.textDisplay = undefined;
           }
         }
       }

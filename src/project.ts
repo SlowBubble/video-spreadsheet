@@ -31,14 +31,14 @@ export class BorderFilter {
 }
 
 export class Overlay {
-  fullScreenFilter: FullScreenFilter | null;
-  borderFilter: BorderFilter | null;
-  textDisplay: TextDisplay | null;
+  fullScreenFilter?: FullScreenFilter;
+  borderFilter?: BorderFilter;
+  textDisplay?: TextDisplay;
 
-  constructor(fullScreenFilter?: FullScreenFilter | null, borderFilter?: BorderFilter | null, textDisplay?: TextDisplay | null) {
-    this.fullScreenFilter = fullScreenFilter || null;
-    this.borderFilter = borderFilter || null;
-    this.textDisplay = textDisplay || null;
+  constructor(fullScreenFilter?: FullScreenFilter, borderFilter?: BorderFilter, textDisplay?: TextDisplay) {
+    if (fullScreenFilter) this.fullScreenFilter = fullScreenFilter;
+    if (borderFilter) this.borderFilter = borderFilter;
+    if (textDisplay) this.textDisplay = textDisplay;
   }
 }
 
@@ -50,7 +50,7 @@ export class ProjectCommand {
   volume: number;
   speed: number;
   name: string;
-  overlay: Overlay;
+  overlay?: Overlay;
 
   constructor(
     asset: string,
@@ -69,7 +69,9 @@ export class ProjectCommand {
     this.volume = volume !== undefined && volume >= 0 ? volume : 100;
     this.speed = speed !== undefined && speed > 0 ? speed : 1;
     this.name = name || '';
-    this.overlay = overlay || new Overlay();
+    if (overlay) {
+      this.overlay = overlay;
+    }
   }
 }
 
@@ -95,14 +97,14 @@ export class Project {
   static fromJSON(json: string): Project {
     const data = JSON.parse(json);
     return new Project(data.title, data.id, data.commands.map((cmd: any) => {
-      let overlay = new Overlay();
+      let overlay: Overlay | undefined = undefined;
       if (cmd.overlay) {
-        let fullScreenFilter = null;
+        let fullScreenFilter: FullScreenFilter | undefined = undefined;
         if (cmd.overlay.fullScreenFilter) {
           fullScreenFilter = new FullScreenFilter(cmd.overlay.fullScreenFilter.fillStyle);
         }
         
-        let borderFilter = null;
+        let borderFilter: BorderFilter | undefined = undefined;
         if (cmd.overlay.borderFilter) {
           borderFilter = new BorderFilter(
             cmd.overlay.borderFilter.topMarginPct,
@@ -111,7 +113,7 @@ export class Project {
           );
         }
         
-        let textDisplay = null;
+        let textDisplay: TextDisplay | undefined = undefined;
         if (cmd.overlay.textDisplay) {
           textDisplay = new TextDisplay(
             cmd.overlay.textDisplay.content,
@@ -119,7 +121,10 @@ export class Project {
           );
         }
         
-        overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+        // Only create overlay if at least one filter/text is present
+        if (fullScreenFilter || borderFilter || textDisplay) {
+          overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+        }
       }
       return new ProjectCommand(
         cmd.asset,

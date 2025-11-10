@@ -15,7 +15,7 @@ export class PlanAction {
   playFromStart: boolean; // Start this video from beginning
   showVideo: boolean; // Show this video's iframe
   assetName: string;
-  overlay: Overlay | null;
+  overlay?: Overlay;
 
   constructor(
     start: number,
@@ -24,7 +24,7 @@ export class PlanAction {
     playFromStart: boolean,
     showVideo: boolean,
     assetName: string,
-    overlay: Overlay | null = null
+    overlay?: Overlay
   ) {
     this.start = start;
     this.end = end;
@@ -32,7 +32,9 @@ export class PlanAction {
     this.playFromStart = playFromStart;
     this.showVideo = showVideo;
     this.assetName = assetName;
-    this.overlay = overlay;
+    if (overlay) {
+      this.overlay = overlay;
+    }
   }
 }
 
@@ -164,7 +166,7 @@ export class ReplayManager {
     ctx.fillText(content, x + padding, y + padding);
   }
 
-  updateOverlay(overlay: Overlay | null) {
+  updateOverlay(overlay?: Overlay) {
     // Clear canvas first
     this.clearOverlay();
     
@@ -380,7 +382,7 @@ export class ReplayManager {
       currentlyActive.forEach((idx) => {
         const playFromStart = !previouslyActive.has(idx);
         const showVideo = (idx === visibleIdx);
-        const overlay = showVideo ? cmds[idx].overlay : null;
+        const overlay = showVideo ? cmds[idx].overlay : undefined;
         const assetName = this.getCommandName(idx);
         
         plan.push(new PlanAction(c, nextPoint, idx, playFromStart, showVideo, assetName, overlay));
@@ -388,7 +390,7 @@ export class ReplayManager {
       
       // If no videos are active, add black screen action
       if (currentlyActive.size === 0) {
-        plan.push(new PlanAction(c, nextPoint, -1, false, true, '[Black Screen]', null));
+        plan.push(new PlanAction(c, nextPoint, -1, false, true, '[Black Screen]'));
       }
       
       previouslyActive = currentlyActive;
@@ -396,7 +398,7 @@ export class ReplayManager {
     
     // For the last change point, show black screen
     const lastPoint = uniquePoints[uniquePoints.length - 1];
-    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, true, '[Black Screen]', null));
+    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, true, '[Black Screen]'));
     
     console.log('[Plan Generated] Replay plan:', JSON.stringify(plan, null, 2));
     
@@ -798,7 +800,7 @@ export class ReplayManager {
       }
       
       // Update overlay based on visible action
-      this.updateOverlay(visibleAction ? visibleAction.overlay : null);
+      this.updateOverlay(visibleAction?.overlay);
       
       this._intervalId && clearInterval(this._intervalId);
       this._intervalId = setInterval(updatePositionDisplay, 500);
