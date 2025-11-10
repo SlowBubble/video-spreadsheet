@@ -77,6 +77,12 @@ Overlay and subcommands
 ## m5e
 - Add shortcut `t`; if there is text, then toggle alignment of TextDisplay among 4 options, upper left, lower left, upper right and lower right
 
+## m5f
+
+- Decide if I need subcommands
+  - I mainly want slow-mo to dramatize a stroke
+  - May be add in some pauses
+
 # m4 impl
 Make it easy to screen-record a good-looking video
 - Present mode

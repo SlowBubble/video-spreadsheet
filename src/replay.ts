@@ -1,5 +1,5 @@
 import { getHashParams } from './urlUtil';
-
+import { showBanner } from './bannerUtil';
 import { Overlay } from './project';
 
 export class PlanAction {
@@ -32,6 +32,9 @@ export class ReplayManager {
   replayOffset: number = 0;
   _intervalId: any = null;
   _stepTimeoutId: any = null;
+  isInitialized: boolean = false;
+  playersReadyCount: number = 0;
+  totalPlayersExpected: number = 0;
 
   isDebugMode(): boolean {
     const params = getHashParams();
@@ -41,6 +44,18 @@ export class ReplayManager {
   isPresentMode(): boolean {
     const params = getHashParams();
     return params.get('present') === '1';
+  }
+
+  showInitBanner() {
+    // Don't show banner in present mode
+    if (this.isPresentMode()) return;
+    
+    showBanner('Player loaded!', {
+      id: 'init-banner',
+      position: 'top',
+      color: 'green',
+      duration: 2000
+    });
   }
 
   clearOverlay() {
@@ -217,6 +232,9 @@ export class ReplayManager {
     // Wait for YT API
     const onYouTubeIframeAPIReady = () => {
       this.players = [];
+      this.playersReadyCount = 0;
+      this.totalPlayersExpected = commands.filter((cmd: any) => getYouTubeId(cmd.asset) !== null).length;
+      
       commands.forEach((cmd: any, idx: number) => {
         const ytId = getYouTubeId(cmd.asset);
         const startSec = Math.floor(cmd.startMs / 1000);
@@ -256,6 +274,16 @@ export class ReplayManager {
                 event.target.pauseVideo();
                 event.target.setVolume(cmd.volume);
                 event.target.setPlaybackRate(cmd.speed);
+                
+                // Track initialization progress
+                this.playersReadyCount++;
+                console.log(`[Init] Players ready: ${this.playersReadyCount}/${this.totalPlayersExpected}`);
+                
+                if (this.playersReadyCount === this.totalPlayersExpected) {
+                  this.isInitialized = true;
+                  console.log('[Init] All players initialized');
+                  this.showInitBanner();
+                }
               }
             }
           });
@@ -547,6 +575,12 @@ export class ReplayManager {
 
   startReplay(resumeFromMs?: number) {
     if (this.isPlaying) return;
+    
+    // Check if players are initialized
+    if (!this.isInitialized) {
+      console.log('[Replay] Cannot start - players not yet initialized');
+      return;
+    }
     
     const players = this.players;
     const commands = this.commands;

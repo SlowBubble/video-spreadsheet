@@ -4,6 +4,7 @@ import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
 import { getHashParams } from './urlUtil';
+import { showBanner } from './bannerUtil';
 
 const columns = ['Asset', 'Position', 'Start', 'End', 'Volume', 'Speed', 'Text'];
 
@@ -531,69 +532,21 @@ export class Editor {
   }
 
   showFilterBanner(message: string) {
-    // Remove existing banner if any
-    const existingBanner = document.getElementById('filter-banner');
-    if (existingBanner) {
-      existingBanner.remove();
-    }
-
-    // Create banner
-    const banner = document.createElement('div');
-    banner.id = 'filter-banner';
-    banner.textContent = message;
-    banner.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #2196f3;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 4px;
-      font-weight: bold;
-      z-index: 2000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    `;
-    
-    document.body.appendChild(banner);
-
-    // Remove after 1.5 seconds
-    setTimeout(() => {
-      banner.remove();
-    }, 1500);
+    showBanner(message, {
+      id: 'filter-banner',
+      position: 'bottom',
+      color: 'blue',
+      duration: 1500
+    });
   }
 
   showSaveBanner() {
-    // Remove existing banner if any
-    const existingBanner = document.getElementById('save-banner');
-    if (existingBanner) {
-      existingBanner.remove();
-    }
-
-    // Create banner
-    const banner = document.createElement('div');
-    banner.id = 'save-banner';
-    banner.textContent = 'Saved!';
-    banner.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #4caf50;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 4px;
-      font-weight: bold;
-      z-index: 2000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    `;
-    
-    document.body.appendChild(banner);
-
-    // Remove after 2 seconds
-    setTimeout(() => {
-      banner.remove();
-    }, 700);
+    showBanner('Saved!', {
+      id: 'save-banner',
+      position: 'top',
+      color: 'green',
+      duration: 700
+    });
   }
 
   handleExportImport() {
