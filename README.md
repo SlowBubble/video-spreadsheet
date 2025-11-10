@@ -136,6 +136,25 @@ E.g. resumeVisual without playVideoFromStart means the video will be visible aga
 
 # wip: m5o
 
+At this point it is simpler to rewrite generateReplayPlan in a separate method, called generateReplayPlan2
+- Given the commands from the project, we know the commandIdx for each command is 0, 1, 2, etc. This is used to determine precedence for what is visible (higher commandIdx, higher precendence when there is overlap)
+- Find all the important points:
+  - Start of a command
+  - End of a command
+- Group them into a list of objects: {starting: [cmdIdx0, ...], ongoing: [cmdIdx1, ...], ending: [cmd2, ...],  timeMs: 123} ascending in timeMs
+  - Create a class for the object, called Surrouding
+  - ongoing command means the start < timeMs and end > timeMs 
+- You can then generate Plan Actions based of the list of Surrounding
+  - Have a function getVisibleCommand(timeMs, commands, surroundings)
+   - It should be the max commandIdx from the starting and ongoing.
+  - For each starting command, you will generate a Plan Action to trigger playFromStart
+    - And decide whether showVideo needs to trigger
+  - If the previously visible command is ending, then you will need to generation an action to trigger showVideo
+    - And decide whether playFromStart is needed depending on whether it is for a starting or ongoing command.
+
+Then call generateReplayPlan2 instead of generateReplayPlan.
+
+# m5p
 - shortcut: `backspace` will remove the asset. Add a confirm prompt
 - In a new row, when entering '' for asset link, create a new row as usual, but set the asset name to 'Black' and when replaying treat it as 'Black Screen'
 

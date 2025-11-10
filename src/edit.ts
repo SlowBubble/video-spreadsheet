@@ -229,8 +229,6 @@ export class Editor {
     
     const cmd = this.project.commands[this.selectedRow];
     const positionMs = cmd.positionMs;
-    
-    console.log(`[Editor] Seeking to row ${this.selectedRow} position: ${(positionMs / 1000).toFixed(1)}s`);
     this.replayManager.seekToTime(positionMs);
   }
 
@@ -324,7 +322,6 @@ export class Editor {
         
         // Start replaying from the specified time
         this.replayManager.startReplay(timeMs);
-        console.log(`[Editor] Started replay from ${(timeMs / 1000).toFixed(1)}s via button click`);
       });
     });
 
@@ -452,17 +449,14 @@ export class Editor {
     if (!overlay.fullScreenFilter) {
       // Start with red
       overlay.fullScreenFilter = new FullScreenFilter(redFilter);
-      console.log(`[Editor] Set fullscreen filter to red on row ${this.selectedRow}`);
       this.showFilterBanner('Fullscreen Filter: Red');
     } else if (overlay.fullScreenFilter.fillStyle === redFilter) {
       // Move to green
       overlay.fullScreenFilter = new FullScreenFilter(greenFilter);
-      console.log(`[Editor] Set fullscreen filter to green on row ${this.selectedRow}`);
       this.showFilterBanner('Fullscreen Filter: Green');
     } else {
       // Remove filter
       overlay.fullScreenFilter = undefined;
-      console.log(`[Editor] Removed fullscreen filter from row ${this.selectedRow}`);
       this.showFilterBanner('Fullscreen Filter: OFF');
     }
   }
@@ -474,15 +468,14 @@ export class Editor {
     const cmd = this.project.commands[this.selectedRow];
     
     // Cycle through percentage options, then remove
-    const percentageOptions = [7, 10, 13, 16, 19];
-    const fillStyle = 'rgba(0, 0, 0, 0.85)';
+    const percentageOptions = [4, 7, 10, 13, 16, 19];
+    const fillStyle = 'rgba(0, 0, 0, 0.95)';
     
     const overlay = ensureOverlay(cmd);
     
     if (!overlay.borderFilter) {
       // Start with first option
       overlay.borderFilter = new BorderFilter(percentageOptions[0], percentageOptions[0], fillStyle);
-      console.log(`[Editor] Added border filter ${percentageOptions[0]}% to row ${this.selectedRow}`);
       this.showFilterBanner(`Border Filter: ${percentageOptions[0]}%`);
     } else {
       // Find current percentage and move to next
@@ -492,13 +485,11 @@ export class Editor {
       if (currentIndex === -1 || currentIndex === percentageOptions.length - 1) {
         // If not found or at last option, remove filter
         overlay.borderFilter = undefined;
-        console.log(`[Editor] Removed border filter from row ${this.selectedRow}`);
         this.showFilterBanner('Border Filter: OFF');
       } else {
         // Move to next option
         const nextPct = percentageOptions[currentIndex + 1];
         overlay.borderFilter = new BorderFilter(nextPct, nextPct, fillStyle);
-        console.log(`[Editor] Updated border filter to ${nextPct}% on row ${this.selectedRow}`);
         this.showFilterBanner(`Border Filter: ${nextPct}%`);
       }
     }
@@ -529,8 +520,6 @@ export class Editor {
     const nextAlignment = alignments[nextIndex];
     
     cmd.overlay.textDisplay.alignment = nextAlignment;
-    
-    console.log(`[Editor] Changed text alignment to ${nextAlignment} on row ${this.selectedRow}`);
     this.showFilterBanner(`Text Alignment: ${nextAlignment}`);
   }
 
@@ -541,14 +530,12 @@ export class Editor {
     // Get current position from replay manager
     const currentMs = this.replayManager.getCurrentPosition();
     if (currentMs === null) {
-      console.log('[Editor] Cannot autofill - no current position');
       return;
     }
     
     const cmd = this.project.commands[this.selectedRow];
     cmd.positionMs = currentMs;
     
-    console.log(`[Editor] Autofilled position to ${(currentMs / 1000).toFixed(1)}s on row ${this.selectedRow}`);
     showBanner(`Position set to ${msToTimeString(currentMs)}`, {
       id: 'autofill-banner',
       position: 'bottom',
@@ -598,7 +585,6 @@ export class Editor {
     if (this.selectedCol === 1) {
       // Pos 0 column
       cmd.positionMs = Math.max(0, cmd.positionMs + deltaMs);
-      console.log(`[Editor] Adjusted position to ${(cmd.positionMs / 1000).toFixed(1)}s`);
       showBanner(`Position: ${msToTimeString(cmd.positionMs)}`, {
         id: 'adjust-banner',
         position: 'bottom',
@@ -611,7 +597,6 @@ export class Editor {
     } else if (this.selectedCol === 3) {
       // Start column
       cmd.startMs = Math.max(0, cmd.startMs + deltaMs);
-      console.log(`[Editor] Adjusted start to ${(cmd.startMs / 1000).toFixed(1)}s`);
       showBanner(`Start: ${msToTimeString(cmd.startMs)}`, {
         id: 'adjust-banner',
         position: 'bottom',
@@ -621,7 +606,6 @@ export class Editor {
     } else if (this.selectedCol === 4) {
       // End column
       cmd.endMs = Math.max(0, cmd.endMs + deltaMs);
-      console.log(`[Editor] Adjusted end to ${(cmd.endMs / 1000).toFixed(1)}s`);
       showBanner(`End: ${msToTimeString(cmd.endMs)}`, {
         id: 'adjust-banner',
         position: 'bottom',
@@ -667,7 +651,6 @@ export class Editor {
       this.clipboard = cmd.overlay?.textDisplay?.content || '';
     }
     
-    console.log(`[Editor] Copied: ${this.clipboard}`);
     showBanner('Copied!', {
       id: 'copy-banner',
       position: 'bottom',
@@ -786,7 +769,6 @@ export class Editor {
       }
     }
     
-    console.log(`[Editor] Pasted: ${this.clipboard}`);
     showBanner('Pasted!', {
       id: 'paste-banner',
       position: 'bottom',
