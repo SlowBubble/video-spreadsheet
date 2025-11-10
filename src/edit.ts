@@ -298,6 +298,8 @@ export class Editor {
       this.cycleFullScreenFilter();
     } else if (matchKey(e, 'b')) {
       this.toggleBorderFilter();
+    } else if (matchKey(e, 't')) {
+      this.toggleTextAlignment();
     } else {
       return;
     }
@@ -369,6 +371,39 @@ export class Editor {
         this.showFilterBanner(`Border Filter: ${nextPct}%`);
       }
     }
+    
+    this.saveProject();
+    this.initReplayManager();
+  }
+
+  toggleTextAlignment() {
+    // Only toggle if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    // Only toggle if there is text
+    if (!cmd.overlay.textDisplay || !cmd.overlay.textDisplay.content) {
+      return;
+    }
+    
+    // Cycle through alignments: upper-left -> lower-left -> upper-right -> lower-right -> upper-left
+    const alignments: Array<'upper-left' | 'lower-left' | 'upper-right' | 'lower-right'> = [
+      'upper-left',
+      'lower-left',
+      'upper-right',
+      'lower-right'
+    ];
+    
+    const currentAlignment = cmd.overlay.textDisplay.alignment;
+    const currentIndex = alignments.indexOf(currentAlignment);
+    const nextIndex = (currentIndex + 1) % alignments.length;
+    const nextAlignment = alignments[nextIndex];
+    
+    cmd.overlay.textDisplay.alignment = nextAlignment;
+    
+    console.log(`[Editor] Changed text alignment to ${nextAlignment} on row ${this.selectedRow}`);
+    this.showFilterBanner(`Text Alignment: ${nextAlignment}`);
     
     this.saveProject();
     this.initReplayManager();

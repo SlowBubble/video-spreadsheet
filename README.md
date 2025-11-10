@@ -74,6 +74,9 @@ Overlay and subcommands
   - Default to writing the text to the upper left of the canvas above the other filters
   - Write the text in white with 36px with black background of opacity 0.6
 
+## m5e
+- Add shortcut `t`; if there is text, then toggle alignment of TextDisplay among 4 options, upper left, lower left, upper right and lower right
+
 # m4 impl
 Make it easy to screen-record a good-looking video
 - Present mode

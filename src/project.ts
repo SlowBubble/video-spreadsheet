@@ -1,8 +1,12 @@
+export type TextAlignment = 'upper-left' | 'lower-left' | 'upper-right' | 'lower-right';
+
 export class TextDisplay {
   content: string;
+  alignment: TextAlignment;
 
-  constructor(content: string) {
+  constructor(content: string, alignment?: TextAlignment) {
     this.content = content;
+    this.alignment = alignment || 'upper-left';
   }
 }
 
@@ -109,7 +113,10 @@ export class Project {
         
         let textDisplay = null;
         if (cmd.overlay.textDisplay) {
-          textDisplay = new TextDisplay(cmd.overlay.textDisplay.content);
+          textDisplay = new TextDisplay(
+            cmd.overlay.textDisplay.content,
+            cmd.overlay.textDisplay.alignment
+          );
         }
         
         overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);

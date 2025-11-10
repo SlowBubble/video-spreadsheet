@@ -78,7 +78,7 @@ export class ReplayManager {
     ctx.fillRect(0, canvasHeight - bottomHeight, canvasWidth, bottomHeight);
   }
 
-  drawText(content: string) {
+  drawText(content: string, alignment: string = 'upper-left') {
     if (!this.overlayCanvas) return;
     const ctx = this.overlayCanvas.getContext('2d');
     if (!ctx) return;
@@ -86,21 +86,51 @@ export class ReplayManager {
     // Set text properties
     ctx.font = '36px sans-serif';
     ctx.fillStyle = 'white';
-    ctx.textBaseline = 'top';
     
     // Measure text to create background
     const textMetrics = ctx.measureText(content);
     const textWidth = textMetrics.width;
     const textHeight = 36; // Font size
     const padding = 10;
+    const margin = 10;
+    
+    // Calculate position based on alignment
+    let x: number, y: number;
+    
+    switch (alignment) {
+      case 'upper-left':
+        x = margin;
+        y = margin;
+        ctx.textBaseline = 'top';
+        break;
+      case 'lower-left':
+        x = margin;
+        y = this.overlayCanvas.height - margin - textHeight - padding * 2;
+        ctx.textBaseline = 'top';
+        break;
+      case 'upper-right':
+        x = this.overlayCanvas.width - margin - textWidth - padding * 2;
+        y = margin;
+        ctx.textBaseline = 'top';
+        break;
+      case 'lower-right':
+        x = this.overlayCanvas.width - margin - textWidth - padding * 2;
+        y = this.overlayCanvas.height - margin - textHeight - padding * 2;
+        ctx.textBaseline = 'top';
+        break;
+      default:
+        x = margin;
+        y = margin;
+        ctx.textBaseline = 'top';
+    }
     
     // Draw black background with opacity
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(10, 10, textWidth + padding * 2, textHeight + padding * 2);
+    ctx.fillRect(x, y, textWidth + padding * 2, textHeight + padding * 2);
     
     // Draw text
     ctx.fillStyle = 'white';
-    ctx.fillText(content, 10 + padding, 10 + padding);
+    ctx.fillText(content, x + padding, y + padding);
   }
 
   updateOverlay(overlay: Overlay | null) {
@@ -125,7 +155,7 @@ export class ReplayManager {
     
     // Draw text if present (on top of filters)
     if (overlay.textDisplay && overlay.textDisplay.content) {
-      this.drawText(overlay.textDisplay.content);
+      this.drawText(overlay.textDisplay.content, overlay.textDisplay.alignment);
     }
   }
 
