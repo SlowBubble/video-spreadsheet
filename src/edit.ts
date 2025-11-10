@@ -553,7 +553,7 @@ export class Editor {
       name = existingCmd.name + '*';
     }
     
-    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 100, 1, name);
+    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 0, 1, name);
   }
 
   removeAsset() {
@@ -790,9 +790,16 @@ export class Editor {
       } else {
         // Create new command with asset URL
         const assetUrl = prompt('Edit Asset URL:', '');
-        if (assetUrl !== null && assetUrl.trim() !== '') {
-          const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
-          this.project.commands.push(newCmd);
+        if (assetUrl !== null) {
+          if (assetUrl.trim() === '') {
+            // Empty asset URL creates a black screen
+            const currentMs = this.replayManager.getCurrentPosition() || 0;
+            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 1, 'Black');
+            this.project.commands.push(newCmd);
+          } else {
+            const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
+            this.project.commands.push(newCmd);
+          }
         }
       }
     } else if (this.selectedCol === 1) {

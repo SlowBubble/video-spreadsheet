@@ -760,12 +760,14 @@ export class ReplayManager {
       this.replayStart = Date.now();
       this.replayOffset = (isResumingMidStep && resumeFromMs !== undefined) ? resumeFromMs : action.start;
       
-      // In debug mode, hide black div; otherwise show it when visibleIdx is -1
+      // In debug mode, hide black div; otherwise show it when visibleIdx is -1 or when visible asset is empty
       if (blackDiv) {
         if (this.isDebugMode()) {
           blackDiv.style.display = 'none';
         } else {
-          blackDiv.style.display = action.visibleIdx === -1 ? 'block' : 'none';
+          const isBlackScreen = action.visibleIdx === -1 || 
+            (action.visibleIdx >= 0 && this.commands[action.visibleIdx].asset === '');
+          blackDiv.style.display = isBlackScreen ? 'block' : 'none';
         }
       }
       
