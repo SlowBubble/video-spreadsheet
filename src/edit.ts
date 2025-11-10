@@ -60,11 +60,18 @@ function extractTimeFromUrl(url: string): number | null {
   }
 }
 
+// Convert speed percentage to playback rate
+// Speed is stored as percentage (5-100), but YouTube API uses rate (0.05-1.0)
+function speedToRate(speed: number): number {
+  return speed / 100;
+}
+
 // Compute the absolute end time in ms for a command
 // Takes into account playback speed: slower speed = longer duration
 function computeCommandEndTimeMs(cmd: ProjectCommand): number {
   const videoDuration = cmd.endMs - cmd.startMs;
-  const actualDuration = videoDuration / cmd.speed;
+  const rate = speedToRate(cmd.speed);
+  const actualDuration = videoDuration / rate;
   return cmd.positionMs + actualDuration;
 }
 
@@ -154,7 +161,7 @@ export class Editor {
         return msToTimeString(cmd.endMs);
       case 5: // Volume
         return cmd.volume.toString();
-      case 6: // Speed
+      case 6: // Speed (display as percentage)
         return cmd.speed.toString();
       case 7: // Text
         return cmd.overlay.textDisplay?.content || '';
@@ -553,7 +560,7 @@ export class Editor {
       name = existingCmd.name + '*';
     }
     
-    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 0, 1, name);
+    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 0, 100, name);
   }
 
   removeAsset() {
@@ -641,7 +648,7 @@ export class Editor {
       // Volume column - store as string
       this.clipboard = cmd.volume.toString();
     } else if (this.selectedCol === 6) {
-      // Speed column - store as string
+      // Speed column - store as percentage string
       this.clipboard = cmd.speed.toString();
     } else if (this.selectedCol === 7) {
       // Text column - store as string
@@ -794,7 +801,7 @@ export class Editor {
           if (assetUrl.trim() === '') {
             // Empty asset URL creates a black screen
             const currentMs = this.replayManager.getCurrentPosition() || 0;
-            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 1, 'Black');
+            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 100, 'Black');
             this.project.commands.push(newCmd);
           } else {
             const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
@@ -849,10 +856,10 @@ export class Editor {
         }
       }
     } else if (this.selectedCol === 6) {
-      // Speed column
+      // Speed column (as percentage)
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
-        const newValue = prompt('Edit Speed:', cmd.speed.toString());
+        const newValue = prompt('Edit Speed (%):', cmd.speed.toString());
         if (newValue !== null) {
           const speed = Number(newValue);
           if (!isNaN(speed) && speed > 0) {
