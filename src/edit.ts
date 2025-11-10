@@ -534,6 +534,24 @@ export class Editor {
     });
   }
 
+  createCommandFromAssetUrl(assetUrl: string): ProjectCommand {
+    // Extract time from URL if present
+    const startMs = extractTimeFromUrl(assetUrl) || 0;
+    const endMs = startMs + 4000; // Add 4 seconds
+    
+    // Autofill position using current time
+    const currentMs = this.replayManager.getCurrentPosition() || 0;
+    
+    // Look up name from existing command with the same asset link
+    let name = '';
+    const existingCmd = this.project.commands.find(cmd => cmd.asset === assetUrl);
+    if (existingCmd && existingCmd.name) {
+      name = existingCmd.name + '*';
+    }
+    
+    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 100, 1, name);
+  }
+
   adjustTimeValue(deltaMs: number) {
     // Only adjust if we have a valid command selected
     if (this.selectedRow >= this.project.commands.length) return;
@@ -623,11 +641,23 @@ export class Editor {
   }
 
   pasteCell() {
-    // Only paste if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
-    
     // Don't paste if clipboard is empty
     if (!this.clipboard) return;
+    
+    const isNewRow = this.selectedRow >= this.project.commands.length;
+    
+    // For new rows, only allow pasting in the asset column
+    if (isNewRow) {
+      if (this.selectedCol === 0) {
+        // Create new command with asset URL from clipboard
+        const assetUrl = this.clipboard.trim();
+        if (assetUrl !== '') {
+          const newCmd = this.createCommandFromAssetUrl(assetUrl);
+          this.project.commands.push(newCmd);
+        }
+      }
+      return;
+    }
     
     const cmd = this.project.commands[this.selectedRow];
     
@@ -744,14 +774,7 @@ export class Editor {
         // Create new command with asset URL
         const assetUrl = prompt('Edit Asset URL:', '');
         if (assetUrl !== null && assetUrl.trim() !== '') {
-          // Extract time from URL if present
-          const startMs = extractTimeFromUrl(assetUrl.trim()) || 0;
-          const endMs = startMs + 4000; // Add 4 seconds
-          
-          // Autofill position using current time
-          const currentMs = this.replayManager.getCurrentPosition() || 0;
-          
-          const newCmd = new ProjectCommand(assetUrl.trim(), currentMs, startMs, endMs, 100, 1, '');
+          const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
           this.project.commands.push(newCmd);
         }
       }

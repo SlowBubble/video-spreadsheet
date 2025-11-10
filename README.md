@@ -121,12 +121,12 @@ Overlay and subcommands
   - If so, call updateIfChanged and save the project
   - If not, don't save the project.
 
-# wip: m5m
+# m5m
 
 - in maybeSave, do a fine-grain check to see if we actually need to call initReplayManager
   - yes only if a new asset has been added or if startMs or endMs has changed.
 
-# m5n
+# wip: m5n
 - Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses
