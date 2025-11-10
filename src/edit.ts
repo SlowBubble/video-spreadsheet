@@ -166,6 +166,13 @@ export class Editor {
     
     const cmd = this.project.commands[rowIdx];
     
+    // For Pos 0 and Pos 1 columns, create clickable buttons
+    if (colIdx === 1 || colIdx === 2) {
+      const timeMs = colIdx === 1 ? cmd.positionMs : computeCommandEndTimeMs(cmd);
+      const dimStyle = colIdx === 2 ? 'opacity: 0.5;' : '';
+      return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
+    }
+    
     // For Start and End columns, create clickable links
     if (colIdx === 3 || colIdx === 4) {
       const timeMs = colIdx === 3 ? cmd.startMs : cmd.endMs;
@@ -249,7 +256,7 @@ export class Editor {
         <table border="1" style="width:100%; text-align:left; border-collapse: collapse;">
           <thead>
             <tr>
-              ${columns.map(col => `<th>${col}</th>`).join('')}
+              ${columns.map((col, idx) => `<th style="${idx === 2 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -284,6 +291,24 @@ export class Editor {
         window.open(newHash, '_blank', 'width=854,height=480');
       };
     }
+
+    // Add event listeners for time seek buttons
+    const timeSeekButtons = document.querySelectorAll('.time-seek-btn');
+    timeSeekButtons.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const timeMs = parseInt((btn as HTMLElement).getAttribute('data-time-ms') || '0');
+        
+        // Stop current replay if playing
+        if (this.replayManager.isPlaying) {
+          this.replayManager.stopReplay();
+        }
+        
+        // Start replaying from the specified time
+        this.replayManager.startReplay(timeMs);
+        console.log(`[Editor] Started replay from ${(timeMs / 1000).toFixed(1)}s via button click`);
+      });
+    });
 
     setupShortcutsModal();
   }
