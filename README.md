@@ -108,7 +108,7 @@ Overlay and subcommands
 - Make Pos 0 and Pos 1 texts into buttons, which will start the replayer at the specified time of the cell.
   - If the replayer is already playing, pause before performing this action.
 
-#  wip: m5l
+#  m5l
 
 - create undo.ts
 - Implement undo/redo in an UndoManager class in undo.ts
@@ -121,7 +121,12 @@ Overlay and subcommands
   - If so, call updateIfChanged and save the project
   - If not, don't save the project.
 
-# m5m
+# wip: m5m
+
+- in maybeSave, do a fine-grain check to see if we actually need to call initReplayManager
+  - yes only if a new asset has been added or if startMs or endMs has changed.
+
+# m5n
 - Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses

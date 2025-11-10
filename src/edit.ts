@@ -833,7 +833,6 @@ export class Editor {
 
   saveProject() {
     localStorage.setItem('project-' + this.projectId, this.project.serialize());
-    this.showSaveBanner();
   }
 
   timeStringToMs(str: string): number {
@@ -899,12 +898,6 @@ export class Editor {
     this.undoManager.undo();
     const stateJson = this.undoManager.getCurrentState();
     this.project = Project.fromJSON(stateJson);
-    showBanner('Undo', {
-      id: 'undo-banner',
-      position: 'bottom',
-      color: 'blue',
-      duration: 500
-    });
     return true;
   }
 
@@ -914,12 +907,6 @@ export class Editor {
     this.undoManager.redo();
     const stateJson = this.undoManager.getCurrentState();
     this.project = Project.fromJSON(stateJson);
-    showBanner('Redo', {
-      id: 'redo-banner',
-      position: 'bottom',
-      color: 'blue',
-      duration: 500
-    });
     return true;
   }
 
@@ -927,11 +914,52 @@ export class Editor {
     const currentJsonString = this.project.serialize();
     const hasChanged = this.undoManager.hasChanged(currentJsonString);
     if (hasChanged) {
+      // TODO: consider whether we should just force caller to specify this for simplicity.
+      // Fine-grain check: only reinit replay manager if assets, startMs, or endMs changed
+      const needsReplayReinit = this.needsReplayManagerReinit(currentJsonString);
+      
       this.undoManager.updateIfChanged(currentJsonString);
-      this.initReplayManager();
+      
+      if (needsReplayReinit) {
+        this.initReplayManager();
+      }
     }
     if (hasChanged || forceSave) {
       this.saveProject();
+      if (!forceSave) {
+        this.showSaveBanner();
+      }
+    }
+  }
+
+  needsReplayManagerReinit(newJsonString: string): boolean {
+    const oldJsonString = this.undoManager.getCurrentState();
+    
+    try {
+      const oldProject = Project.fromJSON(oldJsonString);
+      const newProject = Project.fromJSON(newJsonString);
+      
+      // Check if number of commands changed (new asset added or removed)
+      if (oldProject.commands.length !== newProject.commands.length) {
+        return true;
+      }
+      
+      // Check if any asset, startMs, or endMs changed
+      for (let i = 0; i < oldProject.commands.length; i++) {
+        const oldCmd = oldProject.commands[i];
+        const newCmd = newProject.commands[i];
+        
+        if (oldCmd.asset !== newCmd.asset ||
+            oldCmd.startMs !== newCmd.startMs ||
+            oldCmd.endMs !== newCmd.endMs) {
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (e) {
+      // If parsing fails, reinit to be safe
+      return true;
     }
   }
 
