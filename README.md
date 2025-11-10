@@ -169,6 +169,10 @@ SUpport mouse click
 - double-clicking will move to it and then have the same action as pressing enter (so refactor accordingly)
 
 # m5r
+- Add a "Fill" column (non-editable) where each cell will have a canvas (scaled down by 1/18 of the 480x854 video canvas)
+  - You will fill the canvas with the overlay of that row, except it will be scaled way down by 1/18.
+
+# m5s
 - Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses

@@ -7,7 +7,7 @@ import { getHashParams } from './urlUtil';
 import { showBanner } from './bannerUtil';
 import { UndoManager } from './undo';
 
-const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text'];
+const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text', 'Fill'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -173,6 +173,8 @@ export class Editor {
         return cmd.speed.toString();
       case 7: // Text
         return cmd.overlay?.textDisplay?.content || '';
+      case 8: // Fill (canvas preview)
+        return ''; // Canvas will be rendered separately
       default:
         return '';
     }
@@ -215,12 +217,104 @@ export class Editor {
       }
     }
     
+    // For Fill column, create a canvas with overlay preview
+    if (colIdx === 8) {
+      const canvasId = `fill-canvas-${rowIdx}`;
+      return `<canvas id="${canvasId}" width="47" height="27" style="border: 1px solid #ccc;"></canvas>`;
+    }
+    
     return cellValue;
   }
 
   getRowCount(): number {
     // Always show at least one empty row
     return Math.max(1, this.project.commands.length + 1);
+  }
+
+  drawFillCanvas(canvasId: string, overlay?: Overlay) {
+    const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // If no overlay, leave it blank
+    if (!overlay) return;
+    
+    // Draw fullScreenFilter if present
+    if (overlay.fullScreenFilter) {
+      ctx.fillStyle = overlay.fullScreenFilter.fillStyle;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    // Draw borderFilter if present
+    if (overlay.borderFilter) {
+      const topHeight = (canvas.height * overlay.borderFilter.topMarginPct) / 100;
+      const bottomHeight = (canvas.height * overlay.borderFilter.bottomMarginPct) / 100;
+      
+      ctx.fillStyle = overlay.borderFilter.fillStyle;
+      ctx.fillRect(0, 0, canvas.width, topHeight);
+      ctx.fillRect(0, canvas.height - bottomHeight, canvas.width, bottomHeight);
+    }
+    
+    // Draw text if present
+    if (overlay.textDisplay && overlay.textDisplay.content) {
+      const fontSize = 2; // Scaled down from 36px
+      ctx.font = `${fontSize}px sans-serif`;
+      ctx.fillStyle = 'white';
+      
+      const textMetrics = ctx.measureText(overlay.textDisplay.content);
+      const textWidth = textMetrics.width;
+      const textHeight = fontSize;
+      const padding = 0.5;
+      const margin = 0.5;
+      
+      // Calculate position based on alignment
+      let x: number, y: number;
+      
+      switch (overlay.textDisplay.alignment) {
+        case 'upper-left':
+          x = margin;
+          y = margin;
+          ctx.textBaseline = 'top';
+          break;
+        case 'lower-left':
+          x = margin;
+          y = canvas.height - margin - textHeight - padding * 2;
+          ctx.textBaseline = 'top';
+          break;
+        case 'upper-right':
+          x = canvas.width - margin - textWidth - padding * 2;
+          y = margin;
+          ctx.textBaseline = 'top';
+          break;
+        case 'lower-right':
+          x = canvas.width - margin - textWidth - padding * 2;
+          y = canvas.height - margin - textHeight - padding * 2;
+          ctx.textBaseline = 'top';
+          break;
+        case 'center':
+          x = (canvas.width - textWidth - padding * 2) / 2;
+          y = (canvas.height - textHeight - padding * 2) / 2;
+          ctx.textBaseline = 'top';
+          break;
+        default:
+          x = margin;
+          y = margin;
+          ctx.textBaseline = 'top';
+      }
+      
+      // Draw black background
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(x, y, textWidth + padding * 2, textHeight + padding * 2);
+      
+      // Draw text
+      ctx.fillStyle = 'white';
+      ctx.fillText(overlay.textDisplay.content, x + padding, y + padding);
+    }
   }
 
   renderTable() {
@@ -263,7 +357,7 @@ export class Editor {
         <table border="1" style="width:100%; text-align:left; border-collapse: collapse;">
           <thead>
             <tr>
-              ${columns.map((col, idx) => `<th style="${idx === 2 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
+              ${columns.map((col, idx) => `<th style="${idx === 2 || idx === 8 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -347,6 +441,13 @@ export class Editor {
     }
 
     setupShortcutsModal();
+    
+    // Draw fill canvases for each row
+    for (let rowIdx = 0; rowIdx < this.project.commands.length; rowIdx++) {
+      const cmd = this.project.commands[rowIdx];
+      const canvasId = `fill-canvas-${rowIdx}`;
+      this.drawFillCanvas(canvasId, cmd.overlay);
+    }
   }
 
 
