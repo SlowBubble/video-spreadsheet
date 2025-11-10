@@ -6,7 +6,7 @@ import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
 import { getHashParams } from './urlUtil';
 import { showBanner } from './bannerUtil';
 
-const columns = ['Asset', 'Position', 'Start', 'End', 'Volume', 'Speed', 'Text'];
+const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Volume', 'Speed', 'Text'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -140,19 +140,19 @@ export class Editor {
     switch (colIdx) {
       case 0: // Asset
         return cmd.name ? cmd.name : cmd.asset;
-      case 1: // Position
-        const startTime = msToTimeString(cmd.positionMs);
-        const endTime = msToTimeString(computeCommandEndTimeMs(cmd));
-        return `${startTime}-${endTime}`;
-      case 2: // Start
+      case 1: // Pos 0 (start position)
+        return msToTimeString(cmd.positionMs);
+      case 2: // Pos 1 (end position, calculated)
+        return msToTimeString(computeCommandEndTimeMs(cmd));
+      case 3: // Start
         return msToTimeString(cmd.startMs);
-      case 3: // End
+      case 4: // End
         return msToTimeString(cmd.endMs);
-      case 4: // Volume
+      case 5: // Volume
         return cmd.volume.toString();
-      case 5: // Speed
+      case 6: // Speed
         return cmd.speed.toString();
-      case 6: // Text
+      case 7: // Text
         return cmd.overlay.textDisplay?.content || '';
       default:
         return '';
@@ -477,7 +477,7 @@ export class Editor {
     
     // Check which column we're on and adjust accordingly
     if (this.selectedCol === 1) {
-      // Position column
+      // Pos 0 column
       cmd.positionMs = Math.max(0, cmd.positionMs + deltaMs);
       console.log(`[Editor] Adjusted position to ${(cmd.positionMs / 1000).toFixed(1)}s`);
       showBanner(`Position: ${msToTimeString(cmd.positionMs)}`, {
@@ -487,6 +487,9 @@ export class Editor {
         duration: 800
       });
     } else if (this.selectedCol === 2) {
+      // Pos 1 column - not editable, do nothing
+      return;
+    } else if (this.selectedCol === 3) {
       // Start column
       cmd.startMs = Math.max(0, cmd.startMs + deltaMs);
       console.log(`[Editor] Adjusted start to ${(cmd.startMs / 1000).toFixed(1)}s`);
@@ -496,7 +499,7 @@ export class Editor {
         color: 'blue',
         duration: 800
       });
-    } else if (this.selectedCol === 3) {
+    } else if (this.selectedCol === 4) {
       // End column
       cmd.endMs = Math.max(0, cmd.endMs + deltaMs);
       console.log(`[Editor] Adjusted end to ${(cmd.endMs / 1000).toFixed(1)}s`);
@@ -545,7 +548,7 @@ export class Editor {
         }
       }
     } else if (this.selectedCol === 1) {
-      // Position column - edit position start time
+      // Pos 0 column - edit position start time
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
         const currentValue = msToTimeString(cmd.positionMs);
@@ -557,6 +560,9 @@ export class Editor {
         }
       }
     } else if (this.selectedCol === 2) {
+      // Pos 1 column - not editable, do nothing
+      return;
+    } else if (this.selectedCol === 3) {
       // Start column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -567,7 +573,7 @@ export class Editor {
           this.saveProject();
         }
       }
-    } else if (this.selectedCol === 3) {
+    } else if (this.selectedCol === 4) {
       // End column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -578,7 +584,7 @@ export class Editor {
           this.saveProject();
         }
       }
-    } else if (this.selectedCol === 4) {
+    } else if (this.selectedCol === 5) {
       // Volume column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -591,7 +597,7 @@ export class Editor {
           }
         }
       }
-    } else if (this.selectedCol === 5) {
+    } else if (this.selectedCol === 6) {
       // Speed column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -604,7 +610,7 @@ export class Editor {
           }
         }
       }
-    } else if (this.selectedCol === 6) {
+    } else if (this.selectedCol === 7) {
       // Text column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];

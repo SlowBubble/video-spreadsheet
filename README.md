@@ -89,7 +89,15 @@ Overlay and subcommands
 
 - Autofill the positionMs field of a row using the current time at creation
 
-# wip: m5h
+#  m5h
+
+- Separate the Position column into `Pos 0` and `Pos 1`, where `Pos 1` column that is not editable
+
+# wip: m5i
+- Make it easy to copy and paste the times so that we don't need to build an auto-update/snap system.
+  - Need to copy paste the ms.
+
+# m5j
 - Decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses
@@ -235,3 +243,15 @@ Goal: have something that I can play back to see something
   - Repeat this for all commands, using setTimeout to start the command based on positionMs
 
 
+# Abandoned
+Too hard/too general (avoided using simple copy-paste)
+- Impl snap group:
+  - The project will need a new field snapGroups of type SnapGroup[]
+  - SnapGroup has a points field of type SnapPoint[]
+  - SnapPoint has asset field of type string and useStartAsSnapPoint of type boolean
+  - Whenever the positionMs, start, end
+- Shortcut: press `s` to set the snap1 (should be on the start or end column so that we can create a SnapPoint)
+  - Move to another cell and press `s` to set the snap2 (should be the start or end column so that we can create a SnapPoint)
+  - If the snap1 and snap2 do not belong to an existing SnapGroup, create a SnapGroup of the 2 things and add them to the project
+  - Else, add them to the existing SnapGroup, or if they belong to 2 different SnapGroups, merge the 2 groups.
+  - Sync the time of the things in the same SnapGroup using snap1's data as the source of truth. 
