@@ -5,16 +5,26 @@ import { Overlay } from './project';
 export class PlanAction {
   start: number;
   end: number;
-  idx: number;
-  resume: boolean;
+  visibleIdx: number; // Which video iframe to show (-1 for black screen)
+  playFromStart: number[]; // Indices of videos to start playing from beginning
+  resumeVisual: number[]; // Indices of videos that resume visual display (were playing in background)
   assetName: string;
   overlay: Overlay | null;
 
-  constructor(start: number, end: number, idx: number, resume: boolean, assetName: string, overlay: Overlay | null = null) {
+  constructor(
+    start: number,
+    end: number,
+    visibleIdx: number,
+    playFromStart: number[],
+    resumeVisual: number[],
+    assetName: string,
+    overlay: Overlay | null = null
+  ) {
     this.start = start;
     this.end = end;
-    this.idx = idx;
-    this.resume = resume;
+    this.visibleIdx = visibleIdx;
+    this.playFromStart = playFromStart;
+    this.resumeVisual = resumeVisual;
     this.assetName = assetName;
     this.overlay = overlay;
   }
@@ -328,43 +338,58 @@ export class ReplayManager {
     // Remove duplicates and sort
     const uniquePoints = Array.from(new Set(points)).sort((a, b) => a - b);
     const plan: PlanAction[] = [];
-    let lastVisibleIdx = -1;
+    
+    // Track which videos are currently playing
+    let previouslyActive = new Set<number>();
     
     for (let i = 0; i < uniquePoints.length - 1; i++) {
       const c = uniquePoints[i];
       const nextPoint = uniquePoints[i + 1];
       
-      // Find which command should be visible at time c
-      let idx = -1;
-      for (let j = cmds.length - 1; j >= 0; j--) {
+      // Find all videos that should be active (playing) at time c
+      const currentlyActive = new Set<number>();
+      for (let j = 0; j < cmds.length; j++) {
         const a = cmds[j].positionMs;
         const videoDuration = cmds[j].endMs - cmds[j].startMs;
         const actualDuration = videoDuration / cmds[j].speed;
         const b = cmds[j].positionMs + actualDuration;
         if (c >= a && c < b) {
-          idx = j;
+          currentlyActive.add(j);
+        }
+      }
+      
+      // Separate into videos starting fresh vs resuming visual
+      const playFromStart: number[] = [];
+      const resumeVisual: number[] = [];
+      
+      currentlyActive.forEach((idx) => {
+        if (previouslyActive.has(idx)) {
+          resumeVisual.push(idx);
+        } else {
+          playFromStart.push(idx);
+        }
+      });
+      
+      // Find which video should be visible (pick the last one in table order)
+      let visibleIdx = -1;
+      for (let j = cmds.length - 1; j >= 0; j--) {
+        if (currentlyActive.has(j)) {
+          visibleIdx = j;
           break;
         }
       }
       
-      // Determine if we should resume or start fresh
-      let resume = false;
-      let overlay = null;
-      if (idx !== -1) {
-        // Resume if same video continues from previous action
-        resume = (idx === lastVisibleIdx);
-        overlay = cmds[idx].overlay;
-      }
+      const overlay = visibleIdx !== -1 ? cmds[visibleIdx].overlay : null;
+      const assetName = visibleIdx !== -1 ? this.getCommandName(visibleIdx) : '[Black Screen]';
       
-      const assetName = idx !== -1 ? this.getCommandName(idx) : '[Black Screen]';
-      plan.push(new PlanAction(c, nextPoint, idx, resume, assetName, overlay));
+      plan.push(new PlanAction(c, nextPoint, visibleIdx, playFromStart, resumeVisual, assetName, overlay));
       
-      lastVisibleIdx = idx;
+      previouslyActive = currentlyActive;
     }
     
     // For the last change point, show black screen
     const lastPoint = uniquePoints[uniquePoints.length - 1];
-    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, '[Black Screen]', null));
+    plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, [], [], '[Black Screen]', null));
     
     console.log('[Plan Generated] Replay plan:', JSON.stringify(plan, null, 2));
     
@@ -486,31 +511,58 @@ export class ReplayManager {
     });
   }
 
-  showPlayer(idx: number, resume: boolean) {
-    const visibleName = this.getCommandName(idx);
+  executeAction(action: PlanAction) {
     const debugMode = this.isDebugMode();
+    const visibleName = action.assetName;
+    
+    console.log(`[Action] Executing: visible=${visibleName}, playFromStart=[${action.playFromStart.map(i => this.getCommandName(i)).join(', ')}], resumeVisual=[${action.resumeVisual.map(i => this.getCommandName(i)).join(', ')}]`);
+    
+    // Hide all players first, then show/play the appropriate ones
     this.players.forEach((player, i) => {
       const div = document.getElementById(`yt-player-edit-${i}`);
-      // In debug mode, show all players; otherwise show only the active one
-      if (div) {
-        if (debugMode) {
-          div.style.display = 'block';
-        } else {
-          div.style.display = i === idx ? 'block' : 'none';
-        }
-      }
-      if (i === idx && player) {
-        if (!resume) {
+      const name = this.getCommandName(i);
+      
+      if (action.playFromStart.includes(i)) {
+        // Start this video from the beginning
+        if (player) {
           const cmd = this.commands[i];
           const startSec = Math.floor(cmd.startMs / 1000);
-          console.log(`[Action ${visibleName}] Setting speed: ${cmd.speed}, volume: ${cmd.volume}, startSec: ${startSec}`);
+          console.log(`[Play ${name}] Starting from ${startSec}s, speed: ${cmd.speed}, volume: ${cmd.volume}`);
           player.seekTo(startSec);
           player.setVolume(cmd.volume);
           player.setPlaybackRate(cmd.speed);
           player.playVideo();
-        } else {
-          console.log(`[Action ${visibleName}] Resuming playback (no seek, just play)`);
+        }
+        // Show iframe only if this is the visible video
+        if (div) {
+          if (debugMode) {
+            div.style.display = 'block';
+          } else {
+            div.style.display = i === action.visibleIdx ? 'block' : 'none';
+          }
+        }
+      } else if (action.resumeVisual.includes(i)) {
+        // Resume visual display (video was already playing in background)
+        if (player) {
+          console.log(`[Resume ${name}] Resuming visual display`);
           player.playVideo();
+        }
+        // Show iframe only if this is the visible video
+        if (div) {
+          if (debugMode) {
+            div.style.display = 'block';
+          } else {
+            div.style.display = i === action.visibleIdx ? 'block' : 'none';
+          }
+        }
+      } else {
+        // This video should not be playing, pause it and hide
+        if (player) {
+          console.log(`[Pause ${name}] Pausing inactive video`);
+          player.pauseVideo();
+        }
+        if (div && !debugMode) {
+          div.style.display = 'none';
         }
       }
     });
@@ -679,7 +731,7 @@ export class ReplayManager {
       
       // Handle automatic pause at playback end
       // When reaching the final black screen step, pause at that position
-      if (step >= plan.length - 1 && action.idx === -1) {
+      if (step >= plan.length - 1 && action.visibleIdx === -1) {
         console.log(`[Playback End] Reached end at ${(action.end / 1000).toFixed(1)}s, pausing`);
         this.pausedAtMs = action.end;
         this.isPlaying = false;
@@ -702,32 +754,29 @@ export class ReplayManager {
       let stepDuration = action.end - action.start;
       if (isResumingMidStep && resumeFromMs !== undefined) {
         stepDuration = action.end - resumeFromMs;
-        console.log(`[Plan ${step}] Resuming mid-step: start: ${action.start}ms, resumeFrom: ${resumeFromMs}ms, end: ${action.end}ms, idx: ${action.idx}, remaining: ${stepDuration}ms`);
+        console.log(`[Plan ${step}] Resuming mid-step: start: ${action.start}ms, resumeFrom: ${resumeFromMs}ms, end: ${action.end}ms, visibleIdx: ${action.visibleIdx}, remaining: ${stepDuration}ms`);
       }
       
       this.replayStart = Date.now();
       this.replayOffset = (isResumingMidStep && resumeFromMs !== undefined) ? resumeFromMs : action.start;
       
-      // In debug mode, hide black div; otherwise show it when idx is -1
+      // In debug mode, hide black div; otherwise show it when visibleIdx is -1
       if (blackDiv) {
         if (this.isDebugMode()) {
           blackDiv.style.display = 'none';
         } else {
-          blackDiv.style.display = action.idx === -1 ? 'block' : 'none';
+          blackDiv.style.display = action.visibleIdx === -1 ? 'block' : 'none';
         }
       }
       
-      // Subtask 3.4: Implement video seeking for resume
-      // M3h Fix: When resuming, identify ALL assets that should be playing at this time
-      if (action.idx !== -1) {
-        // When resuming from any non-zero position (including step boundaries),
-        // we need to check for all active videos, not just the visible one
-        const isResuming = step === startStep && resumeFromMs !== undefined && resumeFromMs > 0;
-        if (isResuming && resumeFromMs !== undefined) {
-          this.seekAndPlayAllActiveVideos(resumeFromMs, action.idx);
-        } else {
-          this.showPlayer(action.idx, action.resume);
-        }
+      // Execute the plan action
+      const isResuming = step === startStep && resumeFromMs !== undefined && resumeFromMs > 0;
+      if (isResuming && resumeFromMs !== undefined) {
+        // When resuming mid-playback, seek all active videos to the correct position
+        this.seekAndPlayAllActiveVideos(resumeFromMs, action.visibleIdx);
+      } else {
+        // Normal playback: start/continue videos as specified
+        this.executeAction(action);
       }
       
       // Update overlay based on current action

@@ -127,6 +127,14 @@ Overlay and subcommands
   - yes only if a new asset has been added or if startMs or endMs has changed.
 
 # wip: m5n
+Design plan action fields to be cleaner and more explicit so that the plan generation can also be cleaner. PlanAction should have:
+- playVideoFromStart (opposite of resume; let's just get rid of resume, which is a confusing term)
+- showVideo (all other videos will be hidden except for this one)
+
+E.g. playVideoFromStart without showVideo means the viewer will just hear the sound
+E.g. showVideo without playVideoFromStart means the video will be visible again, but not restarting because it is previously playing in the background
+
+# m5o
 - Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses
