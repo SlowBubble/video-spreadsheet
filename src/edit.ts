@@ -29,6 +29,36 @@ function getYouTubeId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+// Helper to extract the 't' parameter from a YouTube URL and convert to milliseconds
+function extractTimeFromUrl(url: string): number | null {
+  try {
+    const urlObj = new URL(url);
+    const tParam = urlObj.searchParams.get('t');
+    if (!tParam) return null;
+    
+    // Parse formats like "922s", "15m22s", "1h15m22s", or just "922"
+    let totalSeconds = 0;
+    
+    // Try to match hours, minutes, seconds
+    const hoursMatch = tParam.match(/(\d+)h/);
+    const minutesMatch = tParam.match(/(\d+)m/);
+    const secondsMatch = tParam.match(/(\d+)s/);
+    
+    if (hoursMatch) totalSeconds += parseInt(hoursMatch[1]) * 3600;
+    if (minutesMatch) totalSeconds += parseInt(minutesMatch[1]) * 60;
+    if (secondsMatch) totalSeconds += parseInt(secondsMatch[1]);
+    
+    // If no time units found, assume it's just seconds
+    if (!hoursMatch && !minutesMatch && !secondsMatch) {
+      totalSeconds = parseInt(tParam);
+    }
+    
+    return totalSeconds * 1000; // Convert to milliseconds
+  } catch (e) {
+    return null;
+  }
+}
+
 // Compute the absolute end time in ms for a command
 // Takes into account playback speed: slower speed = longer duration
 function computeCommandEndTimeMs(cmd: ProjectCommand): number {
@@ -299,6 +329,12 @@ export class Editor {
       this.toggleBorderFilter();
     } else if (matchKey(e, 't')) {
       this.toggleTextAlignment();
+    } else if (matchKey(e, 'a')) {
+      this.autofillPosition();
+    } else if (matchKey(e, 'alt+right')) {
+      this.adjustTimeValue(500);
+    } else if (matchKey(e, 'alt+left')) {
+      this.adjustTimeValue(-500);
     } else {
       return;
     }
@@ -408,6 +444,76 @@ export class Editor {
     this.initReplayManager();
   }
 
+  autofillPosition() {
+    // Only autofill if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    // Get current position from replay manager
+    const currentMs = this.replayManager.getCurrentPosition();
+    if (currentMs === null) {
+      console.log('[Editor] Cannot autofill - no current position');
+      return;
+    }
+    
+    const cmd = this.project.commands[this.selectedRow];
+    cmd.positionMs = currentMs;
+    
+    console.log(`[Editor] Autofilled position to ${(currentMs / 1000).toFixed(1)}s on row ${this.selectedRow}`);
+    showBanner(`Position set to ${msToTimeString(currentMs)}`, {
+      id: 'autofill-banner',
+      position: 'bottom',
+      color: 'blue',
+      duration: 1500
+    });
+    
+    this.saveProject();
+  }
+
+  adjustTimeValue(deltaMs: number) {
+    // Only adjust if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    // Check which column we're on and adjust accordingly
+    if (this.selectedCol === 1) {
+      // Position column
+      cmd.positionMs = Math.max(0, cmd.positionMs + deltaMs);
+      console.log(`[Editor] Adjusted position to ${(cmd.positionMs / 1000).toFixed(1)}s`);
+      showBanner(`Position: ${msToTimeString(cmd.positionMs)}`, {
+        id: 'adjust-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 800
+      });
+    } else if (this.selectedCol === 2) {
+      // Start column
+      cmd.startMs = Math.max(0, cmd.startMs + deltaMs);
+      console.log(`[Editor] Adjusted start to ${(cmd.startMs / 1000).toFixed(1)}s`);
+      showBanner(`Start: ${msToTimeString(cmd.startMs)}`, {
+        id: 'adjust-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 800
+      });
+    } else if (this.selectedCol === 3) {
+      // End column
+      cmd.endMs = Math.max(0, cmd.endMs + deltaMs);
+      console.log(`[Editor] Adjusted end to ${(cmd.endMs / 1000).toFixed(1)}s`);
+      showBanner(`End: ${msToTimeString(cmd.endMs)}`, {
+        id: 'adjust-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 800
+      });
+    } else {
+      // Not on a time column, do nothing
+      return;
+    }
+    
+    this.saveProject();
+  }
+
   handleEnterKey() {
     const isExistingCommand = this.selectedRow < this.project.commands.length;
     
@@ -425,7 +531,11 @@ export class Editor {
         // Create new command with asset URL
         const assetUrl = prompt('Edit Asset URL:', '');
         if (assetUrl !== null && assetUrl.trim() !== '') {
-          const newCmd = new ProjectCommand(assetUrl.trim(), 0, 0, 0, 100, 1, '');
+          // Extract time from URL if present
+          const startMs = extractTimeFromUrl(assetUrl.trim()) || 0;
+          const endMs = startMs + 4000; // Add 4 seconds
+          
+          const newCmd = new ProjectCommand(assetUrl.trim(), 0, startMs, endMs, 100, 1, '');
           this.project.commands.push(newCmd);
           this.saveProject();
           this.initReplayManager();

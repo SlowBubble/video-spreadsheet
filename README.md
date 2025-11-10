@@ -79,12 +79,13 @@ Overlay and subcommands
 ## m5e
 - Add shortcut `t`; if there is text, then toggle alignment of TextDisplay among 4 options, upper left, lower left, upper right and lower right
 
-## wip: m5f
+## m5f
 
-- alt+space: Autofill position using current time
-- alt+right: increment time value by 0.5 seconds (position, start and end)
+- a: Autofill position using current time
+- alt+right: increment time value by 0.5 seconds (positionMs, startMs and endMs) if the cursor is on one of those columns
+- alt+left: decrement time value by 0.5 seconds similar to alt+right
 
-# m5g
+# wip: m5g
 
 - Autofill the position field of a row using the current time at creation
 
