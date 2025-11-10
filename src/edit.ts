@@ -92,6 +92,7 @@ export class Editor {
   replayDiv: HTMLDivElement;
   clipboard: string = '';
   undoManager!: UndoManager;
+  isModalOpen: boolean = false;
 
   constructor() {
     const params = getHashParams();
@@ -357,7 +358,7 @@ export class Editor {
         <table border="1" style="width:100%; text-align:left; border-collapse: collapse;">
           <thead>
             <tr>
-              ${columns.map((col, idx) => `<th style="${idx === 2 || idx === 8 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
+              ${columns.map((col, idx) => `<th style="${idx === 2 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -453,6 +454,11 @@ export class Editor {
 
 
   handleKey(e: KeyboardEvent, isPresentMode: boolean = false) {
+    // Don't handle keys if modal is open
+    if (this.isModalOpen) {
+      return;
+    }
+    
     // In present mode, only allow space and 0 keys
     if (isPresentMode) {
       if (matchKey(e, '0')) {
@@ -1035,6 +1041,11 @@ export class Editor {
           }
         }
       }
+    } else if (this.selectedCol === 8) {
+      // Fill column - edit overlay JSON
+      if (isExistingCommand) {
+        this.showOverlayModal();
+      }
     }
   }
 
@@ -1180,6 +1191,175 @@ export class Editor {
       this.projectId = newId;
       this.loadEditor(this.loadProject(this.projectId));
     }
+  }
+
+  showOverlayModal() {
+    const cmd = this.project.commands[this.selectedRow];
+    const overlayJson = cmd.overlay ? JSON.stringify(cmd.overlay, null, 2) : '{}';
+    
+    // Set modal open flag
+    this.isModalOpen = true;
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'overlay-modal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    `;
+    
+    const title = document.createElement('h2');
+    title.textContent = 'Edit Overlay JSON';
+    title.style.marginTop = '0';
+    
+    const textarea = document.createElement('textarea');
+    textarea.value = overlayJson;
+    textarea.style.cssText = `
+      width: 100%;
+      min-height: 300px;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: vertical;
+      flex: 1;
+    `;
+    
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    `;
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    `;
+    
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = 'Save';
+    saveBtn.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: 1px solid #007bff;
+      border-radius: 4px;
+    `;
+    
+    const closeModal = () => {
+      this.isModalOpen = false;
+      document.body.removeChild(modal);
+    };
+    
+    cancelBtn.onclick = closeModal;
+    
+    saveBtn.onclick = () => {
+      try {
+        const newOverlayData = JSON.parse(textarea.value);
+        
+        // Reconstruct overlay from JSON
+        let newOverlay: Overlay | undefined = undefined;
+        
+        if (Object.keys(newOverlayData).length > 0) {
+          let fullScreenFilter: FullScreenFilter | undefined = undefined;
+          if (newOverlayData.fullScreenFilter) {
+            fullScreenFilter = new FullScreenFilter(newOverlayData.fullScreenFilter.fillStyle);
+          }
+          
+          let borderFilter: BorderFilter | undefined = undefined;
+          if (newOverlayData.borderFilter) {
+            borderFilter = new BorderFilter(
+              newOverlayData.borderFilter.topMarginPct,
+              newOverlayData.borderFilter.bottomMarginPct,
+              newOverlayData.borderFilter.fillStyle
+            );
+          }
+          
+          let textDisplay: TextDisplay | undefined = undefined;
+          if (newOverlayData.textDisplay) {
+            textDisplay = new TextDisplay(
+              newOverlayData.textDisplay.content,
+              newOverlayData.textDisplay.alignment
+            );
+          }
+          
+          if (fullScreenFilter || borderFilter || textDisplay) {
+            newOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+          }
+        }
+        
+        cmd.overlay = newOverlay;
+        closeModal();
+        this.renderTable();
+        this.maybeSave();
+        
+        showBanner('Overlay updated!', {
+          id: 'overlay-banner',
+          position: 'bottom',
+          color: 'green',
+          duration: 1500
+        });
+      } catch (error) {
+        showBanner('Invalid JSON format', {
+          id: 'overlay-error-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 2000
+        });
+      }
+    };
+    
+    // Close modal on Escape key
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    
+    buttonContainer.appendChild(cancelBtn);
+    buttonContainer.appendChild(saveBtn);
+    
+    modalContent.appendChild(title);
+    modalContent.appendChild(textarea);
+    modalContent.appendChild(buttonContainer);
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Focus textarea
+    textarea.focus();
+    textarea.select();
   }
 }
 
