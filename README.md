@@ -17,6 +17,7 @@
   - Display the video title instead of the link.
 
 # Wishlist
+
 P1:
 - Design subcommands
   - Add a subcommands field to the ProjectCommand class which will have type (ProjectCommand[] vs Subcommand[]) and default to an empty list.
@@ -39,6 +40,7 @@ P3:
 - Present mode
   - warm up all the assets
   - display the first YT player's screen
+- alt-up: move row up
 
 # m5 impl
 
@@ -77,8 +79,16 @@ Overlay and subcommands
 ## m5e
 - Add shortcut `t`; if there is text, then toggle alignment of TextDisplay among 4 options, upper left, lower left, upper right and lower right
 
-## m5f
+## wip: m5f
 
+- alt+space: Autofill position using current time
+- alt+right: increment time value by 0.5 seconds (position, start and end)
+
+# m5g
+
+- Autofill the position field of a row using the current time at creation
+
+# m5h
 - Decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses

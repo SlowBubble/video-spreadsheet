@@ -42,7 +42,8 @@ export class Editor {
   project!: Project;
   selectedRow: number = 0;
   selectedCol: number = 0;
-  replayManager: ReplayManager | null = null;
+  replayManager!: ReplayManager;
+  replayDiv: HTMLDivElement;
 
   constructor() {
     const params = getHashParams();
@@ -58,6 +59,7 @@ export class Editor {
       }
       document.body.insertBefore(replayDiv, document.body.firstChild);
     }
+    this.replayDiv = replayDiv;
     
     this.projectId = this.getProjectIdFromHash()!;
     this.loadEditor(this.loadProject(this.projectId));
@@ -79,10 +81,8 @@ export class Editor {
   }
 
   initReplayManager() {
-    let replayDiv = document.getElementById('replay-container') as HTMLDivElement;
-    if (!replayDiv) return;
     this.replayManager = new ReplayManager(
-      replayDiv,
+      this.replayDiv,
       this.project.commands,
       getYouTubeId
     );
@@ -135,8 +135,6 @@ export class Editor {
   }
 
   seekToSelectedRow() {
-    if (!this.replayManager) return;
-    
     // Only seek if we have a valid command selected
     if (this.selectedRow >= this.project.commands.length) return;
     
@@ -231,11 +229,9 @@ export class Editor {
     // In present mode, only allow space and 0 keys
     if (isPresentMode) {
       if (matchKey(e, '0')) {
-        if (!this.replayManager) return;
         this.replayManager.stopReplay();
         e.preventDefault();
       } else if (matchKey(e, 'space')) {
-        if (!this.replayManager) return;
         if (this.replayManager.isPlaying) {
           this.replayManager.pauseReplay();
         } else {
@@ -251,20 +247,26 @@ export class Editor {
     
     if (matchKey(e, 'up')) {
       this.selectedRow = Math.max(0, this.selectedRow - 1);
-      this.seekToSelectedRow();
+      // Only seek if replayer is not playing
+      if (!this.replayManager.isPlaying) {
+        this.seekToSelectedRow();
+      }
     } else if (matchKey(e, 'down')) {
       this.selectedRow = Math.min(rowCount - 1, this.selectedRow + 1);
-      this.seekToSelectedRow();
+      // Only seek if replayer is not playing
+      if (!this.replayManager.isPlaying) {
+        this.seekToSelectedRow();
+      }
     } else if (matchKey(e, 'left')) {
       // If replayer is playing, rewind instead of changing column
-      if (this.replayManager && this.replayManager.isPlaying) {
+      if (this.replayManager.isPlaying) {
         this.replayManager.rewind(3000);
       } else {
         this.selectedCol = Math.max(0, this.selectedCol - 1);
       }
     } else if (matchKey(e, 'right')) {
       // If replayer is playing, fast-forward instead of changing column
-      if (this.replayManager && this.replayManager.isPlaying) {
+      if (this.replayManager.isPlaying) {
         this.replayManager.fastForward(2000);
       } else {
         this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
@@ -278,10 +280,8 @@ export class Editor {
     } else if (matchKey(e, 'cmd+s')) {
       this.saveProject();
     } else if (matchKey(e, '0')) {
-      if (!this.replayManager) return;
       this.replayManager.stopReplay();
     } else if (matchKey(e, 'space') || matchKey(e, 'k')) {
-      if (!this.replayManager) return;
       if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
       } else {
@@ -290,10 +290,8 @@ export class Editor {
     } else if (matchKey(e, 'x')) {
       this.handleExportImport();
     } else if (matchKey(e, 'j')) {
-      if (!this.replayManager) return;
       this.replayManager.rewind(6000);
     } else if (matchKey(e, 'l')) {
-      if (!this.replayManager) return;
       this.replayManager.fastForward(4000);
     } else if (matchKey(e, 'f')) {
       this.cycleFullScreenFilter();
