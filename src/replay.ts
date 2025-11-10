@@ -314,6 +314,7 @@ export class ReplayManager {
   generateReplayPlan(): PlanAction[] {
     const cmds = this.commands;
     if (!cmds || !cmds.length) return [];
+    
     // Collect all change points (start and end of intervals)
     // Account for playback speed: slower speed = longer actual duration
     const points: number[] = [];
@@ -327,9 +328,13 @@ export class ReplayManager {
     // Remove duplicates and sort
     const uniquePoints = Array.from(new Set(points)).sort((a, b) => a - b);
     const plan: PlanAction[] = [];
-    let lastVisible: { [idx: number]: number } = {};
+    let lastVisibleIdx = -1;
+    
     for (let i = 0; i < uniquePoints.length - 1; i++) {
       const c = uniquePoints[i];
+      const nextPoint = uniquePoints[i + 1];
+      
+      // Find which command should be visible at time c
       let idx = -1;
       for (let j = cmds.length - 1; j >= 0; j--) {
         const a = cmds[j].positionMs;
@@ -341,17 +346,22 @@ export class ReplayManager {
           break;
         }
       }
+      
+      // Determine if we should resume or start fresh
       let resume = false;
       let overlay = null;
       if (idx !== -1) {
-        // Resume if this idx was visible before and not restarting
-        resume = lastVisible[idx] !== undefined && lastVisible[idx] < c;
-        lastVisible[idx] = c;
+        // Resume if same video continues from previous action
+        resume = (idx === lastVisibleIdx);
         overlay = cmds[idx].overlay;
       }
+      
       const assetName = idx !== -1 ? this.getCommandName(idx) : '[Black Screen]';
-      plan.push(new PlanAction(c, uniquePoints[i + 1], idx, resume, assetName, overlay));
+      plan.push(new PlanAction(c, nextPoint, idx, resume, assetName, overlay));
+      
+      lastVisibleIdx = idx;
     }
+    
     // For the last change point, show black screen
     const lastPoint = uniquePoints[uniquePoints.length - 1];
     plan.push(new PlanAction(lastPoint, lastPoint + 1000, -1, false, '[Black Screen]', null));
@@ -536,7 +546,8 @@ export class ReplayManager {
         const cmd = commands[i];
         const cmdStart = cmd.positionMs;
         const elapsedInCmd = resumeFromMs - cmdStart;
-        const videoElapsed = elapsedInCmd;
+        // Account for playback speed: if playing at 0.8x speed, video progresses slower
+        const videoElapsed = elapsedInCmd * cmd.speed;
         const seekToMs = cmd.startMs + videoElapsed;
         const seekToSec = seekToMs / 1000;
         

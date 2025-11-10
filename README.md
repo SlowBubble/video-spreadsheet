@@ -85,11 +85,11 @@ Overlay and subcommands
 - alt+right: increment time value by 0.5 seconds (positionMs, startMs and endMs) if the cursor is on one of those columns
 - alt+left: decrement time value by 0.5 seconds similar to alt+right
 
-# wip: m5g
+# m5g
 
-- Autofill the position field of a row using the current time at creation
+- Autofill the positionMs field of a row using the current time at creation
 
-# m5h
+# wip: m5h
 - Decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses

@@ -535,7 +535,10 @@ export class Editor {
           const startMs = extractTimeFromUrl(assetUrl.trim()) || 0;
           const endMs = startMs + 4000; // Add 4 seconds
           
-          const newCmd = new ProjectCommand(assetUrl.trim(), 0, startMs, endMs, 100, 1, '');
+          // Autofill position using current time
+          const currentMs = this.replayManager.getCurrentPosition() || 0;
+          
+          const newCmd = new ProjectCommand(assetUrl.trim(), currentMs, startMs, endMs, 100, 1, '');
           this.project.commands.push(newCmd);
           this.saveProject();
           this.initReplayManager();
