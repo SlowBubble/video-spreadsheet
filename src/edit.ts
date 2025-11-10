@@ -160,6 +160,39 @@ export class Editor {
     }
   }
 
+  getCellContent(rowIdx: number, colIdx: number, cellValue: string): string {
+    // Empty row at the end
+    if (rowIdx >= this.project.commands.length) return cellValue;
+    
+    const cmd = this.project.commands[rowIdx];
+    
+    // For Start and End columns, create clickable links
+    if (colIdx === 3 || colIdx === 4) {
+      const timeMs = colIdx === 3 ? cmd.startMs : cmd.endMs;
+      const timeInSeconds = Math.floor(timeMs / 1000);
+      
+      // Get the asset URL and remove existing 't' parameter
+      const assetUrl = cmd.asset;
+      if (!assetUrl) return cellValue;
+      
+      try {
+        const url = new URL(assetUrl);
+        // Remove existing 't' parameter
+        url.searchParams.delete('t');
+        // Add new 't' parameter with the time value
+        url.searchParams.set('t', `${timeInSeconds}s`);
+        
+        const linkUrl = url.toString();
+        return `<a href="${linkUrl}" target="_blank" style="color: blue; text-decoration: underline;">${cellValue}</a>`;
+      } catch (e) {
+        // If URL parsing fails, just return the cell value
+        return cellValue;
+      }
+    }
+    
+    return cellValue;
+  }
+
   getRowCount(): number {
     // Always show at least one empty row
     return Math.max(1, this.project.commands.length + 1);
@@ -202,8 +235,9 @@ export class Editor {
       for (let colIdx = 0; colIdx < columns.length; colIdx++) {
         const isSelected = rowIdx === this.selectedRow && colIdx === this.selectedCol;
         const cellValue = this.getDisplayValue(rowIdx, colIdx);
+        const cellContent = this.getCellContent(rowIdx, colIdx, cellValue);
         cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px;">
-          ${cellValue || '&nbsp;'}
+          ${cellContent || '&nbsp;'}
         </td>`);
       }
       tableRows.push(`<tr>${cells.join('')}</tr>`);

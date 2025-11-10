@@ -98,14 +98,17 @@ Overlay and subcommands
   - `cmd+c`: For the 4 column about time in ms, Implement it internally by storing the actual integer in ms as a string; for the asset column, copy the underlying asset link as a string; for the rest, store the string itself.
   - `cmd+v`: Disallowed for `Pos 1` column. For asset, pasting will modify the asset link. For column of type number, you need to parse the string into number; if it's a NaN, then just display a banner "Failed: Invalid number" and return early.
 
-# wip: m5j
+# m5j
 
-- Link the start and end column values to the asset link with a slight modification
+- Show the start and end column values as achored links, where the link to use is the asset link with a slight modification
   - Remove the "t=" url param from the link if it's there
   - construst the "t=123s" based on the value of that cell.
 
-# m5k
-- Decide if I need subcommands
+# wip: m5k
+- Make Pos 0 and Pos 1 texts into buttons, which will start the replayer at the specified time of the cell.
+  - If the replayer is already playing, pause before performing this action.
+# m5l
+- Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses
 
