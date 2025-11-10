@@ -405,6 +405,10 @@ export class Editor {
       this.toggleTextAlignment();
     } else if (matchKey(e, 'a')) {
       this.autofillPosition();
+    } else if (matchKey(e, 'alt+up')) {
+      this.moveCommandUp();
+    } else if (matchKey(e, 'alt+down')) {
+      this.moveCommandDown();
     } else if (matchKey(e, 'alt+right')) {
       this.adjustTimeValue(500);
     } else if (matchKey(e, 'alt+left')) {
@@ -574,6 +578,32 @@ export class Editor {
     if (this.selectedRow >= this.project.commands.length && this.selectedRow > 0) {
       this.selectedRow--;
     }
+  }
+
+  moveCommandUp() {
+    // Only move if we have a valid command selected and it's not the first one
+    if (this.selectedRow >= this.project.commands.length || this.selectedRow === 0) return;
+    
+    // Swap with the command above
+    const temp = this.project.commands[this.selectedRow];
+    this.project.commands[this.selectedRow] = this.project.commands[this.selectedRow - 1];
+    this.project.commands[this.selectedRow - 1] = temp;
+    
+    // Move selection up
+    this.selectedRow--;
+  }
+
+  moveCommandDown() {
+    // Only move if we have a valid command selected and it's not the last one
+    if (this.selectedRow >= this.project.commands.length - 1) return;
+    
+    // Swap with the command below
+    const temp = this.project.commands[this.selectedRow];
+    this.project.commands[this.selectedRow] = this.project.commands[this.selectedRow + 1];
+    this.project.commands[this.selectedRow + 1] = temp;
+    
+    // Move selection down
+    this.selectedRow++;
   }
 
   adjustTimeValue(deltaMs: number) {
