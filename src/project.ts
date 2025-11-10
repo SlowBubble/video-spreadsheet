@@ -1,4 +1,4 @@
-export type TextAlignment = 'upper-left' | 'lower-left' | 'upper-right' | 'lower-right';
+export type TextAlignment = 'upper-left' | 'lower-left' | 'upper-right' | 'lower-right' | 'center';
 
 export class TextDisplay {
   content: string;
