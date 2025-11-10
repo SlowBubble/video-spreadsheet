@@ -104,10 +104,24 @@ Overlay and subcommands
   - Remove the "t=" url param from the link if it's there
   - construst the "t=123s" based on the value of that cell.
 
-# wip: m5k
+# m5k
 - Make Pos 0 and Pos 1 texts into buttons, which will start the replayer at the specified time of the cell.
   - If the replayer is already playing, pause before performing this action.
-# m5l
+
+#  wip: m5l
+
+- create undo.ts
+- Implement undo/redo in an UndoManager class in undo.ts
+  - 3 fields: pastStates, currentState, futureStates
+  - Initialize to [], the current project's json string, []
+  - public methods: hasChanged(currJsonString), updateIfChanged(currentJsonString), undo() and redo(), getCurrentState()
+- `cmd+z`: call undo and getCurrentState to update the editor and save the project
+- `cmd+shift+z`: call redo and getCurrentState to update the editor and save the project
+- For all keyboard events (so just have 1 call at the end of handleKey): call a new method, maybeSave, which first check if the editor's state has changed from the UndoManager's currentState
+  - If so, call updateIfChanged and save the project
+  - If not, don't save the project.
+
+# m5m
 - Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses

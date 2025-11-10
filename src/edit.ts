@@ -5,6 +5,7 @@ import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
 import { getHashParams } from './urlUtil';
 import { showBanner } from './bannerUtil';
+import { UndoManager } from './undo';
 
 const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Volume', 'Speed', 'Text'];
 
@@ -75,6 +76,7 @@ export class Editor {
   replayManager!: ReplayManager;
   replayDiv: HTMLDivElement;
   clipboard: string = '';
+  undoManager!: UndoManager;
 
   constructor() {
     const params = getHashParams();
@@ -109,6 +111,7 @@ export class Editor {
     this.selectedCol = 0;
     this.renderTable();
     this.initReplayManager();
+    this.undoManager = new UndoManager(this.project.serialize());
   }
 
   initReplayManager() {
@@ -334,6 +337,7 @@ export class Editor {
     
     // Normal editor mode - all keys work
     const rowCount = this.getRowCount();
+    let forceSave = false;
     
     if (matchKey(e, 'up')) {
       this.selectedRow = Math.max(0, this.selectedRow - 1);
@@ -367,8 +371,6 @@ export class Editor {
       this.selectedCol = Math.max(0, this.selectedCol - 1);
     } else if (matchKey(e, 'enter')) {
       this.handleEnterKey();
-    } else if (matchKey(e, 'cmd+s')) {
-      this.saveProject();
     } else if (matchKey(e, '0')) {
       this.replayManager.stopReplay();
     } else if (matchKey(e, 'space') || matchKey(e, 'k')) {
@@ -399,11 +401,21 @@ export class Editor {
       this.copyCell();
     } else if (matchKey(e, 'cmd+v')) {
       this.pasteCell();
+    } else if (matchKey(e, 'cmd+z')) {
+      const performed = this.handleUndo();
+      forceSave = performed;
+    } else if (matchKey(e, 'cmd+shift+z')) {
+      const performed = this.handleRedo();
+      forceSave = performed;
+    } else if (matchKey(e, 'cmd+s')) {
+      // Force save even if nothing changed
+      forceSave = true;
     } else {
       return;
     }
     e.preventDefault();
     this.renderTable();
+    this.maybeSave(forceSave);
   }
 
   cycleFullScreenFilter() {
@@ -432,9 +444,6 @@ export class Editor {
       console.log(`[Editor] Removed fullscreen filter from row ${this.selectedRow}`);
       this.showFilterBanner('Fullscreen Filter: OFF');
     }
-    
-    this.saveProject();
-    this.initReplayManager();
   }
 
   toggleBorderFilter() {
@@ -470,9 +479,6 @@ export class Editor {
         this.showFilterBanner(`Border Filter: ${nextPct}%`);
       }
     }
-    
-    this.saveProject();
-    this.initReplayManager();
   }
 
   toggleTextAlignment() {
@@ -503,9 +509,6 @@ export class Editor {
     
     console.log(`[Editor] Changed text alignment to ${nextAlignment} on row ${this.selectedRow}`);
     this.showFilterBanner(`Text Alignment: ${nextAlignment}`);
-    
-    this.saveProject();
-    this.initReplayManager();
   }
 
   autofillPosition() {
@@ -529,8 +532,6 @@ export class Editor {
       color: 'blue',
       duration: 1500
     });
-    
-    this.saveProject();
   }
 
   adjustTimeValue(deltaMs: number) {
@@ -577,8 +578,6 @@ export class Editor {
       // Not on a time column, do nothing
       return;
     }
-    
-    this.saveProject();
   }
 
   copyCell() {
@@ -636,8 +635,6 @@ export class Editor {
     if (this.selectedCol === 0) {
       // Asset column - paste the asset link
       cmd.asset = this.clipboard;
-      this.saveProject();
-      this.initReplayManager();
     } else if (this.selectedCol === 1) {
       // Pos 0 column - parse as number
       const value = Number(this.clipboard);
@@ -651,7 +648,6 @@ export class Editor {
         return;
       }
       cmd.positionMs = Math.max(0, value);
-      this.saveProject();
       this.seekToSelectedRow();
     } else if (this.selectedCol === 2) {
       // Pos 1 column - not editable, disallow paste
@@ -675,7 +671,6 @@ export class Editor {
         return;
       }
       cmd.startMs = Math.max(0, value);
-      this.saveProject();
     } else if (this.selectedCol === 4) {
       // End column - parse as number
       const value = Number(this.clipboard);
@@ -689,7 +684,6 @@ export class Editor {
         return;
       }
       cmd.endMs = Math.max(0, value);
-      this.saveProject();
     } else if (this.selectedCol === 5) {
       // Volume column - parse as number
       const value = Number(this.clipboard);
@@ -703,7 +697,6 @@ export class Editor {
         return;
       }
       cmd.volume = value;
-      this.saveProject();
     } else if (this.selectedCol === 6) {
       // Speed column - parse as number
       const value = Number(this.clipboard);
@@ -717,7 +710,6 @@ export class Editor {
         return;
       }
       cmd.speed = value;
-      this.saveProject();
     } else if (this.selectedCol === 7) {
       // Text column - paste as string
       if (this.clipboard.trim() !== '') {
@@ -725,8 +717,6 @@ export class Editor {
       } else {
         cmd.overlay.textDisplay = null;
       }
-      this.saveProject();
-      this.initReplayManager();
     }
     
     console.log(`[Editor] Pasted: ${this.clipboard}`);
@@ -749,7 +739,6 @@ export class Editor {
         const newName = prompt('Edit name:', cmd.name);
         if (newName !== null) {
           cmd.name = newName;
-          this.saveProject();
         }
       } else {
         // Create new command with asset URL
@@ -764,8 +753,6 @@ export class Editor {
           
           const newCmd = new ProjectCommand(assetUrl.trim(), currentMs, startMs, endMs, 100, 1, '');
           this.project.commands.push(newCmd);
-          this.saveProject();
-          this.initReplayManager();
         }
       }
     } else if (this.selectedCol === 1) {
@@ -776,7 +763,6 @@ export class Editor {
         const newValue = prompt('Edit Position:', currentValue);
         if (newValue !== null) {
           cmd.positionMs = this.timeStringToMs(newValue);
-          this.saveProject();
           this.seekToSelectedRow();
         }
       }
@@ -791,7 +777,6 @@ export class Editor {
         const newValue = prompt('Edit Start:', currentValue);
         if (newValue !== null) {
           cmd.startMs = this.timeStringToMs(newValue);
-          this.saveProject();
         }
       }
     } else if (this.selectedCol === 4) {
@@ -802,7 +787,6 @@ export class Editor {
         const newValue = prompt('Edit End:', currentValue);
         if (newValue !== null) {
           cmd.endMs = this.timeStringToMs(newValue);
-          this.saveProject();
         }
       }
     } else if (this.selectedCol === 5) {
@@ -814,7 +798,6 @@ export class Editor {
           const volume = Number(newValue);
           if (!isNaN(volume)) {
             cmd.volume = volume;
-            this.saveProject();
           }
         }
       }
@@ -827,7 +810,6 @@ export class Editor {
           const speed = Number(newValue);
           if (!isNaN(speed) && speed > 0) {
             cmd.speed = speed;
-            this.saveProject();
           }
         }
       }
@@ -844,8 +826,6 @@ export class Editor {
           } else {
             cmd.overlay.textDisplay = null;
           }
-          this.saveProject();
-          this.initReplayManager();
         }
       }
     }
@@ -910,6 +890,48 @@ export class Editor {
     } catch (error) {
       alert('Failed to import project data. Please check the format.');
       console.error('Import error:', error);
+    }
+  }
+
+  handleUndo() {
+    if (!this.undoManager.canUndo()) return false;
+    
+    this.undoManager.undo();
+    const stateJson = this.undoManager.getCurrentState();
+    this.project = Project.fromJSON(stateJson);
+    showBanner('Undo', {
+      id: 'undo-banner',
+      position: 'bottom',
+      color: 'blue',
+      duration: 500
+    });
+    return true;
+  }
+
+  handleRedo() {
+    if (!this.undoManager.canRedo()) return false;
+    
+    this.undoManager.redo();
+    const stateJson = this.undoManager.getCurrentState();
+    this.project = Project.fromJSON(stateJson);
+    showBanner('Redo', {
+      id: 'redo-banner',
+      position: 'bottom',
+      color: 'blue',
+      duration: 500
+    });
+    return true;
+  }
+
+  maybeSave(forceSave: boolean = false) {
+    const currentJsonString = this.project.serialize();
+    const hasChanged = this.undoManager.hasChanged(currentJsonString);
+    if (hasChanged) {
+      this.undoManager.updateIfChanged(currentJsonString);
+      this.initReplayManager();
+    }
+    if (hasChanged || forceSave) {
+      this.saveProject();
     }
   }
 
