@@ -410,6 +410,10 @@ export class Editor {
     } else if (matchKey(e, 'cmd+s')) {
       // Force save even if nothing changed
       forceSave = true;
+    } else if (matchKey(e, 'cmd+x')) {
+      this.removeAsset();
+    } else if (matchKey(e, 'backspace')) {
+      this.removeAsset();
     } else {
       return;
     }
@@ -550,6 +554,19 @@ export class Editor {
     }
     
     return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 100, 1, name);
+  }
+
+  removeAsset() {
+    // Only remove if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    // Remove the command
+    this.project.commands.splice(this.selectedRow, 1);
+    
+    // Adjust selected row if needed
+    if (this.selectedRow >= this.project.commands.length && this.selectedRow > 0) {
+      this.selectedRow--;
+    }
   }
 
   adjustTimeValue(deltaMs: number) {
@@ -949,9 +966,9 @@ export class Editor {
     }
     if (hasChanged || forceSave) {
       this.saveProject();
-      if (!forceSave) {
-        this.showSaveBanner();
-      }
+      // if (!forceSave) {
+      //   this.showSaveBanner();
+      // }
     }
   }
 
@@ -963,12 +980,12 @@ export class Editor {
       const newProject = Project.fromJSON(newJsonString);
       
       // Check if number of commands changed (new asset added or removed)
-      if (oldProject.commands.length !== newProject.commands.length) {
+      if (oldProject.commands.length < newProject.commands.length) {
         return true;
       }
       
       // Check if any asset, startMs, or endMs changed
-      for (let i = 0; i < oldProject.commands.length; i++) {
+      for (let i = 0; i < newProject.commands.length; i++) {
         const oldCmd = oldProject.commands[i];
         const newCmd = newProject.commands[i];
         

@@ -129,12 +129,17 @@ Overlay and subcommands
 # wip: m5n
 Design plan action fields to be cleaner and more explicit so that the plan generation can also be cleaner. PlanAction should have:
 - playVideoFromStart (opposite of resume; let's just get rid of resume, which is a confusing term)
-- showVideo (all other videos will be hidden except for this one)
+- resumeVisual (all other videos will be hidden except for this one)
 
-E.g. playVideoFromStart without showVideo means the viewer will just hear the sound
-E.g. showVideo without playVideoFromStart means the video will be visible again, but not restarting because it is previously playing in the background
+E.g. playVideoFromStart without resumeVisual means the viewer will just hear the sound
+E.g. resumeVisual without playVideoFromStart means the video will be visible again, but not restarting because it is previously playing in the background
 
-# m5o
+# wip: m5o
+
+- shortcut: `backspace` will remove the asset. Add a confirm prompt
+- In a new row, when entering '' for asset link, create a new row as usual, but set the asset name to 'Black' and when replaying treat it as 'Black Screen'
+
+# m5p
 - Start editing a real project and decide if I need subcommands
   - I mainly want slow-mo to dramatize a stroke
   - May be add in some pauses
