@@ -677,7 +677,20 @@ export class ReplayManager {
       // Find the plan step where resumeFromMs falls
       for (let i = 0; i < plan.length; i++) {
         if (plan[i].start <= resumeFromMs && resumeFromMs < plan[i].end) {
+          // Found a matching action, but we need to find the FIRST action at this time point
+          // (since multiple actions can have the same start time)
+          const matchingTime = plan[i].start;
+          while (startStep < i && plan[startStep].start === matchingTime) {
+            startStep++;
+          }
+          if (plan[startStep].start !== matchingTime) {
+            startStep = i;
+          }
+          // Actually, let's just find the first action with this start time
           startStep = i;
+          while (startStep > 0 && plan[startStep - 1].start === matchingTime) {
+            startStep--;
+          }
           initialDelay = 0; // Start immediately when resuming
           break;
         }
@@ -733,6 +746,9 @@ export class ReplayManager {
         return;
       }
       
+      // Check if this is the starting step BEFORE we increment
+      const isStartingStep = (step === startStep);
+      
       // Group actions by time point (all actions with the same start time)
       const currentTime = plan[step].start;
       const actions: PlanAction[] = [];
@@ -764,11 +780,11 @@ export class ReplayManager {
       }
       
       // Subtask 3.3: Calculate remaining duration for the current step when resuming
-      const isResumingMidStep = step === startStep && resumeFromMs !== undefined && resumeFromMs > action.start;
+      const isResumingMidStep = isStartingStep && resumeFromMs !== undefined && resumeFromMs > action.start;
       let stepDuration = action.end - action.start;
       if (isResumingMidStep && resumeFromMs !== undefined) {
         stepDuration = action.end - resumeFromMs;
-        console.log(`[Plan ${step}] Resuming mid-step: start: ${action.start}ms, resumeFrom: ${resumeFromMs}ms, end: ${action.end}ms, actions: ${actions.length}, remaining: ${stepDuration}ms`);
+        console.log(`[Plan] Resuming mid-step: start: ${action.start}ms, resumeFrom: ${resumeFromMs}ms, end: ${action.end}ms, actions: ${actions.length}, remaining: ${stepDuration}ms`);
       }
       
       this.replayStart = Date.now();
@@ -789,7 +805,7 @@ export class ReplayManager {
       }
       
       // Execute all plan actions for this time point
-      const isResuming = step - actions.length === startStep && resumeFromMs !== undefined && resumeFromMs > 0;
+      const isResuming = isStartingStep && resumeFromMs !== undefined && resumeFromMs > 0;
       if (isResuming && resumeFromMs !== undefined) {
         // When resuming mid-playback, seek all active videos to the correct position
         const visibleIdx = visibleAction ? visibleAction.idx : -1;
