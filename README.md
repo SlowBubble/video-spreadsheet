@@ -51,7 +51,9 @@ P3:
 - volume fade-out to be too laggy
   - consider a field that allows audio to keep playing for longer
 
-# m6 impl
+# m6 impl (DONE)
+
+All basic funcionality without subcommands (which may be too complex).
 
 ## m6a
 
