@@ -80,10 +80,17 @@ P3:
 
 ## m6f
 - Fix copy-paste
-  - Currently, cmd+c and cmd+v is a local operation. Let's actually make cmd+c copy for real, so cmd+v will parse the string to insert
-    - Asset column will copy/paste asset link, not the name
-    - The various time fields will copy the ms quantity as a string
-  - Add checkbox on the left to use for copying entire row.
+  - `cmd+c` now copies to the system clipboard:
+    - Checkbox column: copies entire row/command as JSON (pretty with 2 space indent)
+    - Asset column: copies the asset link (not the name)
+    - Time fields: copy the ms quantity as a string
+    - Other fields: copy as string
+  - `cmd+v` now pastes from the system clipboard:
+    - Checkbox column: detects JSON and replaces entire row with pasted command
+    - Asset column: pastes the asset link
+    - Time fields: parse string as number (shows error if invalid)
+    - Text column: pastes as string
+  - Works with clipboard from other apps
 
 # m5 impl
 

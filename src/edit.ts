@@ -91,7 +91,6 @@ export class Editor {
   selectedCol: number = 0;
   replayManager!: ReplayManager;
   replayDiv: HTMLDivElement;
-  clipboard: string = '';
   undoManager!: UndoManager;
   isModalOpen: boolean = false;
 
@@ -456,7 +455,7 @@ export class Editor {
 
 
 
-  handleKey(e: KeyboardEvent, isPresentMode: boolean = false) {
+  async handleKey(e: KeyboardEvent, isPresentMode: boolean = false) {
     // Don't handle keys if modal is open
     if (this.isModalOpen) {
       return;
@@ -570,9 +569,9 @@ export class Editor {
     } else if (matchKey(e, 'alt+left')) {
       this.adjustTimeValue(-500);
     } else if (matchKey(e, 'cmd+c')) {
-      this.copyCell();
+      await this.copyCell();
     } else if (matchKey(e, 'cmd+v')) {
-      this.pasteCell();
+      await this.pasteCell();
     } else if (matchKey(e, 'cmd+z')) {
       const performed = this.handleUndo();
       forceSave = performed;
@@ -818,64 +817,129 @@ export class Editor {
     }
   }
 
-  copyCell() {
+  async copyCell() {
     // Only copy if we have a valid command selected
     if (this.selectedRow >= this.project.commands.length) return;
     
     const cmd = this.project.commands[this.selectedRow];
+    let textToCopy = '';
     
     // Store the value based on column type
     if (this.selectedCol === 0) {
-      // Checkbox column - copy disabled state
-      this.clipboard = cmd.disabled ? 'true' : 'false';
+      // Checkbox column - copy entire row/command as JSON
+      textToCopy = JSON.stringify(cmd, null, 2);
     } else if (this.selectedCol === 1) {
       // Asset column - copy the underlying asset link
-      this.clipboard = cmd.asset;
+      textToCopy = cmd.asset;
     } else if (this.selectedCol === 2) {
       // Pos 0 column - store as ms integer string
-      this.clipboard = cmd.positionMs.toString();
+      textToCopy = cmd.positionMs.toString();
     } else if (this.selectedCol === 3) {
       // Pos 1 column - store as ms integer string
-      this.clipboard = computeCommandEndTimeMs(cmd).toString();
+      textToCopy = computeCommandEndTimeMs(cmd).toString();
     } else if (this.selectedCol === 4) {
       // Start column - store as ms integer string
-      this.clipboard = cmd.startMs.toString();
+      textToCopy = cmd.startMs.toString();
     } else if (this.selectedCol === 5) {
       // End column - store as ms integer string
-      this.clipboard = cmd.endMs.toString();
+      textToCopy = cmd.endMs.toString();
     } else if (this.selectedCol === 6) {
       // Volume column - store as string
-      this.clipboard = cmd.volume.toString();
+      textToCopy = cmd.volume.toString();
     } else if (this.selectedCol === 7) {
       // Speed column - store as percentage string
-      this.clipboard = cmd.speed.toString();
+      textToCopy = cmd.speed.toString();
     } else if (this.selectedCol === 8) {
       // Text column - store as string
-      this.clipboard = cmd.overlay?.textDisplay?.content || '';
+      textToCopy = cmd.overlay?.textDisplay?.content || '';
     }
     
-    showBanner('Copied!', {
-      id: 'copy-banner',
-      position: 'bottom',
-      color: 'green',
-      duration: 500
-    });
+    // Copy to system clipboard
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      showBanner('Copied!', {
+        id: 'copy-banner',
+        position: 'bottom',
+        color: 'green',
+        duration: 500
+      });
+    } catch (err) {
+      showBanner('Failed to copy', {
+        id: 'copy-banner',
+        position: 'bottom',
+        color: 'red',
+        duration: 1000
+      });
+      console.error('Copy failed:', err);
+    }
   }
 
-  pasteCell() {
-    // Don't paste if clipboard is empty
-    if (!this.clipboard) return;
+  async pasteCell() {
+    // Read from system clipboard
+    let clipboardText = '';
+    try {
+      clipboardText = await navigator.clipboard.readText();
+    } catch (err) {
+      showBanner('Failed to read clipboard', {
+        id: 'paste-banner',
+        position: 'bottom',
+        color: 'red',
+        duration: 1000
+      });
+      console.error('Paste failed:', err);
+      return;
+    }
+    
+    if (!clipboardText) return;
     
     const isNewRow = this.selectedRow >= this.project.commands.length;
     
-    // For new rows, only allow pasting in the asset column
+    // For new rows, only allow pasting in the asset column or checkbox column
     if (isNewRow) {
-      if (this.selectedCol === 1) {
+      if (this.selectedCol === 0) {
+        // Try to parse as JSON command
+        try {
+          const parsedCmd = JSON.parse(clipboardText);
+          const newCmd = new ProjectCommand(
+            parsedCmd.asset,
+            parsedCmd.positionMs,
+            parsedCmd.startMs,
+            parsedCmd.endMs,
+            parsedCmd.volume,
+            parsedCmd.speed,
+            parsedCmd.name,
+            parsedCmd.overlay,
+            parsedCmd.disabled
+          );
+          this.project.commands.push(newCmd);
+          showBanner('Pasted row!', {
+            id: 'paste-banner',
+            position: 'bottom',
+            color: 'green',
+            duration: 500
+          });
+          return;
+        } catch (e) {
+          showBanner('Failed: Invalid JSON', {
+            id: 'paste-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 1500
+          });
+          return;
+        }
+      } else if (this.selectedCol === 1) {
         // Create new command with asset URL from clipboard
-        const assetUrl = this.clipboard.trim();
+        const assetUrl = clipboardText.trim();
         if (assetUrl !== '') {
           const newCmd = this.createCommandFromAssetUrl(assetUrl);
           this.project.commands.push(newCmd);
+          showBanner('Pasted!', {
+            id: 'paste-banner',
+            position: 'bottom',
+            color: 'green',
+            duration: 500
+          });
         }
       }
       return;
@@ -885,19 +949,40 @@ export class Editor {
     
     // Paste based on column type
     if (this.selectedCol === 0) {
-      // Checkbox column - parse as boolean
-      const value = this.clipboard.toLowerCase();
-      if (value === 'true') {
-        cmd.disabled = true;
-      } else if (value === 'false') {
-        cmd.disabled = undefined;
+      // Checkbox column - try to parse as JSON command and replace entire row
+      try {
+        const parsedCmd = JSON.parse(clipboardText);
+        cmd.asset = parsedCmd.asset;
+        cmd.positionMs = parsedCmd.positionMs;
+        cmd.startMs = parsedCmd.startMs;
+        cmd.endMs = parsedCmd.endMs;
+        cmd.volume = parsedCmd.volume;
+        cmd.speed = parsedCmd.speed;
+        cmd.name = parsedCmd.name;
+        cmd.overlay = parsedCmd.overlay;
+        cmd.disabled = parsedCmd.disabled;
+        showBanner('Pasted row!', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'green',
+          duration: 500
+        });
+        return;
+      } catch (e) {
+        showBanner('Failed: Invalid JSON', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
       }
     } else if (this.selectedCol === 1) {
       // Asset column - paste the asset link
-      cmd.asset = this.clipboard;
+      cmd.asset = clipboardText;
     } else if (this.selectedCol === 2) {
       // Pos 0 column - parse as number
-      const value = Number(this.clipboard);
+      const value = Number(clipboardText);
       if (isNaN(value)) {
         showBanner('Failed: Invalid number', {
           id: 'paste-banner',
@@ -919,7 +1004,7 @@ export class Editor {
       return;
     } else if (this.selectedCol === 4) {
       // Start column - parse as number
-      const value = Number(this.clipboard);
+      const value = Number(clipboardText);
       if (isNaN(value)) {
         showBanner('Failed: Invalid number', {
           id: 'paste-banner',
@@ -932,7 +1017,7 @@ export class Editor {
       cmd.startMs = Math.max(0, value);
     } else if (this.selectedCol === 5) {
       // End column - parse as number
-      const value = Number(this.clipboard);
+      const value = Number(clipboardText);
       if (isNaN(value)) {
         showBanner('Failed: Invalid number', {
           id: 'paste-banner',
@@ -945,7 +1030,7 @@ export class Editor {
       cmd.endMs = Math.max(0, value);
     } else if (this.selectedCol === 6) {
       // Volume column - parse as number
-      const value = Number(this.clipboard);
+      const value = Number(clipboardText);
       if (isNaN(value)) {
         showBanner('Failed: Invalid number', {
           id: 'paste-banner',
@@ -958,7 +1043,7 @@ export class Editor {
       cmd.volume = value;
     } else if (this.selectedCol === 7) {
       // Speed column - parse as number
-      const value = Number(this.clipboard);
+      const value = Number(clipboardText);
       if (isNaN(value) || value <= 0) {
         showBanner('Failed: Invalid number', {
           id: 'paste-banner',
@@ -971,9 +1056,9 @@ export class Editor {
       cmd.speed = value;
     } else if (this.selectedCol === 8) {
       // Text column - paste as string
-      if (this.clipboard.trim() !== '') {
+      if (clipboardText.trim() !== '') {
         const overlay = ensureOverlay(cmd);
-        overlay.textDisplay = new TextDisplay(this.clipboard);
+        overlay.textDisplay = new TextDisplay(clipboardText);
       } else if (cmd.overlay) {
         cmd.overlay.textDisplay = undefined;
       }
