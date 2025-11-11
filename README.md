@@ -2,19 +2,6 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# Design
-
-- Think of how to make things look more seamless
-  - Idea 1: give a few seconds to play all the videos near their startMs time (invisibly)
-  - Idea 2: play in slow motion 1 second before to make sure the header is not visible and avoid buffering
-  - Idea 3: add some transition to black screen
-- How to make the recording from an extension easier
-  - Have a countdown
-  - Open a window
-  - For preview, we can use a smaller window
-- Make editing easier
-  - Anchor the position to the end of another asset (may be start with a static impl)
-  - Display the video title instead of the link.
 
 # Wishlist
 
