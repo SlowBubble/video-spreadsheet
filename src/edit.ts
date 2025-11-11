@@ -1352,14 +1352,15 @@ export class Editor {
         return true;
       }
       
-      // Check if any asset, startMs, or endMs changed
+      // Check if any asset, startMs, endMs, or extendAudioSec changed
       for (let i = 0; i < newProject.commands.length; i++) {
         const oldCmd = oldProject.commands[i];
         const newCmd = newProject.commands[i];
         
         if (oldCmd.asset !== newCmd.asset ||
             oldCmd.startMs !== newCmd.startMs ||
-            oldCmd.endMs !== newCmd.endMs) {
+            oldCmd.endMs !== newCmd.endMs ||
+            oldCmd.extendAudioSec !== newCmd.extendAudioSec) {
           return true;
         }
       }
