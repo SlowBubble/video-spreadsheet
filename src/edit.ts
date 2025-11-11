@@ -593,6 +593,10 @@ export class Editor {
       this.removeAsset();
     } else if (matchKey(e, 'backspace')) {
       this.removeAsset();
+    } else if (matchKey(e, '[')) {
+      this.adjustExtendAudioSec(-1);
+    } else if (matchKey(e, ']')) {
+      this.adjustExtendAudioSec(1);
     } else {
       return;
     }
@@ -732,7 +736,7 @@ export class Editor {
       name = existingCmd.name + '*';
     }
     
-    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 0, 100, name);
+    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 0, 100, name, undefined, undefined, 0);
   }
 
   removeAsset() {
@@ -815,6 +819,23 @@ export class Editor {
       // Not on a time column, do nothing
       return;
     }
+  }
+
+  adjustExtendAudioSec(deltaSec: number) {
+    // Only adjust if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    // Adjust extendAudioSec, keeping it >= 0
+    cmd.extendAudioSec = Math.max(0, cmd.extendAudioSec + deltaSec);
+    
+    showBanner(`Extend Audio: ${cmd.extendAudioSec}s`, {
+      id: 'extend-audio-banner',
+      position: 'bottom',
+      color: 'blue',
+      duration: 800
+    });
   }
 
   async copyCell() {
@@ -1103,7 +1124,7 @@ export class Editor {
           if (assetUrl.trim() === '') {
             // Empty asset URL creates a black screen
             const currentMs = this.replayManager.getCurrentPosition() || 0;
-            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 100, 'Black');
+            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 100, 'Black', undefined, undefined, 0);
             this.project.commands.push(newCmd);
           } else {
             const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
@@ -1383,7 +1404,8 @@ export class Editor {
         cmd.speed,
         cmd.name,
         cmd.overlay ? this.cloneOverlay(cmd.overlay) : undefined,
-        cmd.disabled
+        cmd.disabled,
+        cmd.extendAudioSec
       ))
     );
     

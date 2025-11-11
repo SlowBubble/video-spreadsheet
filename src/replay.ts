@@ -30,6 +30,7 @@ export class PlanAction {
   showVideo: boolean; // Show this video's iframe
   assetName: string;
   overlay?: Overlay;
+  pauseVideo: boolean; // Whether to pause this video when it's not in the active list
 
   constructor(
     start: number,
@@ -38,7 +39,8 @@ export class PlanAction {
     playFromStart: boolean,
     showVideo: boolean,
     assetName: string,
-    overlay?: Overlay
+    overlay?: Overlay,
+    pauseVideo: boolean = true
   ) {
     this.start = start;
     this.end = end;
@@ -46,6 +48,7 @@ export class PlanAction {
     this.playFromStart = playFromStart;
     this.showVideo = showVideo;
     this.assetName = assetName;
+    this.pauseVideo = pauseVideo;
     if (overlay) {
       this.overlay = overlay;
     }
@@ -277,6 +280,7 @@ export class ReplayManager {
         const ytId = getYouTubeId(cmd.asset);
         const startSec = Math.floor(cmd.startMs / 1000);
         const endSec = Math.floor(cmd.endMs / 1000);
+        const extendAudioSec = cmd.extendAudioSec || 0;
         const div = document.createElement('div');
         div.id = `yt-player-edit-${idx}`;
         // In debug mode, position players vertically; otherwise stack them
@@ -300,7 +304,7 @@ export class ReplayManager {
               autoplay: 0,
               controls: 0,
               start: startSec,
-              end: endSec,
+              end: endSec + extendAudioSec,
               modestbranding: 1,
               rel: 0,
             },
@@ -365,6 +369,7 @@ export class ReplayManager {
 
     // Step 1: Find all important points (start and end of each command)
     // Skip disabled commands
+    // Also add audio-end points for commands with extendAudioSec > 0
     const points = new Set<number>();
     cmds.forEach((cmd: any) => {
       if (cmd.disabled) return; // Skip disabled commands
@@ -374,9 +379,14 @@ export class ReplayManager {
       const rate = speedToRate(cmd.speed);
       const actualDuration = videoDuration / rate;
       const endTime = cmd.positionMs + actualDuration;
+      const extendAudioSec = cmd.extendAudioSec || 0;
+      const audioEndTime = endTime + (extendAudioSec * 1000);
       
       points.add(startTime);
       points.add(endTime);
+      if (extendAudioSec > 0) {
+        points.add(audioEndTime);
+      }
     });
 
     // Convert to sorted array
@@ -423,7 +433,32 @@ export class ReplayManager {
       // Get all active commands (starting + ongoing)
       const activeCommands = [...current.starting, ...current.ongoing];
 
-      if (activeCommands.length === 0) {
+      // Check for commands that are ending but have extended audio
+      const endingWithAudio: number[] = [];
+      const audioEnding: number[] = [];
+      
+      current.ending.forEach((cmdIdx) => {
+        const cmd = cmds[cmdIdx];
+        const extendAudioSec = cmd.extendAudioSec || 0;
+        const videoDuration = cmd.endMs - cmd.startMs;
+        const rate = speedToRate(cmd.speed);
+        const actualDuration = videoDuration / rate;
+        const endTime = cmd.positionMs + actualDuration;
+        const audioEndTime = endTime + (extendAudioSec * 1000);
+        
+        if (extendAudioSec > 0) {
+          // If we're at the visual end but before audio end, keep it in the list
+          if (current.timeMs === endTime && current.timeMs < audioEndTime) {
+            endingWithAudio.push(cmdIdx);
+          }
+          // If we're at the audio end, mark it for pausing
+          else if (current.timeMs === audioEndTime) {
+            audioEnding.push(cmdIdx);
+          }
+        }
+      });
+
+      if (activeCommands.length === 0 && endingWithAudio.length === 0) {
         // No active commands, show black screen
         plan.push(new PlanAction(
           current.timeMs,
@@ -448,10 +483,43 @@ export class ReplayManager {
             playFromStart,
             showVideo,
             assetName,
-            overlay
+            overlay,
+            false // pauseVideo = false (keep playing)
+          ));
+        });
+        
+        // Create actions for commands with extended audio (don't pause yet)
+        endingWithAudio.forEach((cmdIdx) => {
+          const assetName = this.getCommandName(cmdIdx);
+          
+          plan.push(new PlanAction(
+            current.timeMs,
+            next.timeMs,
+            cmdIdx,
+            false, // playFromStart = false (already playing)
+            false, // showVideo = false (visual has ended)
+            assetName,
+            undefined, // no overlay
+            false // pauseVideo = false (keep audio playing)
           ));
         });
       }
+      
+      // Create pause actions for commands whose audio is ending
+      audioEnding.forEach((cmdIdx) => {
+        const assetName = this.getCommandName(cmdIdx);
+        
+        plan.push(new PlanAction(
+          current.timeMs,
+          next.timeMs,
+          cmdIdx,
+          false, // playFromStart = false
+          false, // showVideo = false
+          assetName,
+          undefined, // no overlay
+          true // pauseVideo = true (now pause it)
+        ));
+      });
     }
 
     // Handle the last point - show black screen
@@ -597,19 +665,26 @@ export class ReplayManager {
       const action = actions.find(a => a.cmdIdx === i);
       
       if (action) {
-        // This video should be active
-        if (action.playFromStart && player) {
-          // Start this video from the beginning
-          const cmd = this.commands[i];
-          const startSec = Math.floor(cmd.startMs / 1000);
-          const rate = speedToRate(cmd.speed);
-          player.seekTo(startSec);
-          player.setVolume(cmd.volume);
-          player.setPlaybackRate(rate);
-          player.playVideo();
-        } else if (player) {
-          // Continue playing (already started)
-          player.playVideo();
+        // This video has an action
+        
+        // Check if we should pause it (for audio-ending actions)
+        if (action.pauseVideo && player) {
+          player.pauseVideo();
+        } else {
+          // Normal playback
+          if (action.playFromStart && player) {
+            // Start this video from the beginning
+            const cmd = this.commands[i];
+            const startSec = Math.floor(cmd.startMs / 1000);
+            const rate = speedToRate(cmd.speed);
+            player.seekTo(startSec);
+            player.setVolume(cmd.volume);
+            player.setPlaybackRate(rate);
+            player.playVideo();
+          } else if (player) {
+            // Continue playing (already started)
+            player.playVideo();
+          }
         }
         
         // Show iframe only if this is the visible video
@@ -622,6 +697,7 @@ export class ReplayManager {
         }
       } else {
         // This video should not be playing, pause it and hide
+        // (Only pause if not found in actions at all)
         if (player) {
           player.pauseVideo();
         }

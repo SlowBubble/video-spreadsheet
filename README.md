@@ -92,6 +92,12 @@ P3:
     - Text column: pastes as string
   - Works with clipboard from other apps
 
+## m6g
+- Add another field to command (no need to display it in the table), called extendAudioSec
+  - Implement it by just adding this number to the endSec for playerVars, so that the player will play for longer even after the visual stop showing
+- Control this field via decrement/increment of 1 second via `[` and `]`, staying >= 0.
+  - Have banner to indicate extendAudioSec when it changes
+
 # m5 impl
 
 Overlay

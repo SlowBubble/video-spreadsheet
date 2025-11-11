@@ -30,6 +30,7 @@ export function getShortcutsModalHtml(): string {
             <tr><td style="padding: 4px 8px;"><strong>B</strong></td><td style="padding: 4px 8px;">Toggle border filter</td></tr>
             <tr><td style="padding: 4px 8px;"><strong>T</strong></td><td style="padding: 4px 8px;">Toggle text alignment</td></tr>
             <tr><td style="padding: 4px 8px;"><strong>A</strong></td><td style="padding: 4px 8px;">Tether to previous row</td></tr>
+            <tr><td style="padding: 4px 8px;"><strong>[ / ]</strong></td><td style="padding: 4px 8px;">Extend audio -/+ 1s</td></tr>
             
             <tr><td colspan="2" style="padding: 8px 8px 4px 8px; font-weight: bold; background: #f0f0f0;">Project</td></tr>
             <tr><td style="padding: 4px 8px;"><strong>Cmd+S</strong></td><td style="padding: 4px 8px;">Save project</td></tr>

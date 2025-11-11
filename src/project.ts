@@ -52,6 +52,7 @@ export class ProjectCommand {
   name: string;
   overlay?: Overlay;
   disabled?: boolean;
+  extendAudioSec: number;
 
   constructor(
     asset: string,
@@ -62,7 +63,8 @@ export class ProjectCommand {
     speed?: number,
     name?: string,
     overlay?: Overlay,
-    disabled?: boolean
+    disabled?: boolean,
+    extendAudioSec?: number
   ) {
     this.asset = asset;
     this.positionMs = positionMs;
@@ -71,6 +73,7 @@ export class ProjectCommand {
     this.volume = volume !== undefined && volume >= 0 ? volume : 100;
     this.speed = speed !== undefined && speed > 0 ? speed : 1;
     this.name = name || '';
+    this.extendAudioSec = extendAudioSec !== undefined && extendAudioSec >= 0 ? extendAudioSec : 0;
     if (overlay) {
       this.overlay = overlay;
     }
@@ -140,7 +143,8 @@ export class Project {
         cmd.speed,
         cmd.name,
         overlay,
-        cmd.disabled
+        cmd.disabled,
+        cmd.extendAudioSec
       );
     }));
   }
