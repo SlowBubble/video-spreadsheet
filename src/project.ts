@@ -6,7 +6,7 @@ export class TextDisplay {
 
   constructor(content: string, alignment?: TextAlignment) {
     this.content = content;
-    this.alignment = alignment || 'upper-left';
+    this.alignment = alignment || 'lower-left';
   }
 }
 

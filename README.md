@@ -18,8 +18,9 @@
 
 # Wishlist
 
-P2:
-- May need to increase the load length both ways for smoother loading
+P1:
+- Increase the load length by 1 second on the left for smoother loading
+- Increase the load length by 5 seconds on the right to extend the audio a little
   - If so, need to include pause in the Plan Action
 
 P1:
@@ -53,6 +54,15 @@ P3:
 
 ## m6a
 
+- Have export/import use a textarea modal instead
+
+## m6b
+- Fix copy-paste
+  - Add checkbox on the left to use for copying entire row
+- Use a slidebar for position
+- Add 0-9 for position
+- Add clone project shortcut
+- Shortcut to tether current row's end with next row's start.
 
 
 # m5 impl

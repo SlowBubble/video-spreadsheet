@@ -644,10 +644,9 @@ export class Editor {
       return;
     }
     
-    // Cycle through alignments: upper-left -> lower-left -> upper-right -> lower-right -> center -> upper-left
     const alignments: Array<'upper-left' | 'lower-left' | 'upper-right' | 'lower-right' | 'center'> = [
-      'center',
       'lower-left',
+      'center',
       'lower-right',
       'upper-right',
       'upper-left',
