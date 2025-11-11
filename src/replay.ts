@@ -364,8 +364,11 @@ export class ReplayManager {
     if (!cmds || !cmds.length) return [];
 
     // Step 1: Find all important points (start and end of each command)
+    // Skip disabled commands
     const points = new Set<number>();
     cmds.forEach((cmd: any) => {
+      if (cmd.disabled) return; // Skip disabled commands
+      
       const startTime = cmd.positionMs;
       const videoDuration = cmd.endMs - cmd.startMs;
       const rate = speedToRate(cmd.speed);
@@ -388,6 +391,8 @@ export class ReplayManager {
       const ending: number[] = [];
 
       cmds.forEach((cmd: any, idx: number) => {
+        if (cmd.disabled) return; // Skip disabled commands
+        
         const startTime = cmd.positionMs;
         const videoDuration = cmd.endMs - cmd.startMs;
         const rate = speedToRate(cmd.speed);

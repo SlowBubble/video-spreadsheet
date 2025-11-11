@@ -45,8 +45,9 @@ P3:
 - Present mode
   - warm up all the assets
   - display the first YT player's screen
-- alt-up: move row up
+- Use a slidebar for position
 
+P3:
 - volume fade-out to be too laggy
   - consider a field that allows audio to keep playing for longer
 
@@ -71,10 +72,12 @@ P3:
   - Impl `1`, ..., `9` to be like `0` but to be set to 1/10, ..., 9/10 of the replaying duration.
 
 ## m6e
-- Use a slidebar for position
 - Add a left-most '✅' column that just have a checkbox for each row
   - This correspond to the opposite of a field in ProjectCommand called `disabled`, which is a boolean or undefined (so we don't even need to init the field)
   - If disabled is true, then the replayer will ignore it.
+  - You can toggle it by being on the cell and pressing `enter`.
+
+## m6f
 - Fix copy-paste
   - Add checkbox on the left to use for copying entire row.
 

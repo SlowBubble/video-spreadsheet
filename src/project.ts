@@ -51,6 +51,7 @@ export class ProjectCommand {
   speed: number;
   name: string;
   overlay?: Overlay;
+  disabled?: boolean;
 
   constructor(
     asset: string,
@@ -60,7 +61,8 @@ export class ProjectCommand {
     volume?: number,
     speed?: number,
     name?: string,
-    overlay?: Overlay
+    overlay?: Overlay,
+    disabled?: boolean
   ) {
     this.asset = asset;
     this.positionMs = positionMs;
@@ -71,6 +73,9 @@ export class ProjectCommand {
     this.name = name || '';
     if (overlay) {
       this.overlay = overlay;
+    }
+    if (disabled !== undefined) {
+      this.disabled = disabled;
     }
   }
 }
@@ -134,7 +139,8 @@ export class Project {
         cmd.volume,
         cmd.speed,
         cmd.name,
-        overlay
+        overlay,
+        cmd.disabled
       );
     }));
   }

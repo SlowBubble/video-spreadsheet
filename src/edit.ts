@@ -8,7 +8,7 @@ import { showBanner } from './bannerUtil';
 import { UndoManager } from './undo';
 import { showTextareaModal } from './modalUtil';
 
-const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text', 'Fill'];
+const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text', 'Fill'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -159,23 +159,25 @@ export class Editor {
     const cmd = this.project.commands[rowIdx];
     
     switch (colIdx) {
-      case 0: // Asset
+      case 0: // Checkbox (enabled/disabled)
+        return cmd.disabled ? '☐' : '☑';
+      case 1: // Asset
         return cmd.name ? cmd.name : cmd.asset;
-      case 1: // Pos 0 (start position)
+      case 2: // Pos 0 (start position)
         return msToTimeString(cmd.positionMs);
-      case 2: // Pos 1 (end position, calculated)
+      case 3: // Pos 1 (end position, calculated)
         return msToTimeString(computeCommandEndTimeMs(cmd));
-      case 3: // Start
+      case 4: // Start
         return msToTimeString(cmd.startMs);
-      case 4: // End
+      case 5: // End
         return msToTimeString(cmd.endMs);
-      case 5: // Volume
+      case 6: // Volume
         return cmd.volume.toString();
-      case 6: // Speed (display as percentage)
+      case 7: // Speed (display as percentage)
         return cmd.speed.toString();
-      case 7: // Text
+      case 8: // Text
         return cmd.overlay?.textDisplay?.content || '';
-      case 8: // Fill (canvas preview)
+      case 9: // Fill (canvas preview)
         return ''; // Canvas will be rendered separately
       default:
         return '';
@@ -189,15 +191,15 @@ export class Editor {
     const cmd = this.project.commands[rowIdx];
     
     // For Pos 0 and Pos 1 columns, create clickable buttons
-    if (colIdx === 1 || colIdx === 2) {
-      const timeMs = colIdx === 1 ? cmd.positionMs : computeCommandEndTimeMs(cmd);
-      const dimStyle = colIdx === 2 ? 'opacity: 0.5;' : '';
+    if (colIdx === 2 || colIdx === 3) {
+      const timeMs = colIdx === 2 ? cmd.positionMs : computeCommandEndTimeMs(cmd);
+      const dimStyle = colIdx === 3 ? 'opacity: 0.5;' : '';
       return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
     }
     
     // For Start and End columns, create clickable links
-    if (colIdx === 3 || colIdx === 4) {
-      const timeMs = colIdx === 3 ? cmd.startMs : cmd.endMs;
+    if (colIdx === 4 || colIdx === 5) {
+      const timeMs = colIdx === 4 ? cmd.startMs : cmd.endMs;
       const timeInSeconds = Math.floor(timeMs / 1000);
       
       // Get the asset URL and remove existing 't' parameter
@@ -220,7 +222,7 @@ export class Editor {
     }
     
     // For Fill column, create a canvas with overlay preview
-    if (colIdx === 8) {
+    if (colIdx === 9) {
       const canvasId = `fill-canvas-${rowIdx}`;
       return `<canvas id="${canvasId}" width="47" height="27" style="border: 1px solid #ccc;"></canvas>`;
     }
@@ -359,7 +361,7 @@ export class Editor {
         <table border="1" style="width:100%; text-align:left; border-collapse: collapse;">
           <thead>
             <tr>
-              ${columns.map((col, idx) => `<th style="${idx === 2 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
+              ${columns.map((col, idx) => `<th style="${idx === 3 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -533,12 +535,12 @@ export class Editor {
       } else {
         // Check if selected cell is on Pos 0 or Pos 1
         let resumeTime = this.replayManager.pausedAtMs;
-        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 1 || this.selectedCol === 2)) {
+        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 2 || this.selectedCol === 3)) {
           const cmd = this.project.commands[this.selectedRow];
-          if (this.selectedCol === 1) {
+          if (this.selectedCol === 2) {
             // Pos 0 column - use positionMs
             resumeTime = cmd.positionMs;
-          } else if (this.selectedCol === 2) {
+          } else if (this.selectedCol === 3) {
             // Pos 1 column - use computed end time
             resumeTime = computeCommandEndTimeMs(cmd);
           }
@@ -778,7 +780,7 @@ export class Editor {
     const cmd = this.project.commands[this.selectedRow];
     
     // Check which column we're on and adjust accordingly
-    if (this.selectedCol === 1) {
+    if (this.selectedCol === 2) {
       // Pos 0 column
       cmd.positionMs = Math.max(0, cmd.positionMs + deltaMs);
       showBanner(`Position: ${msToTimeString(cmd.positionMs)}`, {
@@ -787,10 +789,10 @@ export class Editor {
         color: 'blue',
         duration: 800
       });
-    } else if (this.selectedCol === 2) {
+    } else if (this.selectedCol === 3) {
       // Pos 1 column - not editable, do nothing
       return;
-    } else if (this.selectedCol === 3) {
+    } else if (this.selectedCol === 4) {
       // Start column
       cmd.startMs = Math.max(0, cmd.startMs + deltaMs);
       showBanner(`Start: ${msToTimeString(cmd.startMs)}`, {
@@ -799,7 +801,7 @@ export class Editor {
         color: 'blue',
         duration: 800
       });
-    } else if (this.selectedCol === 4) {
+    } else if (this.selectedCol === 5) {
       // End column
       cmd.endMs = Math.max(0, cmd.endMs + deltaMs);
       showBanner(`End: ${msToTimeString(cmd.endMs)}`, {
@@ -822,27 +824,30 @@ export class Editor {
     
     // Store the value based on column type
     if (this.selectedCol === 0) {
+      // Checkbox column - copy disabled state
+      this.clipboard = cmd.disabled ? 'true' : 'false';
+    } else if (this.selectedCol === 1) {
       // Asset column - copy the underlying asset link
       this.clipboard = cmd.asset;
-    } else if (this.selectedCol === 1) {
+    } else if (this.selectedCol === 2) {
       // Pos 0 column - store as ms integer string
       this.clipboard = cmd.positionMs.toString();
-    } else if (this.selectedCol === 2) {
+    } else if (this.selectedCol === 3) {
       // Pos 1 column - store as ms integer string
       this.clipboard = computeCommandEndTimeMs(cmd).toString();
-    } else if (this.selectedCol === 3) {
+    } else if (this.selectedCol === 4) {
       // Start column - store as ms integer string
       this.clipboard = cmd.startMs.toString();
-    } else if (this.selectedCol === 4) {
+    } else if (this.selectedCol === 5) {
       // End column - store as ms integer string
       this.clipboard = cmd.endMs.toString();
-    } else if (this.selectedCol === 5) {
+    } else if (this.selectedCol === 6) {
       // Volume column - store as string
       this.clipboard = cmd.volume.toString();
-    } else if (this.selectedCol === 6) {
+    } else if (this.selectedCol === 7) {
       // Speed column - store as percentage string
       this.clipboard = cmd.speed.toString();
-    } else if (this.selectedCol === 7) {
+    } else if (this.selectedCol === 8) {
       // Text column - store as string
       this.clipboard = cmd.overlay?.textDisplay?.content || '';
     }
@@ -863,7 +868,7 @@ export class Editor {
     
     // For new rows, only allow pasting in the asset column
     if (isNewRow) {
-      if (this.selectedCol === 0) {
+      if (this.selectedCol === 1) {
         // Create new command with asset URL from clipboard
         const assetUrl = this.clipboard.trim();
         if (assetUrl !== '') {
@@ -878,9 +883,17 @@ export class Editor {
     
     // Paste based on column type
     if (this.selectedCol === 0) {
+      // Checkbox column - parse as boolean
+      const value = this.clipboard.toLowerCase();
+      if (value === 'true') {
+        cmd.disabled = true;
+      } else if (value === 'false') {
+        cmd.disabled = undefined;
+      }
+    } else if (this.selectedCol === 1) {
       // Asset column - paste the asset link
       cmd.asset = this.clipboard;
-    } else if (this.selectedCol === 1) {
+    } else if (this.selectedCol === 2) {
       // Pos 0 column - parse as number
       const value = Number(this.clipboard);
       if (isNaN(value)) {
@@ -893,7 +906,7 @@ export class Editor {
         return;
       }
       cmd.positionMs = Math.max(0, value);
-    } else if (this.selectedCol === 2) {
+    } else if (this.selectedCol === 3) {
       // Pos 1 column - not editable, disallow paste
       showBanner('Cannot paste: Pos 1 is not editable', {
         id: 'paste-banner',
@@ -902,7 +915,7 @@ export class Editor {
         duration: 1500
       });
       return;
-    } else if (this.selectedCol === 3) {
+    } else if (this.selectedCol === 4) {
       // Start column - parse as number
       const value = Number(this.clipboard);
       if (isNaN(value)) {
@@ -915,7 +928,7 @@ export class Editor {
         return;
       }
       cmd.startMs = Math.max(0, value);
-    } else if (this.selectedCol === 4) {
+    } else if (this.selectedCol === 5) {
       // End column - parse as number
       const value = Number(this.clipboard);
       if (isNaN(value)) {
@@ -928,7 +941,7 @@ export class Editor {
         return;
       }
       cmd.endMs = Math.max(0, value);
-    } else if (this.selectedCol === 5) {
+    } else if (this.selectedCol === 6) {
       // Volume column - parse as number
       const value = Number(this.clipboard);
       if (isNaN(value)) {
@@ -941,7 +954,7 @@ export class Editor {
         return;
       }
       cmd.volume = value;
-    } else if (this.selectedCol === 6) {
+    } else if (this.selectedCol === 7) {
       // Speed column - parse as number
       const value = Number(this.clipboard);
       if (isNaN(value) || value <= 0) {
@@ -954,7 +967,7 @@ export class Editor {
         return;
       }
       cmd.speed = value;
-    } else if (this.selectedCol === 7) {
+    } else if (this.selectedCol === 8) {
       // Text column - paste as string
       if (this.clipboard.trim() !== '') {
         const overlay = ensureOverlay(cmd);
@@ -976,6 +989,18 @@ export class Editor {
     const isExistingCommand = this.selectedRow < this.project.commands.length;
     
     if (this.selectedCol === 0) {
+      // Checkbox column - toggle disabled state
+      if (isExistingCommand) {
+        const cmd = this.project.commands[this.selectedRow];
+        cmd.disabled = cmd.disabled ? undefined : true;
+        showBanner(cmd.disabled ? 'Command disabled' : 'Command enabled', {
+          id: 'toggle-banner',
+          position: 'bottom',
+          color: cmd.disabled ? 'red' : 'green',
+          duration: 800
+        });
+      }
+    } else if (this.selectedCol === 1) {
       // Asset column
       if (isExistingCommand) {
         // Edit name
@@ -999,7 +1024,7 @@ export class Editor {
           }
         }
       }
-    } else if (this.selectedCol === 1) {
+    } else if (this.selectedCol === 2) {
       // Pos 0 column - edit position start time
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -1009,10 +1034,10 @@ export class Editor {
           cmd.positionMs = this.timeStringToMs(newValue);
         }
       }
-    } else if (this.selectedCol === 2) {
+    } else if (this.selectedCol === 3) {
       // Pos 1 column - not editable, do nothing
       return;
-    } else if (this.selectedCol === 3) {
+    } else if (this.selectedCol === 4) {
       // Start column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -1022,7 +1047,7 @@ export class Editor {
           cmd.startMs = this.timeStringToMs(newValue);
         }
       }
-    } else if (this.selectedCol === 4) {
+    } else if (this.selectedCol === 5) {
       // End column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -1032,7 +1057,7 @@ export class Editor {
           cmd.endMs = this.timeStringToMs(newValue);
         }
       }
-    } else if (this.selectedCol === 5) {
+    } else if (this.selectedCol === 6) {
       // Volume column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -1044,7 +1069,7 @@ export class Editor {
           }
         }
       }
-    } else if (this.selectedCol === 6) {
+    } else if (this.selectedCol === 7) {
       // Speed column (as percentage)
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -1056,7 +1081,7 @@ export class Editor {
           }
         }
       }
-    } else if (this.selectedCol === 7) {
+    } else if (this.selectedCol === 8) {
       // Text column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
@@ -1072,7 +1097,7 @@ export class Editor {
           }
         }
       }
-    } else if (this.selectedCol === 8) {
+    } else if (this.selectedCol === 9) {
       // Fill column - edit overlay JSON
       if (isExistingCommand) {
         this.showOverlayModal();
@@ -1270,7 +1295,8 @@ export class Editor {
         cmd.volume,
         cmd.speed,
         cmd.name,
-        cmd.overlay ? this.cloneOverlay(cmd.overlay) : undefined
+        cmd.overlay ? this.cloneOverlay(cmd.overlay) : undefined,
+        cmd.disabled
       ))
     );
     
