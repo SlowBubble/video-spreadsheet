@@ -6,6 +6,7 @@ import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
 import { getHashParams } from './urlUtil';
 import { showBanner } from './bannerUtil';
 import { UndoManager } from './undo';
+import { showTextareaModal } from './modalUtil';
 
 const columns = ['Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text', 'Fill'];
 
@@ -1091,22 +1092,48 @@ export class Editor {
     const serializedData = localStorage.getItem('project-' + this.projectId);
     if (!serializedData) return;
     
-    // Open prompt with serialized data selected
-    const userInput = prompt('Export/Import project data:', serializedData);
-    
-    // If cancelled, do nothing
-    if (userInput === null) return;
-    
-    // If confirmed, deserialize and load the data
+    // Pretty-print the JSON with 2-space indentation
+    let prettyJson = serializedData;
     try {
-      const importedProject = Project.fromJSON(userInput);
-      // Save the imported project
-      localStorage.setItem('project-' + this.projectId, importedProject.serialize());
-      this.loadEditor(importedProject);
-    } catch (error) {
-      alert('Failed to import project data. Please check the format.');
-      console.error('Import error:', error);
+      const parsed = JSON.parse(serializedData);
+      prettyJson = JSON.stringify(parsed, null, 2);
+    } catch {
+      // Keep original if parsing fails
     }
+    
+    showTextareaModal({
+      title: 'Export/Import Project Data',
+      initialValue: prettyJson,
+      saveButtonLabel: 'Import',
+      maxWidth: '800px',
+      minHeight: '400px',
+      fontSize: '12px',
+      onModalStateChange: (isOpen) => {
+        this.isModalOpen = isOpen;
+      },
+      onSave: (value) => {
+        try {
+          const importedProject = Project.fromJSON(value);
+          localStorage.setItem('project-' + this.projectId, importedProject.serialize());
+          this.loadEditor(importedProject);
+          
+          showBanner('Project imported!', {
+            id: 'import-banner',
+            position: 'bottom',
+            color: 'green',
+            duration: 1500
+          });
+        } catch (error) {
+          showBanner('Failed to import: Invalid JSON format', {
+            id: 'import-error-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 2000
+          });
+          console.error('Import error:', error);
+        }
+      }
+    });
   }
 
   handleUndo() {
@@ -1196,169 +1223,67 @@ export class Editor {
     const cmd = this.project.commands[this.selectedRow];
     const overlayJson = cmd.overlay ? JSON.stringify(cmd.overlay, null, 2) : '{}';
     
-    // Set modal open flag
-    this.isModalOpen = true;
-    
-    // Create modal
-    const modal = document.createElement('div');
-    modal.id = 'overlay-modal';
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-    `;
-    
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = `
-      background: white;
-      padding: 24px;
-      border-radius: 8px;
-      max-width: 600px;
-      width: 90%;
-      max-height: 80vh;
-      display: flex;
-      flex-direction: column;
-    `;
-    
-    const title = document.createElement('h2');
-    title.textContent = 'Edit Overlay JSON';
-    title.style.marginTop = '0';
-    
-    const textarea = document.createElement('textarea');
-    textarea.value = overlayJson;
-    textarea.style.cssText = `
-      width: 100%;
-      min-height: 300px;
-      font-family: monospace;
-      font-size: 14px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      resize: vertical;
-      flex: 1;
-    `;
-    
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.cssText = `
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 16px;
-    `;
-    
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.cssText = `
-      padding: 8px 16px;
-      cursor: pointer;
-      background: #f0f0f0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    `;
-    
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Save';
-    saveBtn.style.cssText = `
-      padding: 8px 16px;
-      cursor: pointer;
-      background: #007bff;
-      color: white;
-      border: 1px solid #007bff;
-      border-radius: 4px;
-    `;
-    
-    const closeModal = () => {
-      this.isModalOpen = false;
-      document.body.removeChild(modal);
-    };
-    
-    cancelBtn.onclick = closeModal;
-    
-    saveBtn.onclick = () => {
-      try {
-        const newOverlayData = JSON.parse(textarea.value);
-        
-        // Reconstruct overlay from JSON
-        let newOverlay: Overlay | undefined = undefined;
-        
-        if (Object.keys(newOverlayData).length > 0) {
-          let fullScreenFilter: FullScreenFilter | undefined = undefined;
-          if (newOverlayData.fullScreenFilter) {
-            fullScreenFilter = new FullScreenFilter(newOverlayData.fullScreenFilter.fillStyle);
+    showTextareaModal({
+      title: 'Edit Overlay JSON',
+      initialValue: overlayJson,
+      onModalStateChange: (isOpen) => {
+        this.isModalOpen = isOpen;
+      },
+      onSave: (value) => {
+        try {
+          const newOverlayData = JSON.parse(value);
+          
+          // Reconstruct overlay from JSON
+          let newOverlay: Overlay | undefined = undefined;
+          
+          if (Object.keys(newOverlayData).length > 0) {
+            let fullScreenFilter: FullScreenFilter | undefined = undefined;
+            if (newOverlayData.fullScreenFilter) {
+              fullScreenFilter = new FullScreenFilter(newOverlayData.fullScreenFilter.fillStyle);
+            }
+            
+            let borderFilter: BorderFilter | undefined = undefined;
+            if (newOverlayData.borderFilter) {
+              borderFilter = new BorderFilter(
+                newOverlayData.borderFilter.topMarginPct,
+                newOverlayData.borderFilter.bottomMarginPct,
+                newOverlayData.borderFilter.fillStyle
+              );
+            }
+            
+            let textDisplay: TextDisplay | undefined = undefined;
+            if (newOverlayData.textDisplay) {
+              textDisplay = new TextDisplay(
+                newOverlayData.textDisplay.content,
+                newOverlayData.textDisplay.alignment
+              );
+            }
+            
+            if (fullScreenFilter || borderFilter || textDisplay) {
+              newOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+            }
           }
           
-          let borderFilter: BorderFilter | undefined = undefined;
-          if (newOverlayData.borderFilter) {
-            borderFilter = new BorderFilter(
-              newOverlayData.borderFilter.topMarginPct,
-              newOverlayData.borderFilter.bottomMarginPct,
-              newOverlayData.borderFilter.fillStyle
-            );
-          }
+          cmd.overlay = newOverlay;
+          this.renderTable();
+          this.maybeSave();
           
-          let textDisplay: TextDisplay | undefined = undefined;
-          if (newOverlayData.textDisplay) {
-            textDisplay = new TextDisplay(
-              newOverlayData.textDisplay.content,
-              newOverlayData.textDisplay.alignment
-            );
-          }
-          
-          if (fullScreenFilter || borderFilter || textDisplay) {
-            newOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
-          }
+          showBanner('Overlay updated!', {
+            id: 'overlay-banner',
+            position: 'bottom',
+            color: 'green',
+            duration: 1500
+          });
+        } catch (error) {
+          showBanner('Invalid JSON format', {
+            id: 'overlay-error-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 2000
+          });
         }
-        
-        cmd.overlay = newOverlay;
-        closeModal();
-        this.renderTable();
-        this.maybeSave();
-        
-        showBanner('Overlay updated!', {
-          id: 'overlay-banner',
-          position: 'bottom',
-          color: 'green',
-          duration: 1500
-        });
-      } catch (error) {
-        showBanner('Invalid JSON format', {
-          id: 'overlay-error-banner',
-          position: 'bottom',
-          color: 'red',
-          duration: 2000
-        });
       }
-    };
-    
-    // Close modal on Escape key
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeModal();
-        document.removeEventListener('keydown', handleKeyDown);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    
-    buttonContainer.appendChild(cancelBtn);
-    buttonContainer.appendChild(saveBtn);
-    
-    modalContent.appendChild(title);
-    modalContent.appendChild(textarea);
-    modalContent.appendChild(buttonContainer);
-    
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
-    
-    // Focus textarea
-    textarea.focus();
-    textarea.select();
+    });
   }
 }
 
