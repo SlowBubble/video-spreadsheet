@@ -514,6 +514,22 @@ export class ReplayManager {
     }
   }
 
+  getTotalDuration(): number {
+    // Calculate the total duration by finding the maximum end time of all commands
+    if (!this.commands || this.commands.length === 0) return 0;
+    
+    let maxEndTime = 0;
+    this.commands.forEach((cmd: any) => {
+      const videoDuration = cmd.endMs - cmd.startMs;
+      const rate = speedToRate(cmd.speed);
+      const actualDuration = videoDuration / rate;
+      const endTime = cmd.positionMs + actualDuration;
+      maxEndTime = Math.max(maxEndTime, endTime);
+    });
+    
+    return maxEndTime;
+  }
+
   seekToTime(newMs: number) {
     // If currently playing, pause first
     const wasPlaying = this.isPlaying;

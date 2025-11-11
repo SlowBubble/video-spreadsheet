@@ -460,10 +460,20 @@ export class Editor {
       return;
     }
     
-    // In present mode, only allow space and 0 keys
+    // In present mode, only allow space and number keys
     if (isPresentMode) {
       if (matchKey(e, '0')) {
         this.replayManager.stopReplay();
+        // Resume playing from the beginning
+        this.replayManager.startReplay(0);
+        e.preventDefault();
+      } else if (matchKey(e, '1') || matchKey(e, '2') || matchKey(e, '3') || matchKey(e, '4') || 
+                 matchKey(e, '5') || matchKey(e, '6') || matchKey(e, '7') || matchKey(e, '8') || matchKey(e, '9')) {
+        const digit = parseInt(e.key);
+        const totalDuration = this.replayManager.getTotalDuration();
+        const targetTime = (digit / 10) * totalDuration;
+        this.replayManager.stopReplay();
+        this.replayManager.startReplay(targetTime);
         e.preventDefault();
       } else if (matchKey(e, 'space')) {
         if (this.replayManager.isPlaying) {
@@ -508,6 +518,15 @@ export class Editor {
       this.handleEnterKey();
     } else if (matchKey(e, '0')) {
       this.replayManager.stopReplay();
+      // Resume playing from the beginning
+      this.replayManager.startReplay(0);
+    } else if (matchKey(e, '1') || matchKey(e, '2') || matchKey(e, '3') || matchKey(e, '4') || 
+               matchKey(e, '5') || matchKey(e, '6') || matchKey(e, '7') || matchKey(e, '8') || matchKey(e, '9')) {
+      const digit = parseInt(e.key);
+      const totalDuration = this.replayManager.getTotalDuration();
+      const targetTime = (digit / 10) * totalDuration;
+      this.replayManager.stopReplay();
+      this.replayManager.startReplay(targetTime);
     } else if (matchKey(e, 'space') || matchKey(e, 'k')) {
       if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
