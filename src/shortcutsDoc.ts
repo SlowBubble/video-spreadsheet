@@ -9,6 +9,7 @@ export function getShortcutsModalHtml(): string {
           <tr><td style="padding: 4px 8px;"><strong>Enter</strong></td><td style="padding: 4px 8px;">Edit cell</td></tr>
           <tr><td style="padding: 4px 8px;"><strong>Cmd+S</strong></td><td style="padding: 4px 8px;">Save project</td></tr>
           <tr><td style="padding: 4px 8px;"><strong>Cmd+Shift+S</strong></td><td style="padding: 4px 8px;">Clone project</td></tr>
+          <tr><td style="padding: 4px 8px;"><strong>Cmd+Backspace</strong></td><td style="padding: 4px 8px;">Delete project</td></tr>
           <tr><td style="padding: 4px 8px;"><strong>Space</strong></td><td style="padding: 4px 8px;">Start/stop replay</td></tr>
           <tr><td style="padding: 4px 8px;"><strong>X</strong></td><td style="padding: 4px 8px;">Export/import project</td></tr>
         </table>

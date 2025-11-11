@@ -68,7 +68,7 @@ P3:
 - Use a slidebar for position
 
 ## m6d
-- Shortcut to tether current row's end with next row's start.
+- Replace the current shortcut `a` with setting the current row's start to the previous row's end.
 
 ## m6e
 - Add a left-most '✅' column that just have a checkbox for each row
