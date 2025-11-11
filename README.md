@@ -62,7 +62,8 @@ P3:
   - Suffix the project name with '*'
   - the id with be generated so it doesn't clash with the old id
   - navigate to the new url
-- `cmd+backspace`: delete the project after a confirm prompt and navigate to home page
+- `cmd+backspace`: delete the current row
+- `cmd+shift+backspace`: delete the project after a confirm prompt and navigate to home page
 
 ## m6c
 - Replace the current shortcut `a` with setting the current row's start to the previous row's end.
@@ -79,8 +80,10 @@ P3:
 
 ## m6f
 - Fix copy-paste
+  - Currently, cmd+c and cmd+v is a local operation. Let's actually make cmd+c copy for real, so cmd+v will parse the string to insert
+    - Asset column will copy/paste asset link, not the name
+    - The various time fields will copy the ms quantity as a string
   - Add checkbox on the left to use for copying entire row.
-
 
 # m5 impl
 

@@ -585,9 +585,11 @@ export class Editor {
     } else if (matchKey(e, 'cmd+s')) {
       // Force save even if nothing changed
       forceSave = true;
-    } else if (matchKey(e, 'cmd+backspace')) {
+    } else if (matchKey(e, 'cmd+shift+backspace')) {
       this.deleteProject();
       return; // Don't render or save, we're navigating away
+    } else if (matchKey(e, 'cmd+backspace')) {
+      this.removeAsset();
     } else if (matchKey(e, 'cmd+x')) {
       this.removeAsset();
     } else if (matchKey(e, 'backspace')) {
