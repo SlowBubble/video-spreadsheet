@@ -57,12 +57,25 @@ P3:
 - Have export/import use a textarea modal instead
 
 ## m6b
-- Fix copy-paste
-  - Add checkbox on the left to use for copying entire row
-- Use a slidebar for position
+- `cmd+shift+s`: clone project
+  - Suffix the project name with '*'
+  - the id with be generated so it doesn't clash with the old id
+  - navigate to the new url
+- `cmd+backspace`: delete the project after a confirm prompt and navigate to home page
+
+## m6c
 - Add 0-9 for position
-- Add clone project shortcut
+- Use a slidebar for position
+
+## m6d
 - Shortcut to tether current row's end with next row's start.
+
+## m6e
+- Add a left-most '✅' column that just have a checkbox for each row
+  - This correspond to the opposite of a field in ProjectCommand called `disabled`, which is a boolean or undefined (so we don't even need to init the field)
+  - If disabled is true, then the replayer will ignore it.
+- Fix copy-paste
+  - Add checkbox on the left to use for copying entire row.
 
 
 # m5 impl

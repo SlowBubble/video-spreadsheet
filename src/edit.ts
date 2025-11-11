@@ -558,6 +558,9 @@ export class Editor {
     } else if (matchKey(e, 'cmd+shift+z')) {
       const performed = this.handleRedo();
       forceSave = performed;
+    } else if (matchKey(e, 'cmd+shift+s')) {
+      this.cloneProject();
+      return; // Don't render or save, we're navigating away
     } else if (matchKey(e, 'cmd+s')) {
       // Force save even if nothing changed
       forceSave = true;
@@ -1217,6 +1220,63 @@ export class Editor {
       this.projectId = newId;
       this.loadEditor(this.loadProject(this.projectId));
     }
+  }
+
+  cloneProject() {
+    // Save current project first
+    this.saveProject();
+    
+    // Generate new ID using timestamp
+    const newId = Date.now().toString();
+    
+    // Clone the project with new ID and suffixed name
+    const clonedProject = new Project(
+      this.project.title + '*',
+      newId,
+      // Deep clone commands
+      this.project.commands.map(cmd => new ProjectCommand(
+        cmd.asset,
+        cmd.positionMs,
+        cmd.startMs,
+        cmd.endMs,
+        cmd.volume,
+        cmd.speed,
+        cmd.name,
+        cmd.overlay ? this.cloneOverlay(cmd.overlay) : undefined
+      ))
+    );
+    
+    // Save the cloned project
+    localStorage.setItem('project-' + newId, clonedProject.serialize());
+    
+    // Navigate to the new project
+    window.location.hash = `id=${newId}`;
+  }
+
+  cloneOverlay(overlay: Overlay): Overlay {
+    let fullScreenFilter: FullScreenFilter | undefined = undefined;
+    if (overlay.fullScreenFilter) {
+      fullScreenFilter = new FullScreenFilter(overlay.fullScreenFilter.fillStyle);
+    }
+    
+    let borderFilter: BorderFilter | undefined = undefined;
+    if (overlay.borderFilter) {
+      borderFilter = new BorderFilter(
+        overlay.borderFilter.topMarginPct,
+        overlay.borderFilter.bottomMarginPct,
+        overlay.borderFilter.fillStyle
+      );
+    }
+    
+    let textDisplay: TextDisplay | undefined = undefined;
+    if (overlay.textDisplay) {
+      textDisplay = new TextDisplay(
+        overlay.textDisplay.content,
+        overlay.textDisplay.alignment
+      );
+    }
+    
+    return new Overlay(fullScreenFilter, borderFilter, textDisplay);
   }
 
   showOverlayModal() {
