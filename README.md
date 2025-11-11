@@ -64,13 +64,14 @@ P3:
 - `cmd+backspace`: delete the project after a confirm prompt and navigate to home page
 
 ## m6c
-- Add 0-9 for position
-- Use a slidebar for position
-
-## m6d
 - Replace the current shortcut `a` with setting the current row's start to the previous row's end.
 
+## m6d
+- Change `0` to also resume replaying if it was paused
+  - Impl `1`, ..., `9` to be like `0` but to be set to 1/10, ..., 9/10 of the replaying duration.
+
 ## m6e
+- Use a slidebar for position
 - Add a left-most '✅' column that just have a checkbox for each row
   - This correspond to the opposite of a field in ProjectCommand called `disabled`, which is a boolean or undefined (so we don't even need to init the field)
   - If disabled is true, then the replayer will ignore it.

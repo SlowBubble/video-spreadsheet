@@ -539,7 +539,7 @@ export class Editor {
     } else if (matchKey(e, 't')) {
       this.toggleTextAlignment();
     } else if (matchKey(e, 'a')) {
-      this.autofillPosition();
+      this.tetherToPreviousRow();
     } else if (matchKey(e, 'alt+up')) {
       this.moveCommandUp();
     } else if (matchKey(e, 'alt+down')) {
@@ -668,21 +668,27 @@ export class Editor {
     this.showFilterBanner(`Text Alignment: ${nextAlignment}`);
   }
 
-  autofillPosition() {
-    // Only autofill if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
-    
-    // Get current position from replay manager
-    const currentMs = this.replayManager.getCurrentPosition();
-    if (currentMs === null) {
+  tetherToPreviousRow() {
+    // Only tether if we have a valid command selected and it's not the first row
+    if (this.selectedRow >= this.project.commands.length || this.selectedRow === 0) {
+      showBanner('Cannot tether: No previous row', {
+        id: 'tether-banner',
+        position: 'bottom',
+        color: 'red',
+        duration: 1500
+      });
       return;
     }
     
-    const cmd = this.project.commands[this.selectedRow];
-    cmd.positionMs = currentMs;
+    const currentCmd = this.project.commands[this.selectedRow];
+    const previousCmd = this.project.commands[this.selectedRow - 1];
     
-    showBanner(`Position set to ${msToTimeString(currentMs)}`, {
-      id: 'autofill-banner',
+    // Set current row's positionMs to previous row's end time
+    const previousEndTime = computeCommandEndTimeMs(previousCmd);
+    currentCmd.positionMs = previousEndTime;
+    
+    showBanner(`Position tethered to ${msToTimeString(previousEndTime)}`, {
+      id: 'tether-banner',
       position: 'bottom',
       color: 'blue',
       duration: 1500
