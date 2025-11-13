@@ -5,15 +5,13 @@ import { getAuth } from "firebase/auth";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-export const firebaseConfig = {
-  apiKey: "AIzaSyCmgIO1b3NU1h2eB7PzLutqHZ7tSqQvoFw",
-  authDomain: "match-grader.firebaseapp.com",
-  projectId: "match-grader",
-  storageBucket: "match-grader.firebasestorage.app",
-  messagingSenderId: "1003135092000",
-  appId: "1:1003135092000:web:35ea4ec6c4c44cc8060345",
-  measurementId: "G-4MNH7X2F8P"
+const firebaseConfig = {
+  apiKey: "AIzaSyDQ1IomTQstlswBNIUS9dpJt2-5cbA-qes",
+  authDomain: "video-sheet.firebaseapp.com",
+  projectId: "video-sheet",
+  storageBucket: "video-sheet.firebasestorage.app",
+  messagingSenderId: "1020120343780",
+  appId: "1:1020120343780:web:ee5a2ef93590fe75baf8f1"
 };
 
 export const app = initializeApp(firebaseConfig);

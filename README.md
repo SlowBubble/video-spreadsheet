@@ -52,6 +52,22 @@ P3:
 - volume fade-out to be too laggy
   - consider a field that allows audio to keep playing for longer
 
+# m7d
+- Create a class called TopLevelProject that contains:
+  - Project
+  - Metadata
+    - id
+    - owner
+    - createdAt
+    - lastEditedAt
+- Make import/export only paste/copy the Project part and not the Metadata
+- This allows for more flexibility, like if we need to add project-unrelated fields, e.g. editor specific settings
+
+# m7c (DONE)
+
+- Use a new firestore project
+  - Set up the same rules as before
+
 
 # m7b (DONE)
 - Add a sign in button in the homepage using firebase/auth and google as the auth provider.
