@@ -94,3 +94,28 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Auth section styling */
+#sign-in, #sign-out {
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+#sign-in:hover, #sign-out:hover {
+  background-color: #357ae8;
+}
+
+#sign-out {
+  background-color: #ea4335;
+}
+
+#sign-out:hover {
+  background-color: #d33426;
+}

@@ -15,11 +15,6 @@ export function getDao(): IDao {
   return new FirestoreDao();
 }
 
-// import { LocalStorageDao } from './localStorageDao';
-// export function getDao(): IDao {
-//   return new LocalStorageDao();
-// }
-
 const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text', 'Fill'];
 
 // Inverse of the following:
