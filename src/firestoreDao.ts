@@ -2,7 +2,8 @@
 // import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 import { app } from "./firebase/config";
-import { collection, doc, setDoc, getDoc, addDoc, getDocs, deleteDoc } from "firebase/firestore"; 
+import { collection, doc, setDoc, getDoc, addDoc, getDocs, deleteDoc } from "firebase/firestore";
+import type { IDao } from './dao';
 
 export const devCollName = 'spreadsheet';
 
@@ -10,7 +11,7 @@ export const devCollName = 'spreadsheet';
 const db = getFirestore(app);
 
 
-export class FirestoreDao {
+export class FirestoreDao implements IDao {
   constructor(public collectionName = devCollName) {}
 
   async getAll() {

@@ -1,23 +1,17 @@
-import { Editor } from './edit';
+import { Editor, getDao } from './edit';
 import './style.css';
 import { getHashParams } from './urlUtil';
+import type { IDao } from './dao';
 
-function getProjects(): { id: string, title: string }[] {
-  const projects: { id: string, title: string }[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith('project-')) {
-      try {
-        const data = JSON.parse(localStorage.getItem(key)!);
-        projects.push({ id: data.id, title: data.title });
-      } catch {}
-    }
-  }
+async function getProjects(dao: IDao): Promise<{ id: string, title: string }[]> {
+  const docs = await dao.getAll();
+  const projects = docs.map(data => ({ id: data.id, title: data.title }));
   return projects.sort((a, b) => b.id.localeCompare(a.id));
 }
 
-function renderHome() {
-  const projects = getProjects();
+async function renderHome() {
+  const dao = getDao();
+  const projects = await getProjects(dao);
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div>
       <h1>Video Spreadsheet Projects</h1>

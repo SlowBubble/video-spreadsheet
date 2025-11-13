@@ -7,6 +7,18 @@ import { getHashParams } from './urlUtil';
 import { showBanner } from './bannerUtil';
 import { UndoManager } from './undo';
 import { showTextareaModal } from './modalUtil';
+import type { IDao } from './dao';
+import { FirestoreDao } from './firestoreDao';
+
+
+export function getDao(): IDao {
+  return new FirestoreDao();
+}
+
+// import { LocalStorageDao } from './localStorageDao';
+// export function getDao(): IDao {
+//   return new LocalStorageDao();
+// }
 
 const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text', 'Fill'];
 
@@ -93,9 +105,13 @@ export class Editor {
   replayDiv: HTMLDivElement;
   undoManager!: UndoManager;
   isModalOpen: boolean = false;
+  dao: IDao;
 
   constructor() {
     const params = getHashParams();
+    
+    this.dao = getDao();
+    
     const isPresentMode = params.get('present') === '1';
     
     // Create persistent replay container at the top of the body
@@ -111,7 +127,7 @@ export class Editor {
     this.replayDiv = replayDiv;
     
     this.projectId = this.getProjectIdFromHash()!;
-    this.loadEditor(this.loadProject(this.projectId));
+    this.loadProject(this.projectId).then(project => this.loadEditor(project));
     
     window.addEventListener('keydown', (e) => {
       const params = getHashParams();
@@ -143,10 +159,11 @@ export class Editor {
     return params.get('id');
   }
 
-  loadProject(id: string): Project {
-    const json = localStorage.getItem('project-' + id);
-    if (json) {
-      return Project.fromJSON(json);
+  async loadProject(id: string): Promise<Project> {
+    const data = await this.dao.get(id);
+    if (data) {
+      // Data is already parsed by the DAO, reconstruct the Project
+      return Project.fromJSON(JSON.stringify(data));
     }
     return new Project('Untitled Project', id, []);
   }
@@ -1213,8 +1230,9 @@ export class Editor {
     }
   }
 
-  saveProject() {
-    localStorage.setItem('project-' + this.projectId, this.project.serialize());
+  async saveProject() {
+    const data = JSON.parse(this.project.serialize());
+    await this.dao.set(this.projectId, data);
   }
 
   timeStringToMs(str: string): number {
@@ -1248,22 +1266,16 @@ export class Editor {
     });
   }
 
-  handleExportImport() {
+  async handleExportImport() {
     // Save current state first
-    this.saveProject();
+    await this.saveProject();
     
     // Get serialized project data
-    const serializedData = localStorage.getItem('project-' + this.projectId);
-    if (!serializedData) return;
+    const data = await this.dao.get(this.projectId);
+    if (!data) return;
     
     // Pretty-print the JSON with 2-space indentation
-    let prettyJson = serializedData;
-    try {
-      const parsed = JSON.parse(serializedData);
-      prettyJson = JSON.stringify(parsed, null, 2);
-    } catch {
-      // Keep original if parsing fails
-    }
+    const prettyJson = JSON.stringify(data, null, 2);
     
     showTextareaModal({
       title: 'Export/Import Project Data',
@@ -1275,10 +1287,11 @@ export class Editor {
       onModalStateChange: (isOpen) => {
         this.isModalOpen = isOpen;
       },
-      onSave: (value) => {
+      onSave: async (value) => {
         try {
           const importedProject = Project.fromJSON(value);
-          localStorage.setItem('project-' + this.projectId, importedProject.serialize());
+          const data = JSON.parse(importedProject.serialize());
+          await this.dao.set(this.projectId, data);
           this.loadEditor(importedProject);
           
           showBanner('Project imported!', {
@@ -1380,13 +1393,13 @@ export class Editor {
     }
     if (newId !== this.projectId) {
       this.projectId = newId;
-      this.loadEditor(this.loadProject(this.projectId));
+      this.loadProject(this.projectId).then(project => this.loadEditor(project));
     }
   }
 
-  cloneProject() {
+  async cloneProject() {
     // Save current project first
-    this.saveProject();
+    await this.saveProject();
     
     // Generate new ID using timestamp
     const newId = Date.now().toString();
@@ -1411,7 +1424,8 @@ export class Editor {
     );
     
     // Save the cloned project
-    localStorage.setItem('project-' + newId, clonedProject.serialize());
+    const data = JSON.parse(clonedProject.serialize());
+    await this.dao.set(newId, data);
     
     // Navigate to the new project
     window.location.hash = `id=${newId}`;
@@ -1443,14 +1457,14 @@ export class Editor {
     return new Overlay(fullScreenFilter, borderFilter, textDisplay);
   }
 
-  deleteProject() {
+  async deleteProject() {
     const confirmed = confirm(
       `Are you sure you want to delete project "${this.project.title}"? This cannot be undone.`
     );
 
     if (confirmed) {
-      // Remove project from localStorage
-      localStorage.removeItem('project-' + this.projectId);
+      // Remove project from DAO
+      await this.dao.delete(this.projectId);
 
       // Navigate to home page
       window.location.hash = '';

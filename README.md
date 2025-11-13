@@ -38,6 +38,10 @@ Cons:
   - Idea: Just allowlist my own emails to edit anything.
 - Have to deal with sign-in.
 
+Possible design:
+- Integrate with firebase
+  - Have a private param to show a private homepage that list all my projects (it's not sensitive data so I won't need to use ACL).
+
 P3:
 - Present mode
   - warm up all the assets
@@ -50,9 +54,18 @@ P3:
 
 # m7 impl
 
-- Integrate with firebase
-  - Build a public homepage with a waitlist
-  - Have a private param to show a private homepage that list all my projects (it's not sensitive data so I won't need to use ACL).
+## Storage Toggle
+
+The app now supports toggling between localStorage and Firestore storage using a URL parameter:
+
+- **localStorage (default)**: `#id=123456`
+- **Firestore**: `#id=123456&storage=firestore`
+
+Both storage backends implement the same `IDao` interface, making it easy to switch between them.
+
+# m7a (DONE)
+
+- Refactor all the localStorage related logic into localStorageDao.ts, which should follow the same interface as firestoreDao.ts, because I'm planning to have a url param to toggle between using localStorage and firestore
 
 # m6 impl (DONE)
 
