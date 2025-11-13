@@ -95,8 +95,7 @@ button:focus-visible {
   }
 }
 
-/* Auth section styling */
-#sign-in, #sign-out {
+#sign-in, #new-project {
   background-color: #4285f4;
   color: white;
   border: none;
@@ -108,14 +107,7 @@ button:focus-visible {
   transition: background-color 0.2s;
 }
 
-#sign-in:hover, #sign-out:hover {
+#sign-in:hover, #new-project:hover {
   background-color: #357ae8;
 }
 
-#sign-out {
-  background-color: #ea4335;
-}
-
-#sign-out:hover {
-  background-color: #d33426;
-}

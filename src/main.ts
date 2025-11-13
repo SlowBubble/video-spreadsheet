@@ -12,36 +12,36 @@ async function getProjects(dao: IDao): Promise<{ id: string, title: string }[]> 
 }
 
 async function renderHome(user: User | null) {
+  if (!user) {
+    document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
+      <div style="margin-bottom: 20px;">
+        <h1>Video Spreadsheet Projects</h1>
+        <button id="sign-in">Sign in with Google</button>
+      </div>
+    `;
+    const signInBtn = document.getElementById('sign-in');
+    if (signInBtn) {
+      signInBtn.onclick = async () => {
+        await signInWithGoogle();
+      };
+    }
+    return;
+  }
   const dao = getDao();
   const projects = await getProjects(dao);
   
-  document.querySelector<HTMLDivElement>('#app')!.innerHTML = 
-    user ? `
+  document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div>
       <h1>Video Spreadsheet Projects</h1>
-       <div style="margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 4px;">
-        <button id="sign-out" style="margin-left: 10px;">Sign Out</button>
-      </div>
-      <button id="new-project">New Project</button>
+       <button id="new-project">New Project</button>
+       <button id="sign-out" style="margin-left: 10px;">Sign Out</button>
       <h2>Saved Projects</h2>
       <ul style="list-style:none; padding:0;">
         ${projects.length === 0 ? '<li>No projects yet.</li>' : projects.map(p => `<li><a href="#id=${p.id}" class="project-link" data-id="${p.id}">${p.title}</a></li>`).join('')}
       </ul>
     </div>
-  ` : `
-    <div style="margin-bottom: 20px;">
-      <h1>Video Spreadsheet Projects</h1>
-      <button id="sign-in">Sign in with Google</button>
-    </div>
   `;
   
-  // Auth button handlers
-  const signInBtn = document.getElementById('sign-in');
-  if (signInBtn) {
-    signInBtn.onclick = async () => {
-      await signInWithGoogle();
-    };
-  }
   
   const signOutBtn = document.getElementById('sign-out');
   if (signOutBtn) {
