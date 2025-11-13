@@ -10,13 +10,11 @@ P1:
 - Increase the load length by 5 seconds on the right to extend the audio a little
   - If so, need to include pause in the Plan Action
 
-P1:
+P2:
 - Design subcommands
   - Add a subcommands field to the ProjectCommand class which will have type (ProjectCommand[] vs Subcommand[]) and default to an empty list.
     - Think about the use case before deciding; see `Other subcommands`
   - Press `shift+enter` on a row will add a subcommand to the command.
-
-P2:
 - Other subcommands
   - slow-mo a certain segment
   - silence a certain segment
@@ -28,6 +26,18 @@ P2:
   - Zooming in may be hard
     - Instead, put a border around to block stuff
 
+P2:
+Given that all assets are online, decide wether to make an online version.
+
+Pros:
+- Can edit with different computers, even different domains (do I need to do that?)
+- Backup in case my computer is fried.
+
+Cons:
+- Work and maintenance
+  - Idea: Just allowlist my own emails to edit anything.
+- Have to deal with sign-in.
+
 P3:
 - Present mode
   - warm up all the assets
@@ -37,6 +47,12 @@ P3:
 P3:
 - volume fade-out to be too laggy
   - consider a field that allows audio to keep playing for longer
+
+# m7 impl
+
+- Integrate with firebase
+  - Build a public homepage with a waitlist
+  - Have a private param to show a private homepage that list all my projects (it's not sensitive data so I won't need to use ACL).
 
 # m6 impl (DONE)
 
