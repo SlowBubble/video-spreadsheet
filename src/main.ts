@@ -5,19 +5,28 @@ import type { IDao } from './dao';
 import { signInWithGoogle, signOutUser, onAuthChange } from './auth';
 import type { User } from 'firebase/auth';
 
-async function getProjects(dao: IDao): Promise<{ id: string, title: string }[]> {
+async function getProjects(dao: IDao): Promise<{ id: string, title: string, lastEditedAt: number }[]> {
   const docs = await dao.getAll();
   const projects = docs.map(data => {
     // Handle both TopLevelProject and legacy Project formats
     if (data.project && data.metadata) {
       // TopLevelProject format
-      return { id: data.metadata.id, title: data.project.title };
+      return { 
+        id: data.metadata.id, 
+        title: data.project.title,
+        lastEditedAt: data.metadata.lastEditedAt || Date.now()
+      };
     } else {
-      // Legacy Project format
-      return { id: data.id, title: data.title };
+      // Legacy Project format - use current time as fallback
+      return { 
+        id: data.id, 
+        title: data.title,
+        lastEditedAt: Date.now()
+      };
     }
   });
-  return projects.sort((a, b) => b.id.localeCompare(a.id));
+  // Sort by lastEditedAt descending (most recent first)
+  return projects.sort((a, b) => b.lastEditedAt - a.lastEditedAt);
 }
 
 async function renderHome(user: User | null) {
@@ -46,7 +55,18 @@ async function renderHome(user: User | null) {
        <button id="sign-out" style="margin-left: 10px;">Sign Out</button>
       <h2>Saved Projects</h2>
       <ul style="list-style:none; padding:0;">
-        ${projects.length === 0 ? '<li>No projects yet.</li>' : projects.map(p => `<li><a href="#id=${p.id}" class="project-link" data-id="${p.id}">${p.title}</a></li>`).join('')}
+        ${projects.length === 0 ? '<li>No projects yet.</li>' : projects.map(p => {
+          const date = new Date(p.lastEditedAt);
+          const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return `<li style="margin-bottom: 8px;">
+            <a href="#id=${p.id}" class="project-link" data-id="${p.id}" style="text-decoration: none; color: #0066cc;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 500;">${p.title}</span>
+                <span style="color: #666; font-size: 0.9em; margin-left: 16px;">${dateStr}</span>
+              </div>
+            </a>
+          </li>`;
+        }).join('')}
       </ul>
     </div>
   `;
