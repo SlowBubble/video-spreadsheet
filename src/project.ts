@@ -85,26 +85,23 @@ export class ProjectCommand {
 
 export class Project {
   title: string;
-  id: string;
   commands: ProjectCommand[];
 
-  constructor(title: string, id: string, commands: ProjectCommand[]) {
+  constructor(title: string, commands: ProjectCommand[]) {
     this.title = title;
-    this.id = id;
     this.commands = commands;
   }
 
   serialize(): string {
     return JSON.stringify({
       title: this.title,
-      id: this.id,
       commands: this.commands,
     });
   }
 
   static fromJSON(json: string): Project {
     const data = JSON.parse(json);
-    return new Project(data.title, data.id, data.commands.map((cmd: any) => {
+    return new Project(data.title, data.commands.map((cmd: any) => {
       let overlay: Overlay | undefined = undefined;
       if (cmd.overlay) {
         let fullScreenFilter: FullScreenFilter | undefined = undefined;
@@ -185,7 +182,6 @@ export class TopLevelProject {
     if (data.project && data.metadata) {
       const project = new Project(
         data.project.title,
-        data.project.id,
         data.project.commands.map((cmd: any) => {
           let overlay: Overlay | undefined = undefined;
           if (cmd.overlay) {
@@ -241,7 +237,6 @@ export class TopLevelProject {
     // Legacy format: data is a Project
     const project = new Project(
       data.title,
-      data.id,
       data.commands.map((cmd: any) => {
         let overlay: Overlay | undefined = undefined;
         if (cmd.overlay) {

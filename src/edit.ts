@@ -175,7 +175,7 @@ export class Editor {
     // Create new project with metadata
     const currentUser = getCurrentUser();
     const currentUserId = currentUser?.uid || '';
-    const project = new Project('Untitled Project', id, []);
+    const project = new Project('Untitled Project', []);
     const metadata = new Metadata(id, currentUserId);
     this.topLevelProject = new TopLevelProject(project, metadata);
     return project;
@@ -1423,10 +1423,9 @@ export class Editor {
     // Generate new ID using timestamp
     const newId = Date.now().toString();
     
-    // Clone the project with new ID and suffixed name
+    // Clone the project (metadata will have the new ID)
     const clonedProject = new Project(
       this.project.title + '*',
-      newId,
       // Deep clone commands
       this.project.commands.map(cmd => new ProjectCommand(
         cmd.asset,
