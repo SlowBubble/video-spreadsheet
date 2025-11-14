@@ -3,9 +3,11 @@
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
 
+# m7f (done)
 
+Test firebase out
 
-# m7e
+# m7e (done)
 - Remove the id field from Project.
 - Show the last edit date in the home page when listing out the projects
 

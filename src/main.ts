@@ -50,9 +50,11 @@ async function renderHome(user: User | null) {
   
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div>
+      <div style="position: fixed; top: 16px; right: 16px; z-index: 1000;">
+        <button id="new-project">New Project</button>
+        <button id="sign-out" style="margin-left: 10px;">Sign Out</button>
+      </div>
       <h1>Video Spreadsheet Projects</h1>
-       <button id="new-project">New Project</button>
-       <button id="sign-out" style="margin-left: 10px;">Sign Out</button>
       <h2>Saved Projects</h2>
       <ul style="list-style:none; padding:0;">
         ${projects.length === 0 ? '<li>No projects yet.</li>' : projects.map(p => {

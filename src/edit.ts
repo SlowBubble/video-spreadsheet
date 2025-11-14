@@ -1366,9 +1366,9 @@ export class Editor {
     }
     if (hasChanged || forceSave) {
       this.saveProject();
-      // if (!forceSave) {
-      //   this.showSaveBanner();
-      // }
+      if (forceSave) {
+        this.showSaveBanner();
+      }
     }
   }
 
