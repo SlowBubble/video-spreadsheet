@@ -7,7 +7,16 @@ import type { User } from 'firebase/auth';
 
 async function getProjects(dao: IDao): Promise<{ id: string, title: string }[]> {
   const docs = await dao.getAll();
-  const projects = docs.map(data => ({ id: data.id, title: data.title }));
+  const projects = docs.map(data => {
+    // Handle both TopLevelProject and legacy Project formats
+    if (data.project && data.metadata) {
+      // TopLevelProject format
+      return { id: data.metadata.id, title: data.project.title };
+    } else {
+      // Legacy Project format
+      return { id: data.id, title: data.title };
+    }
+  });
   return projects.sort((a, b) => b.id.localeCompare(a.id));
 }
 

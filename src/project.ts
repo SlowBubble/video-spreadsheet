@@ -149,3 +149,151 @@ export class Project {
     }));
   }
 }
+
+export class Metadata {
+  id: string;
+  owner: string;
+  createdAt: number;
+  lastEditedAt: number;
+
+  constructor(id: string, owner: string, createdAt?: number, lastEditedAt?: number) {
+    this.id = id;
+    this.owner = owner;
+    this.createdAt = createdAt || Date.now();
+    this.lastEditedAt = lastEditedAt || Date.now();
+  }
+}
+
+export class TopLevelProject {
+  project: Project;
+  metadata: Metadata;
+
+  constructor(project: Project, metadata: Metadata) {
+    this.project = project;
+    this.metadata = metadata;
+  }
+
+  serialize(): string {
+    return JSON.stringify({
+      project: this.project,
+      metadata: this.metadata,
+    });
+  }
+
+  static fromData(data: any, currentUserId?: string): TopLevelProject {
+    // Check if data is already a TopLevelProject
+    if (data.project && data.metadata) {
+      const project = new Project(
+        data.project.title,
+        data.project.id,
+        data.project.commands.map((cmd: any) => {
+          let overlay: Overlay | undefined = undefined;
+          if (cmd.overlay) {
+            let fullScreenFilter: FullScreenFilter | undefined = undefined;
+            if (cmd.overlay.fullScreenFilter) {
+              fullScreenFilter = new FullScreenFilter(cmd.overlay.fullScreenFilter.fillStyle);
+            }
+            
+            let borderFilter: BorderFilter | undefined = undefined;
+            if (cmd.overlay.borderFilter) {
+              borderFilter = new BorderFilter(
+                cmd.overlay.borderFilter.topMarginPct,
+                cmd.overlay.borderFilter.bottomMarginPct,
+                cmd.overlay.borderFilter.fillStyle
+              );
+            }
+            
+            let textDisplay: TextDisplay | undefined = undefined;
+            if (cmd.overlay.textDisplay) {
+              textDisplay = new TextDisplay(
+                cmd.overlay.textDisplay.content,
+                cmd.overlay.textDisplay.alignment
+              );
+            }
+            
+            if (fullScreenFilter || borderFilter || textDisplay) {
+              overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+            }
+          }
+          return new ProjectCommand(
+            cmd.asset,
+            cmd.positionMs,
+            cmd.startMs,
+            cmd.endMs,
+            cmd.volume,
+            cmd.speed,
+            cmd.name,
+            overlay,
+            cmd.disabled,
+            cmd.extendAudioSec
+          );
+        })
+      );
+      const metadata = new Metadata(
+        data.metadata.id,
+        data.metadata.owner,
+        data.metadata.createdAt,
+        data.metadata.lastEditedAt
+      );
+      return new TopLevelProject(project, metadata);
+    }
+    
+    // Legacy format: data is a Project
+    const project = new Project(
+      data.title,
+      data.id,
+      data.commands.map((cmd: any) => {
+        let overlay: Overlay | undefined = undefined;
+        if (cmd.overlay) {
+          let fullScreenFilter: FullScreenFilter | undefined = undefined;
+          if (cmd.overlay.fullScreenFilter) {
+            fullScreenFilter = new FullScreenFilter(cmd.overlay.fullScreenFilter.fillStyle);
+          }
+          
+          let borderFilter: BorderFilter | undefined = undefined;
+          if (cmd.overlay.borderFilter) {
+            borderFilter = new BorderFilter(
+              cmd.overlay.borderFilter.topMarginPct,
+              cmd.overlay.borderFilter.bottomMarginPct,
+              cmd.overlay.borderFilter.fillStyle
+            );
+          }
+          
+          let textDisplay: TextDisplay | undefined = undefined;
+          if (cmd.overlay.textDisplay) {
+            textDisplay = new TextDisplay(
+              cmd.overlay.textDisplay.content,
+              cmd.overlay.textDisplay.alignment
+            );
+          }
+          
+          if (fullScreenFilter || borderFilter || textDisplay) {
+            overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+          }
+        }
+        return new ProjectCommand(
+          cmd.asset,
+          cmd.positionMs,
+          cmd.startMs,
+          cmd.endMs,
+          cmd.volume,
+          cmd.speed,
+          cmd.name,
+          overlay,
+          cmd.disabled,
+          cmd.extendAudioSec
+        );
+      })
+    );
+    
+    // Create metadata for legacy project
+    const metadata = new Metadata(
+      data.id,
+      currentUserId || '',
+      Date.now(),
+      Date.now()
+    );
+    
+    return new TopLevelProject(project, metadata);
+  }
+}

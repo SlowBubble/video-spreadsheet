@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay, Overlay } from './project';
+import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay, Overlay, TopLevelProject, Metadata } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
@@ -9,9 +9,11 @@ import { UndoManager } from './undo';
 import { showTextareaModal } from './modalUtil';
 import type { IDao } from './dao';
 import { FirestoreDao } from './firestoreDao';
+import { getCurrentUser } from './auth';
 
 
 export function getDao(): IDao {
+  // return new LocalStorageDao();
   return new FirestoreDao();
 }
 
@@ -93,7 +95,7 @@ function computeCommandEndTimeMs(cmd: ProjectCommand): number {
 
 export class Editor {
   projectId: string;
-  project!: Project;
+  topLevelProject!: TopLevelProject;
   selectedRow: number = 0;
   selectedCol: number = 0;
   replayManager!: ReplayManager;
@@ -101,6 +103,10 @@ export class Editor {
   undoManager!: UndoManager;
   isModalOpen: boolean = false;
   dao: IDao;
+
+  get project(): Project {
+    return this.topLevelProject.project;
+  }
 
   constructor() {
     const params = getHashParams();
@@ -122,7 +128,7 @@ export class Editor {
     this.replayDiv = replayDiv;
     
     this.projectId = this.getProjectIdFromHash()!;
-    this.loadProject(this.projectId).then(project => this.loadEditor(project));
+    this.loadProject(this.projectId).then(() => this.loadEditor());
     
     window.addEventListener('keydown', (e) => {
       const params = getHashParams();
@@ -132,8 +138,8 @@ export class Editor {
     window.addEventListener('hashchange', () => this.handleHashChange());
   }
 
-  private loadEditor(project: Project) {
-    this.project = project;
+  private loadEditor() {
+    // project is already set via topLevelProject in loadProject
     this.selectedRow = 0;
     this.selectedCol = 0;
     this.renderTable();
@@ -157,10 +163,22 @@ export class Editor {
   async loadProject(id: string): Promise<Project> {
     const data = await this.dao.get(id);
     if (data) {
-      // Data is already parsed by the DAO, reconstruct the Project
-      return Project.fromJSON(JSON.stringify(data));
+      // Get current user ID for legacy project conversion
+      const currentUser = getCurrentUser();
+      const currentUserId = currentUser?.uid || '';
+      
+      // Convert data to TopLevelProject (handles both new and legacy formats)
+      this.topLevelProject = TopLevelProject.fromData(data, currentUserId);
+      return this.topLevelProject.project;
     }
-    return new Project('Untitled Project', id, []);
+    
+    // Create new project with metadata
+    const currentUser = getCurrentUser();
+    const currentUserId = currentUser?.uid || '';
+    const project = new Project('Untitled Project', id, []);
+    const metadata = new Metadata(id, currentUserId);
+    this.topLevelProject = new TopLevelProject(project, metadata);
+    return project;
   }
 
   getDisplayValue(rowIdx: number, colIdx: number): string {
@@ -392,7 +410,7 @@ export class Editor {
       editBtn.onclick = () => {
         const newTitle = prompt('Edit project title:', this.project.title);
         if (newTitle !== null) {
-          this.project.title = newTitle.trim() || 'Untitled Project';
+          this.topLevelProject.project.title = newTitle.trim() || 'Untitled Project';
           this.saveProject();
           this.renderTable();
         }
@@ -1226,7 +1244,11 @@ export class Editor {
   }
 
   async saveProject() {
-    const data = JSON.parse(this.project.serialize());
+    // Update lastEditedAt timestamp
+    this.topLevelProject.metadata.lastEditedAt = Date.now();
+    
+    // Save the TopLevelProject
+    const data = JSON.parse(this.topLevelProject.serialize());
     await this.dao.set(this.projectId, data);
   }
 
@@ -1265,12 +1287,9 @@ export class Editor {
     // Save current state first
     await this.saveProject();
     
-    // Get serialized project data
-    const data = await this.dao.get(this.projectId);
-    if (!data) return;
-    
-    // Pretty-print the JSON with 2-space indentation
-    const prettyJson = JSON.stringify(data, null, 2);
+    // Export only the Project part (not metadata)
+    const projectJson = this.project.serialize();
+    const prettyJson = JSON.stringify(JSON.parse(projectJson), null, 2);
     
     showTextareaModal({
       title: 'Export/Import Project Data',
@@ -1284,10 +1303,15 @@ export class Editor {
       },
       onSave: async (value) => {
         try {
+          // Import only the Project part
           const importedProject = Project.fromJSON(value);
-          const data = JSON.parse(importedProject.serialize());
-          await this.dao.set(this.projectId, data);
-          this.loadEditor(importedProject);
+          
+          // Update the current project but keep metadata
+          this.topLevelProject.project = importedProject;
+          
+          // Save with updated lastEditedAt
+          await this.saveProject();
+          this.loadEditor();
           
           showBanner('Project imported!', {
             id: 'import-banner',
@@ -1313,7 +1337,7 @@ export class Editor {
     
     this.undoManager.undo();
     const stateJson = this.undoManager.getCurrentState();
-    this.project = Project.fromJSON(stateJson);
+    this.topLevelProject.project = Project.fromJSON(stateJson);
     return true;
   }
 
@@ -1322,7 +1346,7 @@ export class Editor {
     
     this.undoManager.redo();
     const stateJson = this.undoManager.getCurrentState();
-    this.project = Project.fromJSON(stateJson);
+    this.topLevelProject.project = Project.fromJSON(stateJson);
     return true;
   }
 
@@ -1388,7 +1412,7 @@ export class Editor {
     }
     if (newId !== this.projectId) {
       this.projectId = newId;
-      this.loadProject(this.projectId).then(project => this.loadEditor(project));
+      this.loadProject(this.projectId).then(() => this.loadEditor());
     }
   }
 
@@ -1418,8 +1442,14 @@ export class Editor {
       ))
     );
     
+    // Create new metadata for the cloned project
+    const currentUser = getCurrentUser();
+    const currentUserId = currentUser?.uid || '';
+    const metadata = new Metadata(newId, currentUserId);
+    const topLevelProject = new TopLevelProject(clonedProject, metadata);
+    
     // Save the cloned project
-    const data = JSON.parse(clonedProject.serialize());
+    const data = JSON.parse(topLevelProject.serialize());
     await this.dao.set(newId, data);
     
     // Navigate to the new project

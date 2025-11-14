@@ -52,16 +52,19 @@ P3:
 - volume fade-out to be too laggy
   - consider a field that allows audio to keep playing for longer
 
-# m7d
+# m7d (done)
 - Create a class called TopLevelProject that contains:
   - Project
   - Metadata
-    - id
-    - owner
-    - createdAt
-    - lastEditedAt
+    - id: same as the Project's id field
+    - owner: use the auth.currentUser.uid if available when the project is first initialized; if auth is not available, just ''.
+    - createdAt: Date.now() when the project is first created
+    - lastEditedAt: Date.now() updated whenever you make a save to the project.
 - Make import/export only paste/copy the Project part and not the Metadata
-- This allows for more flexibility, like if we need to add project-unrelated fields, e.g. editor specific settings
+- Change the saving and loading from dao to use TopLevelProject instead of project
+  - To make it compatible with existing project, when you first load from the dao and it is a Project instead of TopLevelProject, handle it by wrapping it in a TopLevelProject and setting the Metadata field appropriately
+- Reason: This allows for more flexibility, like if we need to add project-unrelated fields, e.g. editor specific settings
+- In a future step, we will remove the id field from Project; don't do it now.
 
 # m7c (DONE)
 
