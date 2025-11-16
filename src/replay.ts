@@ -936,7 +936,8 @@ export class ReplayManager {
       // Handle automatic pause at playback end
       // When reaching the final black screen step, pause at that position
       if (step >= plan.length && action.cmdIdx === -1) {
-        this.pausedAtMs = action.start;
+        // TODO see whether to use action.start or action.end here to be correct.
+        this.pausedAtMs = action.end;
         this.isPlaying = false;
         this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
         this._intervalId && clearInterval(this._intervalId);
