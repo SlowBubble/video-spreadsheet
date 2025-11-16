@@ -537,7 +537,9 @@ export class Editor {
     // Normal editor mode - all keys work
     const rowCount = this.getRowCount();
     let forceSave = false;
-    
+  
+    const isSpace = matchKey(e, 'space');
+
     if (matchKey(e, 'up')) {
       this.selectedRow = Math.max(0, this.selectedRow - 1);
     } else if (matchKey(e, 'down')) {
@@ -564,13 +566,13 @@ export class Editor {
       const targetTime = (digit / 10) * totalDuration;
       this.replayManager.stopReplay();
       this.replayManager.startReplay(targetTime, enabledCommands);
-    } else if (matchKey(e, 'space') || matchKey(e, 'k')) {
+    } else if (isSpace || matchKey(e, 'k')) {
       if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
       } else {
         // Check if selected cell is on Pos 0 or Pos 1
         let resumeTime = this.replayManager.pausedAtMs;
-        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 2 || this.selectedCol === 3)) {
+        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 2 || this.selectedCol === 3) && isSpace) {
           const cmd = this.project.commands[this.selectedRow];
           if (this.selectedCol === 2) {
             // Pos 0 column - use positionMs
