@@ -147,10 +147,14 @@ export class Editor {
     this.undoManager = new UndoManager(this.project.serialize());
   }
 
+  getEnabledCommands(): ProjectCommand[] {
+    return this.project.commands.filter(cmd => !cmd.disabled);
+  }
+
   initReplayManager() {
     this.replayManager = new ReplayManager(
       this.replayDiv,
-      this.project.commands,
+      this.getEnabledCommands(),
       getYouTubeId
     );
   }
@@ -439,7 +443,7 @@ export class Editor {
         }
         
         // Start replaying from the specified time
-        this.replayManager.startReplay(timeMs);
+        this.replayManager.startReplay(timeMs, this.getEnabledCommands());
       });
     });
 
@@ -496,15 +500,16 @@ export class Editor {
       if (matchKey(e, '0')) {
         this.replayManager.stopReplay();
         // Resume playing from the beginning
-        this.replayManager.startReplay(0);
+        this.replayManager.startReplay(0, this.getEnabledCommands());
         e.preventDefault();
       } else if (matchKey(e, '1') || matchKey(e, '2') || matchKey(e, '3') || matchKey(e, '4') || 
                  matchKey(e, '5') || matchKey(e, '6') || matchKey(e, '7') || matchKey(e, '8') || matchKey(e, '9')) {
         const digit = parseInt(e.key);
-        const totalDuration = this.replayManager.getTotalDuration();
+        const enabledCommands = this.getEnabledCommands();
+        const totalDuration = this.replayManager.getTotalDuration(enabledCommands);
         const targetTime = (digit / 10) * totalDuration;
         this.replayManager.stopReplay();
-        this.replayManager.startReplay(targetTime);
+        this.replayManager.startReplay(targetTime, enabledCommands);
         e.preventDefault();
       } else if (matchKey(e, 'space')) {
         if (this.replayManager.isPlaying) {
@@ -522,7 +527,7 @@ export class Editor {
               resumeTime = computeCommandEndTimeMs(cmd);
             }
           }
-          this.replayManager.startReplay(resumeTime);
+          this.replayManager.startReplay(resumeTime, this.getEnabledCommands());
         }
         e.preventDefault();
       }
@@ -550,14 +555,15 @@ export class Editor {
     } else if (matchKey(e, '0')) {
       this.replayManager.stopReplay();
       // Resume playing from the beginning
-      this.replayManager.startReplay(0);
+      this.replayManager.startReplay(0, this.getEnabledCommands());
     } else if (matchKey(e, '1') || matchKey(e, '2') || matchKey(e, '3') || matchKey(e, '4') || 
                matchKey(e, '5') || matchKey(e, '6') || matchKey(e, '7') || matchKey(e, '8') || matchKey(e, '9')) {
       const digit = parseInt(e.key);
-      const totalDuration = this.replayManager.getTotalDuration();
+      const enabledCommands = this.getEnabledCommands();
+      const totalDuration = this.replayManager.getTotalDuration(enabledCommands);
       const targetTime = (digit / 10) * totalDuration;
       this.replayManager.stopReplay();
-      this.replayManager.startReplay(targetTime);
+      this.replayManager.startReplay(targetTime, enabledCommands);
     } else if (matchKey(e, 'space') || matchKey(e, 'k')) {
       if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
@@ -574,14 +580,14 @@ export class Editor {
             resumeTime = computeCommandEndTimeMs(cmd);
           }
         }
-        this.replayManager.startReplay(resumeTime);
+        this.replayManager.startReplay(resumeTime, this.getEnabledCommands());
       }
     } else if (matchKey(e, 'x')) {
       this.handleExportImport();
     } else if (matchKey(e, 'j')) {
-      this.replayManager.rewind(3000);
+      this.replayManager.rewind(3000, this.getEnabledCommands());
     } else if (matchKey(e, 'l')) {
-      this.replayManager.fastForward(3000);
+      this.replayManager.fastForward(3000, this.getEnabledCommands());
     } else if (matchKey(e, 'f')) {
       this.cycleFullScreenFilter();
     } else if (matchKey(e, 'b')) {

@@ -375,17 +375,13 @@ export class ReplayManager {
     return Math.max(...activeCommands);
   }
 
-  generateReplayPlan2(): PlanAction[] {
-    const cmds = this.commands;
-    if (!cmds || !cmds.length) return [];
+  generateReplayPlan2(enabledCommands: any[]): PlanAction[] {
+    if (!enabledCommands || enabledCommands.length === 0) return [];
 
     // Step 1: Find all important points (start and end of each command)
-    // Skip disabled commands
     // Also add audio-end points for commands with extendAudioSec > 0
     const points = new Set<number>();
-    cmds.forEach((cmd: any) => {
-      if (cmd.disabled) return; // Skip disabled commands
-      
+    enabledCommands.forEach((cmd) => {
       const startTime = cmd.positionMs;
       const videoDuration = cmd.endMs - cmd.startMs;
       const rate = speedToRate(cmd.speed);
@@ -412,9 +408,7 @@ export class ReplayManager {
       const ongoing: number[] = [];
       const ending: number[] = [];
 
-      cmds.forEach((cmd: any, idx: number) => {
-        if (cmd.disabled) return; // Skip disabled commands
-        
+      enabledCommands.forEach((cmd, idx) => {
         const startTime = cmd.positionMs;
         const videoDuration = cmd.endMs - cmd.startMs;
         const rate = speedToRate(cmd.speed);
@@ -450,7 +444,7 @@ export class ReplayManager {
       const audioEnding: number[] = [];
       
       current.ending.forEach((cmdIdx) => {
-        const cmd = cmds[cmdIdx];
+        const cmd = enabledCommands[cmdIdx];
         const extendAudioSec = cmd.extendAudioSec || 0;
         const videoDuration = cmd.endMs - cmd.startMs;
         const rate = speedToRate(cmd.speed);
@@ -485,7 +479,7 @@ export class ReplayManager {
         activeCommands.forEach((cmdIdx) => {
           const playFromStart = current.starting.includes(cmdIdx);
           const showVideo = (cmdIdx === visibleCmdIdx);
-          const overlay = showVideo ? cmds[cmdIdx].overlay : undefined;
+          const overlay = showVideo ? enabledCommands[cmdIdx].overlay : undefined;
           const assetName = this.getCommandName(cmdIdx);
 
           plan.push(new PlanAction(
@@ -599,12 +593,12 @@ export class ReplayManager {
     }
   }
 
-  getTotalDuration(): number {
-    // Calculate the total duration by finding the maximum end time of all commands
-    if (!this.commands || this.commands.length === 0) return 0;
+  getTotalDuration(enabledCommands: any[]): number {
+    // Calculate the total duration by finding the maximum end time of all enabled commands
+    if (enabledCommands.length === 0) return 0;
     
     let maxEndTime = 0;
-    this.commands.forEach((cmd: any) => {
+    enabledCommands.forEach((cmd) => {
       const videoDuration = cmd.endMs - cmd.startMs;
       const rate = speedToRate(cmd.speed);
       const actualDuration = videoDuration / rate;
@@ -615,7 +609,7 @@ export class ReplayManager {
     return maxEndTime;
   }
 
-  seekToTime(newMs: number) {
+  seekToTime(newMs: number, enabledCommands: any[]) {
     // If currently playing, pause first
     const wasPlaying = this.isPlaying;
     if (wasPlaying) {
@@ -636,24 +630,24 @@ export class ReplayManager {
     
     // If was playing, resume from new position
     if (wasPlaying) {
-      this.startReplay(this.pausedAtMs);
+      this.startReplay(this.pausedAtMs, enabledCommands);
     }
   }
 
-  rewind(rewindMs: number) {
+  rewind(rewindMs: number, enabledCommands: any[]) {
     const currentMs = this.getCurrentPosition();
     if (currentMs === null) return;
     
     const newMs = currentMs - rewindMs;
-    this.seekToTime(newMs);
+    this.seekToTime(newMs, enabledCommands);
   }
 
-  fastForward(forwardMs: number) {
+  fastForward(forwardMs: number, enabledCommands: any[]) {
     const currentMs = this.getCurrentPosition();
     if (currentMs === null) return;
     
     const newMs = currentMs + forwardMs;
-    this.seekToTime(newMs);
+    this.seekToTime(newMs, enabledCommands);
   }
 
   hideAllPlayers() {
@@ -668,7 +662,7 @@ export class ReplayManager {
     });
   }
 
-  executeActions(actions: PlanAction[]) {
+  executeActions(actions: PlanAction[], enabledCommands: any[]) {
     const debugMode = this.isDebugMode();
     
     // Process each player
@@ -686,7 +680,7 @@ export class ReplayManager {
           // Normal playback
           if (action.playFromStart && player) {
             // Start this video from the beginning
-            const cmd = this.commands[i];
+            const cmd = enabledCommands[i];
             const startSec = Math.floor(cmd.startMs / 1000);
             const rate = speedToRate(cmd.speed);
             player.seekTo(startSec);
@@ -720,12 +714,10 @@ export class ReplayManager {
     });
   }
 
-  seekAndPlayAllActiveVideos(resumeFromMs: number, visibleIdx: number) {
-    const commands = this.commands;
-    // Find all commands that should be playing at resumeFromMs
+  seekAndPlayAllActiveVideos(resumeFromMs: number, visibleIdx: number, enabledCommands: any[]) {
+    // Find all enabled commands that should be playing at resumeFromMs
     const activeCommands: number[] = [];
-    for (let j = 0; j < commands.length; j++) {
-      const cmd = commands[j];
+    enabledCommands.forEach((cmd, idx) => {
       const cmdStart = cmd.positionMs;
       const videoDuration = cmd.endMs - cmd.startMs;
       const rate = speedToRate(cmd.speed);
@@ -734,16 +726,16 @@ export class ReplayManager {
       
       // Check if this command overlaps with resumeFromMs
       if (resumeFromMs >= cmdStart && resumeFromMs < cmdEnd) {
-        activeCommands.push(j);
+        activeCommands.push(idx);
       }
-    }
+    });
     
     // Seek and play all active commands
     this.players.forEach((player, i) => {
       const div = document.getElementById(`yt-player-edit-${i}`);
       
       if (activeCommands.includes(i) && player) {
-        const cmd = commands[i];
+        const cmd = enabledCommands[i];
         const cmdStart = cmd.positionMs;
         const elapsedInCmd = resumeFromMs - cmdStart;
         const rate = speedToRate(cmd.speed);
@@ -782,7 +774,7 @@ export class ReplayManager {
     });
   }
 
-  startReplay(resumeFromMs?: number) {
+  startReplay(resumeFromMs: number | undefined, enabledCommands: any[]) {
     if (this.isPlaying) return;
     
     // Check if players are initialized
@@ -796,7 +788,7 @@ export class ReplayManager {
     if (!players || !commands || !blackDiv) return;
     
     // Subtask 3.2: Generate the full replay plan and detect resume-from-end
-    const plan = this.generateReplayPlan2();
+    const plan = this.generateReplayPlan2(enabledCommands);
     if (plan.length === 0) return;
     
     const endTime = plan[plan.length - 1].start;
@@ -944,10 +936,10 @@ export class ReplayManager {
       if (isResuming && resumeFromMs !== undefined) {
         // When resuming mid-playback, seek all active videos to the correct position
         const visibleIdx = visibleAction ? visibleAction.cmdIdx : -1;
-        this.seekAndPlayAllActiveVideos(resumeFromMs, visibleIdx);
+        this.seekAndPlayAllActiveVideos(resumeFromMs, visibleIdx, enabledCommands);
       } else {
         // Normal playback: execute all actions
-        this.executeActions(actions);
+        this.executeActions(actions, enabledCommands);
       }
       
       // Update overlay based on visible action
