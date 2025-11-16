@@ -422,7 +422,7 @@ export class Editor {
       presentBtn.onclick = () => {
         const currentHash = window.location.hash;
         const newHash = `${currentHash}&present=1`;
-        window.open(newHash, '_blank', 'width=854,height=480');
+        window.open(newHash, '_blank', 'width=854,height=530');
       };
     }
 
@@ -1224,16 +1224,27 @@ export class Editor {
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
         const currentText = cmd.overlay?.textDisplay?.content || '';
-        const newValue = prompt('Edit Text:', currentText);
-        if (newValue !== null) {
-          // Update overlay textDisplay
-          if (newValue.trim() !== '') {
-            const overlay = ensureOverlay(cmd);
-            overlay.textDisplay = new TextDisplay(newValue);
-          } else if (cmd.overlay) {
-            cmd.overlay.textDisplay = undefined;
+        
+        showTextareaModal({
+          title: 'Edit Text',
+          initialValue: currentText,
+          maxWidth: '600px',
+          minHeight: '200px',
+          onModalStateChange: (isOpen) => {
+            this.isModalOpen = isOpen;
+          },
+          onSave: (newValue) => {
+            // Update overlay textDisplay
+            if (newValue.trim() !== '') {
+              const overlay = ensureOverlay(cmd);
+              overlay.textDisplay = new TextDisplay(newValue);
+            } else if (cmd.overlay) {
+              cmd.overlay.textDisplay = undefined;
+            }
+            this.renderTable();
+            this.maybeSave();
           }
-        }
+        });
       }
     } else if (this.selectedCol === 9) {
       // Fill column - edit overlay JSON

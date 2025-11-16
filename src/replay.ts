@@ -134,13 +134,23 @@ export class ReplayManager {
     if (!ctx) return;
     
     // Set text properties
-    ctx.font = '36px sans-serif';
+    const fontSize = 36;
+    const lineHeight = fontSize * 1.2; // 20% spacing between lines
+    ctx.font = `${fontSize}px sans-serif`;
     ctx.fillStyle = 'white';
     
-    // Measure text to create background
-    const textMetrics = ctx.measureText(content);
-    const textWidth = textMetrics.width;
-    const textHeight = 36; // Font size
+    // Split content into lines
+    const lines = content.split('\n');
+    
+    // Measure all lines to find the widest one
+    let maxWidth = 0;
+    lines.forEach(line => {
+      const metrics = ctx.measureText(line);
+      maxWidth = Math.max(maxWidth, metrics.width);
+    });
+    
+    const textWidth = maxWidth;
+    const textHeight = lines.length * lineHeight;
     const padding = 10;
     const margin = 10;
     
@@ -183,9 +193,11 @@ export class ReplayManager {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(x, y, textWidth + padding * 2, textHeight + padding * 2);
     
-    // Draw text
+    // Draw each line of text
     ctx.fillStyle = 'white';
-    ctx.fillText(content, x + padding, y + padding);
+    lines.forEach((line, index) => {
+      ctx.fillText(line, x + padding, y + padding + (index * lineHeight));
+    });
   }
 
   updateOverlay(overlay?: Overlay) {

@@ -112,9 +112,13 @@ export function showTextareaModal(options: TextareaModalOptions): void {
     closeModal();
   };
 
-  // Close modal on Escape key
+  // Close modal on Escape key, save on Shift+Enter
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
+      closeModal();
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      onSave(textarea.value);
       closeModal();
     }
   };
