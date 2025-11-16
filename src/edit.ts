@@ -409,6 +409,7 @@ export class Editor {
           <button id="shortcuts-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Shortcuts</button>
           <button id="present-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Present</button>
           <button id="short-btn" style="padding: 8px 16px; cursor: pointer;">Short</button>
+          <button id="edit-short-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Edit Short</button>
         </div>
       </div>
       ${getShortcutsModalHtml()}
@@ -432,6 +433,53 @@ export class Editor {
         const currentHash = window.location.hash;
         const newHash = `${currentHash}&present=1`;
         window.open(newHash, '_blank', 'width=854,height=530');
+      };
+    }
+
+    const editShortBtn = document.getElementById('edit-short-btn');
+    if (editShortBtn) {
+      editShortBtn.onclick = () => {
+        // Get current values or defaults
+        const currentStartSec = this.project.shortStartMs !== undefined ? this.project.shortStartMs / 1000 : 0;
+        const currentEndSec = this.project.shortEndMs !== undefined ? this.project.shortEndMs / 1000 : 60;
+        const defaultValue = `${currentStartSec} ${currentEndSec}`;
+        
+        const input = prompt('Enter start and finish times in seconds (e.g., "0 60"):', defaultValue);
+        if (input !== null) {
+          const parts = input.trim().split(/\s+/);
+          if (parts.length === 2) {
+            const startSec = parseFloat(parts[0]);
+            const endSec = parseFloat(parts[1]);
+            
+            if (!isNaN(startSec) && !isNaN(endSec) && startSec >= 0 && endSec > startSec) {
+              // Store in project
+              this.project.shortStartMs = startSec * 1000;
+              this.project.shortEndMs = endSec * 1000;
+              this.saveProject();
+              
+              showBanner(`Short range set: ${startSec}s - ${endSec}s`, {
+                id: 'short-set-banner',
+                position: 'bottom',
+                color: 'green',
+                duration: 2000
+              });
+            } else {
+              showBanner('Invalid times: must be numbers with end > start', {
+                id: 'short-error-banner',
+                position: 'bottom',
+                color: 'red',
+                duration: 2000
+              });
+            }
+          } else {
+            showBanner('Invalid format: enter two numbers separated by space', {
+              id: 'short-error-banner',
+              position: 'bottom',
+              color: 'red',
+              duration: 2000
+            });
+          }
+        }
       };
     }
 
@@ -529,19 +577,17 @@ export class Editor {
         if (this.replayManager.isPlaying) {
           this.replayManager.pauseReplay();
         } else {
-          // Check if selected cell is on Pos 0 or Pos 1
+          // In present mode, use shortStartMs and shortEndMs if available
           let resumeTime = this.replayManager.pausedAtMs;
-          if (this.selectedRow < this.project.commands.length && (this.selectedCol === 1 || this.selectedCol === 2)) {
-            const cmd = this.project.commands[this.selectedRow];
-            if (this.selectedCol === 1) {
-              // Pos 0 column - use positionMs
-              resumeTime = cmd.positionMs;
-            } else if (this.selectedCol === 2) {
-              // Pos 1 column - use computed end time
-              resumeTime = computeCommandEndTimeMs(cmd);
-            }
+          let endTime: number | undefined = undefined;
+          
+          if (this.project.shortStartMs !== undefined && this.project.shortEndMs !== undefined) {
+            // Play from shortStartMs to shortEndMs
+            resumeTime = this.project.shortStartMs;
+            endTime = this.project.shortEndMs;
           }
-          this.replayManager.startReplay(resumeTime, this.getEnabledCommands());
+          
+          this.replayManager.startReplay(resumeTime, this.getEnabledCommands(), endTime);
         }
         e.preventDefault();
       }
@@ -1473,7 +1519,9 @@ export class Editor {
         cmd.overlay ? this.cloneOverlay(cmd.overlay) : undefined,
         cmd.disabled,
         cmd.extendAudioSec
-      ))
+      )),
+      this.project.shortStartMs,
+      this.project.shortEndMs
     );
     
     // Create new metadata for the cloned project

@@ -86,16 +86,22 @@ export class ProjectCommand {
 export class Project {
   title: string;
   commands: ProjectCommand[];
+  shortStartMs?: number;
+  shortEndMs?: number;
 
-  constructor(title: string, commands: ProjectCommand[]) {
+  constructor(title: string, commands: ProjectCommand[], shortStartMs?: number, shortEndMs?: number) {
     this.title = title;
     this.commands = commands;
+    if (shortStartMs !== undefined) this.shortStartMs = shortStartMs;
+    if (shortEndMs !== undefined) this.shortEndMs = shortEndMs;
   }
 
   serialize(): string {
     return JSON.stringify({
       title: this.title,
       commands: this.commands,
+      shortStartMs: this.shortStartMs,
+      shortEndMs: this.shortEndMs,
     });
   }
 
@@ -148,7 +154,7 @@ export class Project {
         cmd.disabled,
         cmd.extendAudioSec
       );
-    }));
+    }), data.shortStartMs, data.shortEndMs);
   }
 }
 
@@ -228,7 +234,9 @@ export class TopLevelProject {
             cmd.disabled,
             cmd.extendAudioSec
           );
-        })
+        }),
+        data.project.shortStartMs,
+        data.project.shortEndMs
       );
       const metadata = new Metadata(
         data.metadata.id,
@@ -283,7 +291,9 @@ export class TopLevelProject {
           cmd.disabled,
           cmd.extendAudioSec
         );
-      })
+      }),
+      data.shortStartMs,
+      data.shortEndMs
     );
     
     // Create metadata for legacy project

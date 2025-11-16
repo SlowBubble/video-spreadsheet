@@ -609,7 +609,7 @@ export class ReplayManager {
     return maxEndTime;
   }
 
-  seekToTime(newMs: number, enabledCommands: any[]) {
+  seekToTime(newMs: number, enabledCommands: any[], endMs?: number) {
     // If currently playing, pause first
     const wasPlaying = this.isPlaying;
     if (wasPlaying) {
@@ -630,24 +630,24 @@ export class ReplayManager {
     
     // If was playing, resume from new position
     if (wasPlaying) {
-      this.startReplay(this.pausedAtMs, enabledCommands);
+      this.startReplay(this.pausedAtMs, enabledCommands, endMs);
     }
   }
 
-  rewind(rewindMs: number, enabledCommands: any[]) {
+  rewind(rewindMs: number, enabledCommands: any[], endMs?: number) {
     const currentMs = this.getCurrentPosition();
     if (currentMs === null) return;
     
     const newMs = currentMs - rewindMs;
-    this.seekToTime(newMs, enabledCommands);
+    this.seekToTime(newMs, enabledCommands, endMs);
   }
 
-  fastForward(forwardMs: number, enabledCommands: any[]) {
+  fastForward(forwardMs: number, enabledCommands: any[], endMs?: number) {
     const currentMs = this.getCurrentPosition();
     if (currentMs === null) return;
     
     const newMs = currentMs + forwardMs;
-    this.seekToTime(newMs, enabledCommands);
+    this.seekToTime(newMs, enabledCommands, endMs);
   }
 
   hideAllPlayers() {
@@ -774,7 +774,7 @@ export class ReplayManager {
     });
   }
 
-  startReplay(resumeFromMs: number | undefined, enabledCommands: any[]) {
+  startReplay(resumeFromMs: number | undefined, enabledCommands: any[], endMs?: number) {
     if (this.isPlaying) return;
     
     // Check if players are initialized
@@ -788,7 +788,52 @@ export class ReplayManager {
     if (!players || !commands || !blackDiv) return;
     
     // Subtask 3.2: Generate the full replay plan and detect resume-from-end
-    const plan = this.generateReplayPlan2(enabledCommands);
+    let plan = this.generateReplayPlan2(enabledCommands);
+    if (plan.length === 0) return;
+    
+    // If endMs is specified, truncate the plan at that time
+    if (endMs !== undefined) {
+      // Filter and truncate actions
+      const truncatedPlan: PlanAction[] = [];
+      
+      for (const action of plan) {
+        if (action.start >= endMs) {
+          // Action starts at or after endMs, skip it
+          break;
+        } else if (action.end <= endMs) {
+          // Action ends before endMs, keep it as is
+          truncatedPlan.push(action);
+        } else {
+          // Action spans across endMs, truncate it
+          truncatedPlan.push(new PlanAction(
+            action.start,
+            endMs,
+            action.cmdIdx,
+            action.playFromStart,
+            action.showVideo,
+            action.assetName,
+            action.overlay,
+            action.pauseVideo
+          ));
+        }
+      }
+      
+      plan = truncatedPlan;
+      
+      // Add a black screen action at endMs if plan is not empty
+      // Use a very short duration (1ms) so it immediately triggers the end-of-plan logic
+      if (plan.length > 0) {
+        plan.push(new PlanAction(
+          endMs,
+          endMs + 1,
+          -1,
+          false,
+          true,
+          '[Black Screen]'
+        ));
+      }
+    }
+    
     if (plan.length === 0) return;
     
     const endTime = plan[plan.length - 1].start;
@@ -891,13 +936,17 @@ export class ReplayManager {
       // Handle automatic pause at playback end
       // When reaching the final black screen step, pause at that position
       if (step >= plan.length && action.cmdIdx === -1) {
-        this.pausedAtMs = action.end;
+        this.pausedAtMs = action.start;
         this.isPlaying = false;
         this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
         this._intervalId && clearInterval(this._intervalId);
         this._stepTimeoutId = null;
         this._intervalId = null;
         this.clearOverlay();
+        
+        // Hide all players and show black screen
+        this.hideAllPlayers();
+        if (blackDiv) blackDiv.style.display = 'block';
         
         // Update position display to show paused at end
         if (!hideTime && posDiv) {
