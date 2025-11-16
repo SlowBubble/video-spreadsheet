@@ -148,7 +148,7 @@ export class Editor {
   }
 
   getEnabledCommands(): ProjectCommand[] {
-    return this.project.commands.filter(cmd => !cmd.disabled);
+    return this.project.getEnabledCommands();
   }
 
   initReplayManager() {
@@ -1395,16 +1395,18 @@ export class Editor {
     try {
       const oldProject = Project.fromJSON(oldJsonString);
       const newProject = Project.fromJSON(newJsonString);
+      const oldCommands = oldProject.getEnabledCommands();
+      const newCommands = newProject.getEnabledCommands();
       
       // Check if number of commands changed (new asset added or removed)
-      if (oldProject.commands.length < newProject.commands.length) {
+      if (oldCommands.length < newCommands.length) {
         return true;
       }
       
       // Check if any asset, startMs, endMs, or extendAudioSec changed
-      for (let i = 0; i < newProject.commands.length; i++) {
-        const oldCmd = oldProject.commands[i];
-        const newCmd = newProject.commands[i];
+      for (let i = 0; i < newCommands.length; i++) {
+        const oldCmd = oldCommands[i];
+        const newCmd = newCommands[i];
         
         if (oldCmd.asset !== newCmd.asset ||
             oldCmd.startMs !== newCmd.startMs ||

@@ -99,6 +99,11 @@ export class Project {
     });
   }
 
+  getEnabledCommands(): ProjectCommand[] {
+    return this.commands.filter(cmd => !cmd.disabled);
+  }
+
+  // TODO see if we should clean this up by having fromJSON for the children classes
   static fromJSON(json: string): Project {
     const data = JSON.parse(json);
     return new Project(data.title, data.commands.map((cmd: any) => {
