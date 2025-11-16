@@ -30,6 +30,10 @@ body {
   min-height: 100vh;
 }
 
+body.present-mode {
+  background-color: black;
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;

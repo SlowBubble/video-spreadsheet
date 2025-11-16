@@ -364,8 +364,12 @@ export class Editor {
       document.body.style.margin = '0';
       document.body.style.padding = '0';
       document.body.style.overflow = 'hidden';
+      document.body.classList.add('present-mode');
       return;
     }
+    
+    // Remove present-mode class if not in present mode
+    document.body.classList.remove('present-mode');
     
     const editIcon = `<span id="edit-title" style="cursor:pointer; margin-right:8px;" title="Edit title">✏️</span>`;
     const titleHtml = `<div style="display:flex; align-items:center; font-size:2em; font-weight:bold;">
@@ -403,7 +407,8 @@ export class Editor {
         </table>
         <div style="margin-top: 12px;">
           <button id="shortcuts-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Shortcuts</button>
-          <button id="present-btn" style="padding: 8px 16px; cursor: pointer;">Present</button>
+          <button id="present-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Present</button>
+          <button id="short-btn" style="padding: 8px 16px; cursor: pointer;">Short</button>
         </div>
       </div>
       ${getShortcutsModalHtml()}
@@ -427,6 +432,15 @@ export class Editor {
         const currentHash = window.location.hash;
         const newHash = `${currentHash}&present=1`;
         window.open(newHash, '_blank', 'width=854,height=530');
+      };
+    }
+
+    const shortBtn = document.getElementById('short-btn');
+    if (shortBtn) {
+      shortBtn.onclick = () => {
+        const currentHash = window.location.hash;
+        const newHash = `${currentHash}&present=1`;
+        window.open(newHash, '_blank', 'width=854,height=1520');
       };
     }
 
