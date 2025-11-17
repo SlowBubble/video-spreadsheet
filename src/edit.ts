@@ -11,6 +11,8 @@ import type { IDao } from './dao';
 import { FirestoreDao } from './firestoreDao';
 import { getCurrentUser } from './auth';
 
+// Move to the left slightly when resuming a replay.
+const offsetMs = 2000;
 
 export function getDao(): IDao {
   // return new LocalStorageDao();
@@ -525,7 +527,7 @@ export class Editor {
         }
         
         // Start replaying from the specified time
-        this.replayManager.startReplay(timeMs, this.getEnabledCommands());
+        this.replayManager.startReplay(Math.max(timeMs - offsetMs, 0), this.getEnabledCommands());
       });
     });
 
@@ -656,10 +658,12 @@ export class Editor {
           const cmd = this.project.commands[this.selectedRow];
           if (this.selectedCol === 2) {
             // Pos 0 column - use positionMs
-            resumeTime = cmd.positionMs;
+            resumeTime = cmd.positionMs - offsetMs;
+            resumeTime = Math.max(resumeTime, 0);
           } else if (this.selectedCol === 3) {
             // Pos 1 column - use computed end time
-            resumeTime = computeCommandEndTimeMs(cmd);
+            resumeTime = computeCommandEndTimeMs(cmd) - offsetMs;
+            resumeTime = Math.max(resumeTime, 0);
           }
         }
         this.replayManager.startReplay(resumeTime, this.getEnabledCommands());

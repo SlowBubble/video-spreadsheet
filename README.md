@@ -2,6 +2,10 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
+# wishlist
+
+- Need to migrate from startMs to inputStartMs and endMs to inputEndMs, and positionMs to outputStartMs
+
 # m8c (done)
 - When the "Short" button is pressed, prompt for the % of the default window size to open the new window in. Default the value to be 100.
   - Note: The current default window size is set to 854 by 1520.
