@@ -245,11 +245,18 @@ export class ReplayManager {
       container.style.height = '480px';
     }
     
-    // In present mode, remove margin and make it fill the window
+    // In present mode, center the iframe based on window width
     if (isPresentMode) {
-      container.style.margin = '0';
       replayDiv.style.margin = '0';
       replayDiv.style.padding = '0';
+      
+      // Center the iframe horizontally by offsetting it
+      const defaultWidth = 854;
+      const windowWidth = window.innerWidth;
+      const offset = Math.round((defaultWidth - windowWidth) / 2);
+      container.style.position = 'relative';
+      container.style.left = `-${offset}px`;
+      container.style.margin = '0';
     } else {
       container.style.margin = '0 auto';
     }

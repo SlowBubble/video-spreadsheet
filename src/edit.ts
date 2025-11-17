@@ -486,9 +486,29 @@ export class Editor {
     const shortBtn = document.getElementById('short-btn');
     if (shortBtn) {
       shortBtn.onclick = () => {
+        const defaultWidth = 854;
+        const defaultHeight = 1520;
+        
+        const percentInput = prompt('Enter window size as % of default (854x1520):', '100');
+        if (percentInput === null) return; // User cancelled
+        
+        const percent = parseFloat(percentInput);
+        if (isNaN(percent) || percent <= 0) {
+          showBanner('Invalid percentage value', {
+            id: 'short-error-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 2000
+          });
+          return;
+        }
+        
+        const width = Math.round(defaultWidth * (percent / 100));
+        const height = Math.round(defaultHeight * (percent / 100));
+        
         const currentHash = window.location.hash;
         const newHash = `${currentHash}&present=1`;
-        window.open(newHash, '_blank', 'width=854,height=1520');
+        window.open(newHash, '_blank', `width=${width},height=${height}`);
       };
     }
 
