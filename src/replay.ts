@@ -297,8 +297,8 @@ export class ReplayManager {
       
       commands.forEach((cmd: any, idx: number) => {
         const ytId = getYouTubeId(cmd.asset);
-        const startSec = Math.floor(cmd.startMs / 1000);
-        const endSec = Math.floor(cmd.endMs / 1000);
+        const startSec = cmd.startMs / 1000;
+        const endSec = cmd.endMs / 1000;
         const extendAudioSec = cmd.extendAudioSec || 0;
         const div = document.createElement('div');
         div.id = `yt-player-edit-${idx}`;
@@ -688,7 +688,7 @@ export class ReplayManager {
           if (action.playFromStart && player) {
             // Start this video from the beginning
             const cmd = enabledCommands[i];
-            const startSec = Math.floor(cmd.startMs / 1000);
+            const startSec = cmd.startMs / 1000;
             const rate = speedToRate(cmd.speed);
             player.seekTo(startSec);
             player.setVolume(cmd.volume);
