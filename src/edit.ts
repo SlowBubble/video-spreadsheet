@@ -19,7 +19,7 @@ export function getDao(): IDao {
   return new FirestoreDao();
 }
 
-const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed', 'Text', 'Fill'];
+const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'Dur', 'Vol', 'Speed', 'Text', 'Fill'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -31,12 +31,14 @@ function msToTimeString(ms: number): string {
   const s = totalSeconds % 60;
   
   // Format seconds with 1 decimal place
-  const sFormatted = s.toFixed(1).padStart(4, '0');
+  const sFormatted = s.toFixed(1);
   
   if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${sFormatted}`;
+    return `${h}:${m.toString().padStart(2, '0')}:${sFormatted.padStart(4, '0')}`;
+  } else if (m > 0) {
+    return `${m}:${sFormatted.padStart(4, '0')}`;
   } else {
-    return `${m}:${sFormatted}`;
+    return sFormatted;
   }
 }
 
@@ -52,8 +54,10 @@ function msToEditString(ms: number): string {
   
   if (h > 0) {
     return `${h}:${m.toString().padStart(2, '0')}:${sFormatted.padStart(2, '0')}`;
-  } else {
+  } else if (m > 0) {
     return `${m}:${sFormatted.padStart(2, '0')}`;
+  } else {
+    return sFormatted;
   }
 }
 
@@ -225,8 +229,10 @@ export class Editor {
         return msToTimeString(computeCommandEndTimeMs(cmd));
       case 4: // Start
         return msToTimeString(cmd.startMs);
-      case 5: // End
-        return msToTimeString(cmd.endMs);
+      case 5: // Dur (duration accounting for speed)
+        const videoDuration = cmd.endMs - cmd.startMs;
+        const actualDuration = videoDuration / (cmd.speed / 100);
+        return msToTimeString(actualDuration);
       case 6: // Volume
         return cmd.volume.toString();
       case 7: // Speed (display as percentage)
@@ -253,9 +259,9 @@ export class Editor {
       return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
     }
     
-    // For Start and End columns, create clickable links
-    if (colIdx === 4 || colIdx === 5) {
-      const timeMs = colIdx === 4 ? cmd.startMs : cmd.endMs;
+    // For Start column, create clickable link
+    if (colIdx === 4) {
+      const timeMs = cmd.startMs;
       const timeInSeconds = Math.floor(timeMs / 1000);
       
       // Get the asset URL and remove existing 't' parameter
@@ -275,6 +281,11 @@ export class Editor {
         // If URL parsing fails, just return the cell value
         return cellValue;
       }
+    }
+    
+    // For Dur column, just show the duration (no link)
+    if (colIdx === 5) {
+      return cellValue;
     }
     
     // For Fill column, create a canvas with overlay preview
@@ -412,7 +423,7 @@ export class Editor {
         // Add background colors for Asset and Vol columns based on volume
         const cmd = rowIdx < this.project.commands.length ? this.project.commands[rowIdx] : null;
         let bgColor = 'transparent';
-        if ((colIdx === 1 || colIdx === 6) && cmd) {
+        if ((colIdx === 6) && cmd) {
           if (cmd.volume === 100) {
             bgColor = '#eeeecc';
           } else if (cmd.volume > 0 && cmd.volume < 100) {
@@ -420,8 +431,8 @@ export class Editor {
           }
         }
         
-        // Right-align time columns (Pos 0, Pos 1, Start, End)
-        const textAlign = (colIdx >= 2 && colIdx <= 5) ? 'text-align: right;' : '';
+        // Right-align time, volume, and speed columns (Pos 0, Pos 1, Start, Dur, Vol, Speed)
+        const textAlign = (colIdx >= 2 && colIdx <= 7) ? 'text-align: right;' : '';
         
         cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px; background-color: ${bgColor}; ${textAlign}">
           ${cellContent || '&nbsp;'}
@@ -975,7 +986,7 @@ export class Editor {
         duration: 800
       });
     } else if (this.selectedCol === 5) {
-      // End column
+      // Dur column (displays duration but adjusts endMs)
       cmd.endMs = Math.max(0, cmd.endMs + deltaMs);
       showBanner(`End: ${msToTimeString(cmd.endMs)}`, {
         id: 'adjust-banner',
@@ -1079,7 +1090,7 @@ export class Editor {
       // Start column - store as ms integer string
       textToCopy = cmd.startMs.toString();
     } else if (this.selectedCol === 5) {
-      // End column - store as ms integer string
+      // Dur column (displays duration but copies endMs)
       textToCopy = cmd.endMs.toString();
     } else if (this.selectedCol === 6) {
       // Volume column - store as string
@@ -1254,7 +1265,7 @@ export class Editor {
       }
       cmd.startMs = Math.max(0, value);
     } else if (this.selectedCol === 5) {
-      // End column - parse as number
+      // Dur column (displays duration but pastes to endMs)
       const value = Number(clipboardText);
       if (isNaN(value)) {
         showBanner('Failed: Invalid number', {
@@ -1373,7 +1384,7 @@ export class Editor {
         }
       }
     } else if (this.selectedCol === 5) {
-      // End column
+      // Dur column (displays duration but edits endMs)
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
         const currentValue = msToEditString(cmd.endMs);
