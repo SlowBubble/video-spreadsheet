@@ -701,9 +701,17 @@ export class Editor {
     } else if (matchKey(e, 'alt+down')) {
       this.moveCommandDown();
     } else if (matchKey(e, 'alt+right')) {
-      this.adjustTimeValue(500);
+      if (this.selectedCol === 6 || this.selectedCol === 7) {
+        this.cycleColumnValue(1);
+      } else {
+        this.adjustTimeValue(500);
+      }
     } else if (matchKey(e, 'alt+left')) {
-      this.adjustTimeValue(-500);
+      if (this.selectedCol === 6 || this.selectedCol === 7) {
+        this.cycleColumnValue(-1);
+      } else {
+        this.adjustTimeValue(-500);
+      }
     } else if (matchKey(e, 'cmd+c')) {
       await this.copyCell();
     } else if (matchKey(e, 'cmd+v')) {
@@ -954,6 +962,55 @@ export class Editor {
     } else {
       // Not on a time column, do nothing
       return;
+    }
+  }
+
+  cycleColumnValue(direction: number) {
+    // Only cycle if we have a valid command selected
+    if (this.selectedRow >= this.project.commands.length) return;
+    
+    const cmd = this.project.commands[this.selectedRow];
+    
+    if (this.selectedCol === 6) {
+      // Volume column
+      const volumeOptions = [0, 25, 50, 75, 100];
+      const currentIndex = volumeOptions.indexOf(cmd.volume);
+      let nextIndex: number;
+      
+      if (currentIndex === -1) {
+        // Current value not in options, find closest
+        nextIndex = direction > 0 ? 0 : volumeOptions.length - 1;
+      } else {
+        nextIndex = (currentIndex + direction + volumeOptions.length) % volumeOptions.length;
+      }
+      
+      cmd.volume = volumeOptions[nextIndex];
+      showBanner(`Volume: ${cmd.volume}`, {
+        id: 'cycle-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 800
+      });
+    } else if (this.selectedCol === 7) {
+      // Speed column
+      const speedOptions = [25, 50, 75, 100];
+      const currentIndex = speedOptions.indexOf(cmd.speed);
+      let nextIndex: number;
+      
+      if (currentIndex === -1) {
+        // Current value not in options, find closest
+        nextIndex = direction > 0 ? 0 : speedOptions.length - 1;
+      } else {
+        nextIndex = (currentIndex + direction + speedOptions.length) % speedOptions.length;
+      }
+      
+      cmd.speed = speedOptions[nextIndex];
+      showBanner(`Speed: ${cmd.speed}%`, {
+        id: 'cycle-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 800
+      });
     }
   }
 

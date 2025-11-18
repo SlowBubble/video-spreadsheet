@@ -23,7 +23,7 @@ export function getShortcutsModalHtml(): string {
             <tr><td style="padding: 4px 8px;"><strong>Backspace / Cmd+X</strong></td><td style="padding: 4px 8px;">Delete row</td></tr>
             <tr><td style="padding: 4px 8px;"><strong>Cmd+Backspace</strong></td><td style="padding: 4px 8px;">Delete row</td></tr>
             <tr><td style="padding: 4px 8px;"><strong>Alt+Up / Alt+Down</strong></td><td style="padding: 4px 8px;">Move row up / down</td></tr>
-            <tr><td style="padding: 4px 8px;"><strong>Alt+Left / Alt+Right</strong></td><td style="padding: 4px 8px;">Adjust time -/+ 0.5s</td></tr>
+            <tr><td style="padding: 4px 8px;"><strong>Alt+Left / Alt+Right</strong></td><td style="padding: 4px 8px;">Adjust time -/+ 0.5s (or cycle Vol/Speed)</td></tr>
             
             <tr><td colspan="2" style="padding: 8px 8px 4px 8px; font-weight: bold; background: #f0f0f0;">Filters & Effects</td></tr>
             <tr><td style="padding: 4px 8px;"><strong>F</strong></td><td style="padding: 4px 8px;">Cycle fullscreen filter</td></tr>
