@@ -279,7 +279,7 @@ export class Editor {
         url.searchParams.set('t', `${timeInSeconds}s`);
         
         const linkUrl = url.toString();
-        return `<a href="${linkUrl}" target="_blank" style="color: blue; text-decoration: underline;">${cellValue}</a>`;
+        return `<a href="${linkUrl}" target="_blank" style="color: black; text-decoration: underline;">${cellValue}</a>`;
       } catch (e) {
         // If URL parsing fails, just return the cell value
         return cellValue;
