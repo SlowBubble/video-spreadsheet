@@ -2,18 +2,15 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# m9d
+# m9d (done)
+- shortcut `p` will toggle to round the 4 columns with the time to round the value displayed to 0/1 decimal place.
 
-- In the editor, have a field that says hideTimePrecision default to false
-  - shortcut `p` will toggle it
-  - if hideTimePrecision is true, round the 4 columns with the time to round the value displayed to 0 decimal places.
-
-# m9c
+# m9c (done)
 - Change the "End" column to "Dur" instead and show the duration up to 0.1 precision
   - Don't modify how the underlying data is stored, just compute the duration using endMs - startMs.
   - The editing operations will still be modifying the underlying endMs.
 
-# m9b
+# m9b (done)
 - display 0.1 precision for all the column involving times
 - also, when loading the edit prompt value, don't round, but display the actual precision (if it's 5, display 5; if it's 5.2, display 5.2 in the prompt)
 

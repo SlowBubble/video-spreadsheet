@@ -24,19 +24,20 @@ const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'Dur', 'Vol', 'Speed
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
 // Similarly 1:2:3 is 60*60*1+60*2+3
-function msToTimeString(ms: number): string {
+function msToTimeString(ms: number, decimalPlaces: number = 1): string {
   const totalSeconds = ms / 1000;
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
   
-  // Format seconds with 1 decimal place
-  const sFormatted = s.toFixed(1);
+  // Format seconds with specified decimal places
+  const sFormatted = s.toFixed(decimalPlaces);
+  const padding = decimalPlaces > 0 ? 4 : 2;
   
   if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${sFormatted.padStart(4, '0')}`;
+    return `${h}:${m.toString().padStart(2, '0')}:${sFormatted.padStart(padding, '0')}`;
   } else if (m > 0) {
-    return `${m}:${sFormatted.padStart(4, '0')}`;
+    return `${m}:${sFormatted.padStart(padding, '0')}`;
   } else {
     return sFormatted;
   }
@@ -130,6 +131,7 @@ export class Editor {
   undoManager!: UndoManager;
   isModalOpen: boolean = false;
   dao: IDao;
+  numDecimalPlacesForTimeDisplay: number = 0;
 
   get project(): Project {
     return this.topLevelProject.project;
@@ -217,6 +219,7 @@ export class Editor {
     if (rowIdx >= this.project.commands.length) return '';
     
     const cmd = this.project.commands[rowIdx];
+    const precision = this.numDecimalPlacesForTimeDisplay;
     
     switch (colIdx) {
       case 0: // Checkbox (enabled/disabled)
@@ -224,15 +227,15 @@ export class Editor {
       case 1: // Asset
         return cmd.name ? cmd.name : cmd.asset;
       case 2: // Pos 0 (start position)
-        return msToTimeString(cmd.positionMs);
+        return msToTimeString(cmd.positionMs, precision);
       case 3: // Pos 1 (end position, calculated)
-        return msToTimeString(computeCommandEndTimeMs(cmd));
+        return msToTimeString(computeCommandEndTimeMs(cmd), precision);
       case 4: // Start
-        return msToTimeString(cmd.startMs);
+        return msToTimeString(cmd.startMs, precision);
       case 5: // Dur (duration accounting for speed)
         const videoDuration = cmd.endMs - cmd.startMs;
         const actualDuration = videoDuration / (cmd.speed / 100);
-        return msToTimeString(actualDuration);
+        return msToTimeString(actualDuration, precision);
       case 6: // Volume
         return cmd.volume.toString();
       case 7: // Speed (display as percentage)
@@ -731,6 +734,8 @@ export class Editor {
       this.toggleTextAlignment();
     } else if (matchKey(e, 't')) {
       this.tetherToPreviousRow();
+    } else if (matchKey(e, 'p')) {
+      this.toggleTimePrecision();
     } else if (matchKey(e, 'alt+up')) {
       this.moveCommandUp();
     } else if (matchKey(e, 'alt+down')) {
@@ -897,6 +902,16 @@ export class Editor {
       position: 'bottom',
       color: 'blue',
       duration: 1500
+    });
+  }
+
+  toggleTimePrecision() {
+    this.numDecimalPlacesForTimeDisplay = this.numDecimalPlacesForTimeDisplay === 0 ? 1 : 0;
+    showBanner(`Time precision: ${this.numDecimalPlacesForTimeDisplay} decimal place${this.numDecimalPlacesForTimeDisplay === 1 ? '' : 's'}`, {
+      id: 'precision-banner',
+      position: 'bottom',
+      color: 'blue',
+      duration: 1000
     });
   }
 
