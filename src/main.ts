@@ -5,7 +5,7 @@ import type { IDao } from './dao';
 import { signInWithGoogle, signOutUser, onAuthChange } from './auth';
 import type { User } from 'firebase/auth';
 
-async function getProjects(dao: IDao): Promise<{ id: string, title: string, lastEditedAt: number }[]> {
+async function getProjects(dao: IDao): Promise<{ id: string, title: string, lastEditedAt: number, owner: string }[]> {
   const docs = await dao.getAll();
   const projects = docs.map(data => {
     // Handle both TopLevelProject and legacy Project formats
@@ -14,14 +14,16 @@ async function getProjects(dao: IDao): Promise<{ id: string, title: string, last
       return { 
         id: data.metadata.id, 
         title: data.project.title,
-        lastEditedAt: data.metadata.lastEditedAt || Date.now()
+        lastEditedAt: data.metadata.lastEditedAt || Date.now(),
+        owner: data.metadata.owner || ''
       };
     } else {
       // Legacy Project format - use current time as fallback
       return { 
         id: data.id, 
         title: data.title,
-        lastEditedAt: Date.now()
+        lastEditedAt: Date.now(),
+        owner: data.owner || ''
       };
     }
   });
@@ -30,6 +32,10 @@ async function getProjects(dao: IDao): Promise<{ id: string, title: string, last
 }
 
 async function renderHome(user: User | null) {
+  // Get opacity from URL parameter, default to 0 if not specified
+  const params = getHashParams();
+  const dimOpacity = params.has('opacity') ? params.get('opacity') : '0';
+  
   if (!user) {
     document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div style="margin-bottom: 20px;">
@@ -47,6 +53,7 @@ async function renderHome(user: User | null) {
   }
   const dao = getDao();
   const projects = await getProjects(dao);
+  const currentUserId = user.uid;
   
   document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div>
@@ -60,7 +67,9 @@ async function renderHome(user: User | null) {
         ${projects.length === 0 ? '<li>No projects yet.</li>' : projects.map(p => {
           const date = new Date(p.lastEditedAt);
           const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          return `<li style="margin-bottom: 8px;">
+          const isOwner = p.owner === currentUserId;
+          const opacity = isOwner ? '1' : dimOpacity;
+          return `<li style="margin-bottom: 8px; opacity: ${opacity};">
             <a href="#id=${p.id}" class="project-link" data-id="${p.id}" style="text-decoration: none; color: #0066cc;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-weight: 500;">${p.title}</span>

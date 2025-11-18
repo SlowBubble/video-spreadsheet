@@ -2,6 +2,9 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
+# m9e (done)
+- Disable replay until players loading is complete. If the user try to replay before that, display a banner that says "Loading is not finished."
+
 # m9d (done)
 - shortcut `p` will toggle to round the 4 columns with the time to round the value displayed to 0/1 decimal place.
 

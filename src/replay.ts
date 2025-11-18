@@ -786,6 +786,12 @@ export class ReplayManager {
     
     // Check if players are initialized
     if (!this.isInitialized) {
+      showBanner('Loading is not finished.', {
+        id: 'loading-banner',
+        position: 'top',
+        color: 'yellow',
+        duration: 2000
+      });
       return;
     }
     
