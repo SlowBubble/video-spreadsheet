@@ -12,7 +12,7 @@ import { FirestoreDao } from './firestoreDao';
 import { getCurrentUser } from './auth';
 
 // Move to the left slightly when resuming a replay.
-const offsetMs = 2000;
+const offsetMs = 1000;
 
 export function getDao(): IDao {
   // return new LocalStorageDao();
@@ -387,7 +387,19 @@ export class Editor {
         const isSelected = rowIdx === this.selectedRow && colIdx === this.selectedCol;
         const cellValue = this.getDisplayValue(rowIdx, colIdx);
         const cellContent = this.getCellContent(rowIdx, colIdx, cellValue);
-        cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px;">
+        
+        // Add background colors for Asset and Vol columns based on volume
+        const cmd = rowIdx < this.project.commands.length ? this.project.commands[rowIdx] : null;
+        let bgColor = 'transparent';
+        if ((colIdx === 1 || colIdx === 6) && cmd) {
+          if (cmd.volume === 100) {
+            bgColor = '#eeeecc';
+          } else if (cmd.volume > 0 && cmd.volume < 100) {
+            bgColor = '#ffffdd';
+          }
+        }
+        
+        cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px; background-color: ${bgColor};">
           ${cellContent || '&nbsp;'}
         </td>`);
       }
@@ -620,8 +632,6 @@ export class Editor {
     const rowCount = this.getRowCount();
     let forceSave = false;
   
-    const isSpace = matchKey(e, 'space');
-
     if (matchKey(e, 'up')) {
       this.selectedRow = Math.max(0, this.selectedRow - 1);
     } else if (matchKey(e, 'down')) {
@@ -648,22 +658,26 @@ export class Editor {
       const targetTime = (digit / 10) * totalDuration;
       this.replayManager.stopReplay();
       this.replayManager.startReplay(targetTime, enabledCommands);
-    } else if (isSpace || matchKey(e, 'k')) {
+    } else if (matchKey(e, 'space') || matchKey(e, 'k')) {
       if (this.replayManager.isPlaying) {
         this.replayManager.pauseReplay();
       } else {
         // Check if selected cell is on Pos 0 or Pos 1
         let resumeTime = this.replayManager.pausedAtMs;
-        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 2 || this.selectedCol === 3) && isSpace) {
+        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 2 || this.selectedCol === 3)) {
           const cmd = this.project.commands[this.selectedRow];
           if (this.selectedCol === 2) {
             // Pos 0 column - use positionMs
             resumeTime = cmd.positionMs - offsetMs;
             resumeTime = Math.max(resumeTime, 0);
+            // move away from the special columns (Pos 0 or Pos 1)
+            this.selectedCol -= 1;
           } else if (this.selectedCol === 3) {
             // Pos 1 column - use computed end time
             resumeTime = computeCommandEndTimeMs(cmd) - offsetMs;
             resumeTime = Math.max(resumeTime, 0);
+            // move away from the special columns (Pos 0 or Pos 1)
+            this.selectedCol += 1;
           }
         }
         this.replayManager.startReplay(resumeTime, this.getEnabledCommands());
