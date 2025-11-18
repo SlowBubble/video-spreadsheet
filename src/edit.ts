@@ -25,14 +25,35 @@ const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'End', 'Vol', 'Speed
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
 // Similarly 1:2:3 is 60*60*1+60*2+3
 function msToTimeString(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const h = Math.floor(seconds / 4800);
-  const m = Math.floor((seconds % 4800) / 60);
-  const s = seconds % 60;
+  const totalSeconds = ms / 1000;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  
+  // Format seconds with 1 decimal place
+  const sFormatted = s.toFixed(1).padStart(4, '0');
+  
   if (h > 0) {
-    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${h}:${m.toString().padStart(2, '0')}:${sFormatted}`;
   } else {
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${sFormatted}`;
+  }
+}
+
+// Convert ms to time string for editing (shows actual precision without rounding)
+function msToEditString(ms: number): string {
+  const totalSeconds = ms / 1000;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  
+  // Remove trailing zeros and decimal point if not needed
+  const sFormatted = s.toString().replace(/\.?0+$/, '');
+  
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${sFormatted.padStart(2, '0')}`;
+  } else {
+    return `${m}:${sFormatted.padStart(2, '0')}`;
   }
 }
 
@@ -399,7 +420,10 @@ export class Editor {
           }
         }
         
-        cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px; background-color: ${bgColor};">
+        // Right-align time columns (Pos 0, Pos 1, Start, End)
+        const textAlign = (colIdx >= 2 && colIdx <= 5) ? 'text-align: right;' : '';
+        
+        cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px; background-color: ${bgColor}; ${textAlign}">
           ${cellContent || '&nbsp;'}
         </td>`);
       }
@@ -692,9 +716,9 @@ export class Editor {
       this.cycleFullScreenFilter();
     } else if (matchKey(e, 'b')) {
       this.toggleBorderFilter();
-    } else if (matchKey(e, 't')) {
-      this.toggleTextAlignment();
     } else if (matchKey(e, 'a')) {
+      this.toggleTextAlignment();
+    } else if (matchKey(e, 't')) {
       this.tetherToPreviousRow();
     } else if (matchKey(e, 'alt+up')) {
       this.moveCommandUp();
@@ -1329,7 +1353,7 @@ export class Editor {
       // Pos 0 column - edit position start time
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
-        const currentValue = msToTimeString(cmd.positionMs);
+        const currentValue = msToEditString(cmd.positionMs);
         const newValue = prompt('Edit Position:', currentValue);
         if (newValue !== null) {
           cmd.positionMs = this.timeStringToMs(newValue);
@@ -1342,7 +1366,7 @@ export class Editor {
       // Start column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
-        const currentValue = msToTimeString(cmd.startMs);
+        const currentValue = msToEditString(cmd.startMs);
         const newValue = prompt('Edit Start:', currentValue);
         if (newValue !== null) {
           cmd.startMs = this.timeStringToMs(newValue);
@@ -1352,7 +1376,7 @@ export class Editor {
       // End column
       if (isExistingCommand) {
         const cmd = this.project.commands[this.selectedRow];
-        const currentValue = msToTimeString(cmd.endMs);
+        const currentValue = msToEditString(cmd.endMs);
         const newValue = prompt('Edit End:', currentValue);
         if (newValue !== null) {
           cmd.endMs = this.timeStringToMs(newValue);
@@ -1428,14 +1452,21 @@ export class Editor {
 
   timeStringToMs(str: string): number {
     if (!str) return 0;
-    const parts = str.trim().split(/[: ]/).map(Number).filter(n => !isNaN(n));
+    const parts = str.trim().split(/[: ]/);
     if (parts.length === 0) return 0;
+    
     let total = 0;
     let multiplier = 1;
+    
+    // Process from right to left (seconds, minutes, hours)
     for (let i = parts.length - 1; i >= 0; i--) {
-      total += parts[i] * multiplier;
+      const value = parseFloat(parts[i]);
+      if (!isNaN(value)) {
+        total += value * multiplier;
+      }
       multiplier *= 60;
     }
+    
     return total * 1000;
   }
 
