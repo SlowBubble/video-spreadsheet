@@ -1765,6 +1765,7 @@ export class Editor {
       } else if (this.selectedCol === 8) {
         // Text column
         const currentText = cmd.overlay?.textDisplay?.content || '';
+        const currentAlignment = cmd.overlay?.textDisplay?.alignment || 'lower-center';
         
         showTextareaModal({
           title: 'Edit Text',
@@ -1775,10 +1776,10 @@ export class Editor {
             this.isModalOpen = isOpen;
           },
           onSave: (newValue) => {
-            // Update overlay textDisplay
+            // Update overlay textDisplay, preserving alignment
             if (newValue.trim() !== '') {
               const overlay = ensureOverlay(cmd);
-              overlay.textDisplay = new TextDisplay(newValue);
+              overlay.textDisplay = new TextDisplay(newValue, currentAlignment);
             } else if (cmd.overlay) {
               cmd.overlay.textDisplay = undefined;
             }
@@ -1839,6 +1840,7 @@ export class Editor {
       } else if (this.selectedCol === 8) {
         // Text column
         const currentText = subCmd.overlay?.textDisplay?.content || '';
+        const currentAlignment = subCmd.overlay?.textDisplay?.alignment || 'lower-center';
         
         showTextareaModal({
           title: 'Edit Subcommand Text',
@@ -1849,12 +1851,12 @@ export class Editor {
             this.isModalOpen = isOpen;
           },
           onSave: (newValue) => {
-            // Update overlay textDisplay
+            // Update overlay textDisplay, preserving alignment
             if (newValue.trim() !== '') {
               if (!subCmd.overlay) {
                 subCmd.overlay = new Overlay();
               }
-              subCmd.overlay.textDisplay = new TextDisplay(newValue);
+              subCmd.overlay.textDisplay = new TextDisplay(newValue, currentAlignment);
             } else if (subCmd.overlay) {
               subCmd.overlay.textDisplay = undefined;
             }

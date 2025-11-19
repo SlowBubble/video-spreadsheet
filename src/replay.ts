@@ -1102,9 +1102,33 @@ export class ReplayManager {
       // Execute all plan actions for this time point
       const isResuming = isStartingStep && resumeFromMs !== undefined && resumeFromMs > 0;
       if (isResuming && resumeFromMs !== undefined) {
-        // When resuming mid-playback, seek all active videos to the correct position
-        const displayAction = actions.find(a => a instanceof DisplayAction) as DisplayAction | undefined;
-        const visibleIdx = displayAction ? displayAction.cmdIdx : -1;
+        // When resuming mid-playback, we need to:
+        // 1. Find and execute the most recent DisplayAction and OverlayAction to set up the visual state
+        // 2. Use special video seeking logic for active videos
+        
+        // Find the most recent DisplayAction at or before resumeFromMs
+        const allDisplayActions = plan.filter(a => a instanceof DisplayAction && a.replayPositionMs <= resumeFromMs);
+        const mostRecentDisplayAction = allDisplayActions.length > 0 
+          ? allDisplayActions[allDisplayActions.length - 1] as DisplayAction
+          : null;
+        
+        // Find the most recent OverlayAction at or before resumeFromMs
+        const allOverlayActions = plan.filter(a => a instanceof OverlayAction && a.replayPositionMs <= resumeFromMs);
+        const mostRecentOverlayAction = allOverlayActions.length > 0
+          ? allOverlayActions[allOverlayActions.length - 1] as OverlayAction
+          : null;
+        
+        // Execute the most recent DisplayAction and OverlayAction to establish current state
+        const initialStateActions: PlanAction[] = [];
+        if (mostRecentDisplayAction) initialStateActions.push(mostRecentDisplayAction);
+        if (mostRecentOverlayAction) initialStateActions.push(mostRecentOverlayAction);
+        
+        if (initialStateActions.length > 0) {
+          this.executeActions(initialStateActions, enabledCommands);
+        }
+        
+        // Seek and play all active videos
+        const visibleIdx = mostRecentDisplayAction ? mostRecentDisplayAction.cmdIdx : -1;
         this.seekAndPlayAllActiveVideos(resumeFromMs, visibleIdx, enabledCommands);
       } else {
         // Normal playback: execute all actions

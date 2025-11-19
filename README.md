@@ -22,9 +22,13 @@
 
 # m11e
 - Fix replay at non-zero time (certain visuals are not displayed; I suspect some DisplayAction from before the resume time is skipped) 
+
+# m11f
 - Add links back to Dur by computing the footage end time in seconds (round down)
 - Add links for the subcommands based on the parent command
-- Allow edit
+- Allow editing pos 1 column
+  - `enter`, `alt+left` and `alt+right`
+- copy-paste the overlay, excluding TextDisplay
 - Add `d` shortcut to get debug info based on the current play
 
 
