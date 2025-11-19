@@ -8,17 +8,33 @@ function speedToRate(speed: number): number {
   return speed / 100;
 }
 
-export class Surrounding {
-  starting: number[];
-  ongoing: number[];
-  ending: number[];
+enum OpType {
+  START_VIDEO = 'START_VIDEO',
+  PAUSE_VIDEO = 'PAUSE_VIDEO',
+  HIDE_VISUAL = 'HIDE_VISUAL'
+}
+
+class OpEvt {
+  opType: OpType;
+  timeMs: number;
+  cmdIdx: number;
+
+  constructor(opType: OpType, timeMs: number, cmdIdx: number) {
+    this.opType = opType;
+    this.timeMs = timeMs;
+    this.cmdIdx = cmdIdx;
+  }
+}
+
+class OpEvtsGroup {
+  opEvts: OpEvt[];
+  ongoingCmdIndices: Set<number>;
   timeMs: number;
 
-  constructor(timeMs: number, starting: number[] = [], ongoing: number[] = [], ending: number[] = []) {
+  constructor(timeMs: number, opEvts: OpEvt[]) {
     this.timeMs = timeMs;
-    this.starting = starting;
-    this.ongoing = ongoing;
-    this.ending = ending;
+    this.opEvts = opEvts;
+    this.ongoingCmdIndices = new Set<number>();
   }
 }
 
@@ -27,11 +43,13 @@ abstract class PlanAction {
   replayPositionMs: number;
   cmdIdx: number; // Command index in original project commands array (-1 for black screen)
   debugAssetName: string; // For debugging purposes only
+  debugActionType: string; // For debugging purposes only
 
-  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, debugActionType: string) {
     this.replayPositionMs = replayPositionMs;
     this.cmdIdx = cmdIdx;
     this.debugAssetName = debugAssetName;
+    this.debugActionType = debugActionType;
   }
 
   // For sorting: PlayVideoAction=1, OverlayAction=2, DisplayAction=3, PauseVideoAction=4
@@ -43,7 +61,7 @@ class PlayVideoAction extends PlanAction {
   playbackRate: number;
 
   constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, volume: number, playbackRate: number) {
-    super(replayPositionMs, cmdIdx, debugAssetName);
+    super(replayPositionMs, cmdIdx, debugAssetName, 'PlayVideoAction');
     this.volume = volume;
     this.playbackRate = playbackRate;
   }
@@ -57,7 +75,7 @@ class OverlayAction extends PlanAction {
   overlays: Overlay[];
 
   constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, overlays: Overlay[]) {
-    super(replayPositionMs, cmdIdx, debugAssetName);
+    super(replayPositionMs, cmdIdx, debugAssetName, 'OverlayAction');
     this.overlays = overlays;
   }
 
@@ -69,7 +87,7 @@ class OverlayAction extends PlanAction {
 class DisplayAction extends PlanAction {
   // This action indicates which iframe should be displayed (all others hidden)
   constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
-    super(replayPositionMs, cmdIdx, debugAssetName);
+    super(replayPositionMs, cmdIdx, debugAssetName, 'DisplayAction');
   }
 
   getTypePriority(): number {
@@ -79,7 +97,7 @@ class DisplayAction extends PlanAction {
 
 class PauseVideoAction extends PlanAction {
   constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
-    super(replayPositionMs, cmdIdx, debugAssetName);
+    super(replayPositionMs, cmdIdx, debugAssetName, 'PauseVideoAction');
   }
 
   getTypePriority(): number {
@@ -414,162 +432,205 @@ export class ReplayManager {
     return cmd.name || `[${idx}]`;
   }
 
-  getVisibleCommand(timeMs: number, surroundings: Surrounding[]): number {
-    // Find the surrounding for this timeMs
-    const surrounding = surroundings.find(s => s.timeMs === timeMs);
-    if (!surrounding) return -1;
 
-    // Get all active commands (starting + ongoing)
-    const activeCommands = [...surrounding.starting, ...surrounding.ongoing];
+
+  private createOpEvts(enabledCommands: any[]): OpEvt[] {
+    const opEvts: OpEvt[] = [];
     
-    // Return the max commandIdx (highest precedence)
-    if (activeCommands.length === 0) return -1;
-    return Math.max(...activeCommands);
+    enabledCommands.forEach((cmd, idx) => {
+      const startTime = cmd.positionMs;
+      const videoDuration = cmd.endMs - cmd.startMs;
+      const rate = speedToRate(cmd.speed);
+      const actualDuration = videoDuration / rate;
+      const endTime = startTime + actualDuration;
+      const extendAudioSec = cmd.extendAudioSec || 0;
+      
+      if (extendAudioSec > 0) {
+        // Three events: start video, hide visual, pause video
+        opEvts.push(new OpEvt(OpType.START_VIDEO, startTime, idx));
+        opEvts.push(new OpEvt(OpType.HIDE_VISUAL, endTime, idx));
+        opEvts.push(new OpEvt(OpType.PAUSE_VIDEO, endTime + (extendAudioSec * 1000), idx));
+      } else {
+        // Two events: start video, pause video
+        opEvts.push(new OpEvt(OpType.START_VIDEO, startTime, idx));
+        opEvts.push(new OpEvt(OpType.PAUSE_VIDEO, endTime, idx));
+      }
+    });
+    
+    return opEvts;
+  }
+
+  private groupOpEvts(opEvts: OpEvt[]): OpEvtsGroup[] {
+    // Group by timeMs
+    const groupMap = new Map<number, OpEvt[]>();
+    
+    opEvts.forEach(evt => {
+      if (!groupMap.has(evt.timeMs)) {
+        groupMap.set(evt.timeMs, []);
+      }
+      groupMap.get(evt.timeMs)!.push(evt);
+    });
+    
+    // Convert to OpEvtsGroup array and sort by timeMs
+    const groups: OpEvtsGroup[] = [];
+    groupMap.forEach((evts, timeMs) => {
+      groups.push(new OpEvtsGroup(timeMs, evts));
+    });
+    
+    groups.sort((a, b) => a.timeMs - b.timeMs);
+    
+    return groups;
+  }
+
+  private populateOngoingCmdIndices(groups: OpEvtsGroup[]): void {
+    const oci = new Set<number>();
+    
+    groups.forEach(group => {
+      // Sort events: process HIDE_VISUAL and PAUSE_VIDEO before START_VIDEO to ensure correct state
+      const sortedEvts = [...group.opEvts].sort((a, b) => {
+        // Order: HIDE_VISUAL, PAUSE_VIDEO, then START_VIDEO
+        const order = { [OpType.HIDE_VISUAL]: 0, [OpType.PAUSE_VIDEO]: 1, [OpType.START_VIDEO]: 2 };
+        return order[a.opType] - order[b.opType];
+      });
+      
+      // Process events in this group
+      sortedEvts.forEach(evt => {
+        if (evt.opType === OpType.START_VIDEO) {
+          oci.add(evt.cmdIdx);
+        } else if (evt.opType === OpType.HIDE_VISUAL || evt.opType === OpType.PAUSE_VIDEO) {
+          // Remove from ongoing when visual is hidden or video is paused
+          oci.delete(evt.cmdIdx);
+        }
+      });
+      
+      // Copy current oci to this group
+      group.ongoingCmdIndices = new Set(oci);
+    });
+  }
+
+  private generatePlayVideoActions(groups: OpEvtsGroup[], enabledCommands: any[]): PlayVideoAction[] {
+    const actions: PlayVideoAction[] = [];
+    
+    groups.forEach(group => {
+      group.opEvts.forEach(evt => {
+        if (evt.opType === OpType.START_VIDEO) {
+          const cmd = enabledCommands[evt.cmdIdx];
+          const assetName = this.getCommandName(evt.cmdIdx);
+          const rate = speedToRate(cmd.speed);
+          actions.push(new PlayVideoAction(group.timeMs, evt.cmdIdx, assetName, cmd.volume, rate));
+        }
+      });
+    });
+    
+    return actions;
+  }
+
+  private generatePauseVideoActions(groups: OpEvtsGroup[]): PauseVideoAction[] {
+    const actions: PauseVideoAction[] = [];
+    
+    groups.forEach(group => {
+      group.opEvts.forEach(evt => {
+        if (evt.opType === OpType.PAUSE_VIDEO) {
+          const assetName = this.getCommandName(evt.cmdIdx);
+          actions.push(new PauseVideoAction(group.timeMs, evt.cmdIdx, assetName));
+        }
+      });
+    });
+    
+    return actions;
+  }
+
+  private generateDisplayActions(groups: OpEvtsGroup[]): DisplayAction[] {
+    const actions: DisplayAction[] = [];
+    
+    groups.forEach(group => {
+      const visibleCmdIdx = group.ongoingCmdIndices.size > 0 
+        ? Math.max(...Array.from(group.ongoingCmdIndices))
+        : -1;
+      
+      const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx) : '[Black Screen]';
+      actions.push(new DisplayAction(group.timeMs, visibleCmdIdx, assetName));
+    });
+    
+    return actions;
+  }
+
+
+
+  private generateOverlayActions(groups: OpEvtsGroup[], enabledCommands: any[]): OverlayAction[] {
+    const actions: OverlayAction[] = [];
+    
+    groups.forEach(group => {
+      const visibleCmdIdx = group.ongoingCmdIndices.size > 0 
+        ? Math.max(...Array.from(group.ongoingCmdIndices))
+        : -1;
+      
+      const overlays: Overlay[] = [];
+      Array.from(group.ongoingCmdIndices).forEach(cmdIdx => {
+        if (enabledCommands[cmdIdx].overlay) {
+          overlays.push(enabledCommands[cmdIdx].overlay);
+        }
+      });
+      
+      const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx) : '[Black Screen]';
+      actions.push(new OverlayAction(group.timeMs, visibleCmdIdx, assetName, overlays));
+    });
+    
+    return actions;
+  }
+
+  private removeEmptyOverlayActions(actions: OverlayAction[]): OverlayAction[] {
+    return actions.filter(action => action.overlays.length > 0);
+  }
+
+  private deduplicateDisplayActions(actions: DisplayAction[]): DisplayAction[] {
+    if (actions.length === 0) return actions;
+    
+    const deduplicated: DisplayAction[] = [actions[0]];
+    
+    for (let i = 1; i < actions.length; i++) {
+      const prev = deduplicated[deduplicated.length - 1];
+      const current = actions[i];
+      
+      // Only add if cmdIdx is different from previous
+      if (current.cmdIdx !== prev.cmdIdx) {
+        deduplicated.push(current);
+      }
+    }
+    
+    return deduplicated;
   }
 
   generateReplayPlan2(enabledCommands: any[]): PlanAction[] {
     if (!enabledCommands || enabledCommands.length === 0) return [];
 
-    // Step 1: Find all important points (start and end of each command)
-    // Also add audio-end points for commands with extendAudioSec > 0
-    const points = new Set<number>();
-    enabledCommands.forEach((cmd) => {
-      const startTime = cmd.positionMs;
-      const videoDuration = cmd.endMs - cmd.startMs;
-      const rate = speedToRate(cmd.speed);
-      const actualDuration = videoDuration / rate;
-      const endTime = cmd.positionMs + actualDuration;
-      const extendAudioSec = cmd.extendAudioSec || 0;
-      const audioEndTime = endTime + (extendAudioSec * 1000);
-      
-      points.add(startTime);
-      points.add(endTime);
-      if (extendAudioSec > 0) {
-        points.add(audioEndTime);
-      }
-    });
-
-    // Convert to sorted array
-    const sortedPoints = Array.from(points).sort((a, b) => a - b);
-
-    // Step 2: Create Surrounding objects for each time point
-    const surroundings: Surrounding[] = [];
+    // Create operation events
+    const opEvts = this.createOpEvts(enabledCommands);
     
-    sortedPoints.forEach((timeMs) => {
-      const starting: number[] = [];
-      const ongoing: number[] = [];
-      const ending: number[] = [];
-
-      enabledCommands.forEach((cmd, idx) => {
-        const startTime = cmd.positionMs;
-        const videoDuration = cmd.endMs - cmd.startMs;
-        const rate = speedToRate(cmd.speed);
-        const actualDuration = videoDuration / rate;
-        const endTime = cmd.positionMs + actualDuration;
-        const extendAudioSec = cmd.extendAudioSec || 0;
-        const audioEndTime = endTime + (extendAudioSec * 1000);
-
-        if (timeMs === startTime) {
-          starting.push(idx);
-        } else if (timeMs === endTime || (extendAudioSec > 0 && timeMs === audioEndTime)) {
-          // A command is ending if we're at its visual end OR its audio end
-          ending.push(idx);
-        } else if (timeMs > startTime && timeMs < audioEndTime) {
-          // A command is ongoing if we're between start and audio end (not just visual end)
-          ongoing.push(idx);
-        }
-      });
-
-      surroundings.push(new Surrounding(timeMs, starting, ongoing, ending));
-    });
-
-    // Step 3: Generate Plan Actions based on surroundings
-    const actions: PlanAction[] = [];
-
-    for (let i = 0; i < surroundings.length; i++) {
-      const current = surroundings[i];
-      
-      const visibleCmdIdx = this.getVisibleCommand(current.timeMs, surroundings);
-      
-      // Get all active commands (starting + ongoing)
-      const activeCommands = [...current.starting, ...current.ongoing];
-
-      // Check for commands that are ending but have extended audio
-      const endingWithAudio: number[] = [];
-      const audioEnding: number[] = [];
-      const regularEnding: number[] = [];
-      
-      current.ending.forEach((cmdIdx) => {
-        const cmd = enabledCommands[cmdIdx];
-        const extendAudioSec = cmd.extendAudioSec || 0;
-        const videoDuration = cmd.endMs - cmd.startMs;
-        const rate = speedToRate(cmd.speed);
-        const actualDuration = videoDuration / rate;
-        const endTime = cmd.positionMs + actualDuration;
-        const audioEndTime = endTime + (extendAudioSec * 1000);
-        
-        if (extendAudioSec > 0) {
-          // If we're at the visual end but before audio end, keep it in the list
-          if (current.timeMs === endTime && current.timeMs < audioEndTime) {
-            endingWithAudio.push(cmdIdx);
-          }
-          // If we're at the audio end, mark it for pausing
-          else if (current.timeMs === audioEndTime) {
-            audioEnding.push(cmdIdx);
-          }
-        } else {
-          // No extended audio, this is a regular ending
-          regularEnding.push(cmdIdx);
-        }
-      });
-
-      if (activeCommands.length === 0 && endingWithAudio.length === 0) {
-        // No active commands, show black screen
-        actions.push(new DisplayAction(current.timeMs, -1, '[Black Screen]'));
-      } else {
-        // Create PlayVideoAction for each starting command
-        current.starting.forEach((cmdIdx) => {
-          const cmd = enabledCommands[cmdIdx];
-          const assetName = this.getCommandName(cmdIdx);
-          const rate = speedToRate(cmd.speed);
-          actions.push(new PlayVideoAction(current.timeMs, cmdIdx, assetName, cmd.volume, rate));
-        });
-        
-        // Create OverlayAction with all overlays from active commands
-        const overlays: Overlay[] = [];
-        activeCommands.forEach((cmdIdx) => {
-          if (enabledCommands[cmdIdx].overlay) {
-            overlays.push(enabledCommands[cmdIdx].overlay);
-          }
-        });
-        if (overlays.length > 0) {
-          const assetName = this.getCommandName(visibleCmdIdx);
-          actions.push(new OverlayAction(current.timeMs, visibleCmdIdx, assetName, overlays));
-        }
-        
-        // Create DisplayAction for the visible command
-        if (visibleCmdIdx >= 0) {
-          const assetName = this.getCommandName(visibleCmdIdx);
-          actions.push(new DisplayAction(current.timeMs, visibleCmdIdx, assetName));
-        } else {
-          // No visible command, show black screen
-          actions.push(new DisplayAction(current.timeMs, -1, '[Black Screen]'));
-        }
-      }
-      
-      // Create PauseVideoAction for commands that are ending
-      // This includes both regular endings and audio endings
-      regularEnding.forEach((cmdIdx) => {
-        const assetName = this.getCommandName(cmdIdx);
-        actions.push(new PauseVideoAction(current.timeMs, cmdIdx, assetName));
-      });
-      
-      audioEnding.forEach((cmdIdx) => {
-        const assetName = this.getCommandName(cmdIdx);
-        actions.push(new PauseVideoAction(current.timeMs, cmdIdx, assetName));
-      });
-    }
-
+    // Group by timeMs and sort
+    const groups = this.groupOpEvts(opEvts);
+    
+    // Populate ongoing command indices
+    this.populateOngoingCmdIndices(groups);
+    
+    // Generate actions
+    const playActions = this.generatePlayVideoActions(groups, enabledCommands);
+    const pauseActions = this.generatePauseVideoActions(groups);
+    let displayActions = this.generateDisplayActions(groups);
+    let overlayActions = this.generateOverlayActions(groups, enabledCommands);
+    
+    // Clean up
+    displayActions = this.deduplicateDisplayActions(displayActions);
+    overlayActions = this.removeEmptyOverlayActions(overlayActions);
+    
+    // Merge all actions
+    const actions: PlanAction[] = [
+      ...playActions,
+      ...pauseActions,
+      ...displayActions,
+      ...overlayActions
+    ];
+    
     // Sort actions: ascending by replayPositionMs, then by type priority
     actions.sort((a, b) => {
       if (a.replayPositionMs !== b.replayPositionMs) {
@@ -578,7 +639,7 @@ export class ReplayManager {
       return a.getTypePriority() - b.getTypePriority();
     });
 
-    console.log('[Plan Generated] Replay plan:', JSON.stringify(actions, null, 2));
+    // console.log('[Plan Generated] Replay plan:', JSON.stringify(actions, null, 2));
     
     return actions;
   }
@@ -710,25 +771,39 @@ export class ReplayManager {
     const pauseActions = actions.filter(a => a instanceof PauseVideoAction) as PauseVideoAction[];
     const overlayActions = actions.filter(a => a instanceof OverlayAction) as OverlayAction[];
     
-    // Determine which iframe should be displayed
+    // Determine which iframe should be displayed (only if there's a DisplayAction)
     const displayAction = displayActions[0]; // Should only be one DisplayAction per time point
-    const visibleCmdIdx = displayAction ? displayAction.cmdIdx : -1;
     
-    // Show/hide black screen
-    if (this.blackDiv) {
-      if (debugMode) {
-        this.blackDiv.style.display = 'none';
-      } else {
-        const isBlackScreen = visibleCmdIdx === -1 || 
-          (visibleCmdIdx >= 0 && this.commands[visibleCmdIdx].asset === '');
-        this.blackDiv.style.display = isBlackScreen ? 'block' : 'none';
+    // Only update display if there's a DisplayAction
+    if (displayAction) {
+      const visibleCmdIdx = displayAction.cmdIdx;
+      
+      // Show/hide black screen
+      if (this.blackDiv) {
+        if (debugMode) {
+          this.blackDiv.style.display = 'none';
+        } else {
+          const isBlackScreen = visibleCmdIdx === -1 || 
+            (visibleCmdIdx >= 0 && this.commands[visibleCmdIdx].asset === '');
+          this.blackDiv.style.display = isBlackScreen ? 'block' : 'none';
+        }
       }
+      
+      // Show/hide iframes based on DisplayAction
+      this.players.forEach((_player, i) => {
+        const div = document.getElementById(`yt-player-edit-${i}`);
+        if (div) {
+          if (debugMode) {
+            div.style.display = 'block';
+          } else {
+            div.style.display = (i === visibleCmdIdx) ? 'block' : 'none';
+          }
+        }
+      });
     }
     
-    // Process each player
+    // Process play and pause actions
     this.players.forEach((player, i) => {
-      const div = document.getElementById(`yt-player-edit-${i}`);
-      
       // Check if this player should play from start
       const playAction = playActions.find(a => a.cmdIdx === i);
       if (playAction && player) {
@@ -744,15 +819,6 @@ export class ReplayManager {
       const pauseAction = pauseActions.find(a => a.cmdIdx === i);
       if (pauseAction && player) {
         player.pauseVideo();
-      }
-      
-      // Show/hide iframe based on DisplayAction
-      if (div) {
-        if (debugMode) {
-          div.style.display = 'block';
-        } else {
-          div.style.display = (i === visibleCmdIdx) ? 'block' : 'none';
-        }
       }
     });
     
@@ -937,6 +1003,9 @@ export class ReplayManager {
       // Get current time point and all actions at this time
       const currentTime = timePoints[timeIdx];
       const actions = plan.filter(a => a.replayPositionMs === currentTime);
+      
+      // Log actions being executed
+      console.log(`[nextStep] timeMs=${currentTime}, actions:`, JSON.stringify(actions, null, 2));
       
       // Move to next time point
       timeIdx++;
