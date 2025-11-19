@@ -16,8 +16,15 @@
 # m11d
 
 - Display Pos 0 and Pos 1
-  - Think of allowing editing Pos 0 and translating that to changing Start
-- Add links back to Dur
+- Allow editing Pos 0 of a subcommand row
+  - `enter` will open up a prompt with the computed value as in the cell and if the user change it, you will need to compute the corresponding startMs for the subcommand
+  - Make `alt+left` and `alt+right` work for subcommand rows at Pos 0 column as well
+
+# m11e
+- Fix replay at non-zero time (certain visuals are not displayed; I suspect some DisplayAction from before the resume time is skipped) 
+- Add links back to Dur by computing the footage end time in seconds (round down)
+- Add links for the subcommands based on the parent command
+- Allow edit
 - Add `d` shortcut to get debug info based on the current play
 
 

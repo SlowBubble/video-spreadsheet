@@ -266,10 +266,18 @@ export class Editor {
           return '';
         case 1: // Show subcommand name with indent
           return `  ↳ ${subCmd.name}`;
-        case 2: // Empty
-          return '';
-        case 3: // Empty
-          return '';
+        case 2: // Pos 0 (absolute start position in timeline)
+          // Calculate absolute position: parent's positionMs + offset adjusted for parent's speed
+          const rate = speedToRate(cmd.speed);
+          const subStartOffset = subCmd.startMs - cmd.startMs;
+          const subAbsoluteStart = cmd.positionMs + (subStartOffset / rate);
+          return msToTimeString(subAbsoluteStart, precision);
+        case 3: // Pos 1 (absolute end position in timeline)
+          // Calculate absolute end position
+          const rateEnd = speedToRate(cmd.speed);
+          const subEndOffset = subCmd.endMs - cmd.startMs;
+          const subAbsoluteEnd = cmd.positionMs + (subEndOffset / rateEnd);
+          return msToTimeString(subAbsoluteEnd, precision);
         case 4: // Start (relative to command)
           return msToTimeString(subCmd.startMs, precision);
         case 5: // Dur (duration of subcommand)
@@ -341,6 +349,21 @@ export class Editor {
       return cellValue;
     } else {
       // Subcommand row
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      
+      // For Pos 0 and Pos 1 columns, create clickable buttons
+      if (colIdx === 2 || colIdx === 3) {
+        const rate = speedToRate(cmd.speed);
+        const startOffset = subCmd.startMs - cmd.startMs;
+        const endOffset = subCmd.endMs - cmd.startMs;
+        const timeMs = colIdx === 2 
+          ? cmd.positionMs + (startOffset / rate)
+          : cmd.positionMs + (endOffset / rate);
+        const dimStyle = colIdx === 3 ? 'opacity: 0.5;' : '';
+        return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
+      }
+      
       // For Fill column, create a canvas with overlay preview
       if (colIdx === 9) {
         const canvasId = `fill-canvas-sub-${rowType.cmdIdx}-${rowType.subIdx}`;
@@ -828,6 +851,26 @@ export class Editor {
             // move away from the special columns (Pos 0 or Pos 1)
             this.selectedCol += 1;
           }
+        } else if (rowType && rowType.type === 'subcommand' && (this.selectedCol === 2 || this.selectedCol === 3)) {
+          const cmd = this.project.commands[rowType.cmdIdx];
+          const subCmd = cmd.subcommands[rowType.subIdx];
+          const rate = speedToRate(cmd.speed);
+          
+          if (this.selectedCol === 2) {
+            // Pos 0 column - use subcommand absolute start position
+            const startOffset = subCmd.startMs - cmd.startMs;
+            resumeTime = cmd.positionMs + (startOffset / rate) - offsetMs;
+            resumeTime = Math.max(resumeTime, 0);
+            // move away from the special columns (Pos 0 or Pos 1)
+            this.selectedCol -= 1;
+          } else if (this.selectedCol === 3) {
+            // Pos 1 column - use subcommand absolute end position
+            const endOffset = subCmd.endMs - cmd.startMs;
+            resumeTime = cmd.positionMs + (endOffset / rate) - offsetMs;
+            resumeTime = Math.max(resumeTime, 0);
+            // move away from the special columns (Pos 0 or Pos 1)
+            this.selectedCol += 1;
+          }
         }
         this.replayManager.startReplay(resumeTime, this.getEnabledCommands());
       }
@@ -1248,7 +1291,30 @@ export class Editor {
       const cmd = this.project.commands[rowType.cmdIdx];
       const subCmd = cmd.subcommands[rowType.subIdx];
       
-      if (this.selectedCol === 4) {
+      if (this.selectedCol === 2) {
+        // Pos 0 column - adjust absolute position
+        // Calculate current absolute position
+        const rate = speedToRate(cmd.speed);
+        const currentOffset = subCmd.startMs - cmd.startMs;
+        const currentAbsoluteStart = cmd.positionMs + (currentOffset / rate);
+        
+        // Apply delta to absolute position
+        const newAbsoluteStart = Math.max(0, currentAbsoluteStart + deltaMs);
+        
+        // Convert back to relative startMs
+        const newStartMs = cmd.startMs + (newAbsoluteStart - cmd.positionMs) * rate;
+        subCmd.startMs = Math.max(0, newStartMs);
+        
+        showBanner(`Subcommand Position: ${msToTimeString(newAbsoluteStart)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
+      } else if (this.selectedCol === 3) {
+        // Pos 1 column - not editable, do nothing
+        return;
+      } else if (this.selectedCol === 4) {
         // Start column
         subCmd.startMs = Math.max(0, subCmd.startMs + deltaMs);
         showBanner(`Subcommand Start: ${msToTimeString(subCmd.startMs)}`, {
@@ -1734,6 +1800,28 @@ export class Editor {
         if (newName !== null) {
           subCmd.name = newName;
         }
+      } else if (this.selectedCol === 2) {
+        // Pos 0 column - edit absolute start position
+        // Calculate current absolute position
+        const rate = speedToRate(cmd.speed);
+        const currentOffset = subCmd.startMs - cmd.startMs;
+        const currentAbsoluteStart = cmd.positionMs + (currentOffset / rate);
+        
+        const currentValue = msToEditString(currentAbsoluteStart);
+        const newValue = prompt('Edit Subcommand Absolute Position:', currentValue);
+        if (newValue !== null) {
+          const newAbsoluteStart = this.timeStringToMs(newValue);
+          // Convert absolute position back to relative startMs
+          // newAbsoluteStart = cmd.positionMs + (newStartMs - cmd.startMs) / rate
+          // newAbsoluteStart - cmd.positionMs = (newStartMs - cmd.startMs) / rate
+          // (newAbsoluteStart - cmd.positionMs) * rate = newStartMs - cmd.startMs
+          // newStartMs = cmd.startMs + (newAbsoluteStart - cmd.positionMs) * rate
+          const newStartMs = cmd.startMs + (newAbsoluteStart - cmd.positionMs) * rate;
+          subCmd.startMs = newStartMs;
+        }
+      } else if (this.selectedCol === 3) {
+        // Pos 1 column - not editable (calculated value)
+        return;
       } else if (this.selectedCol === 4) {
         // Start column - edit subcommand start time
         const currentValue = msToEditString(subCmd.startMs);
@@ -2049,7 +2137,9 @@ export class Editor {
       borderFilter = new BorderFilter(
         overlay.borderFilter.topMarginPct,
         overlay.borderFilter.bottomMarginPct,
-        overlay.borderFilter.fillStyle
+        overlay.borderFilter.fillStyle,
+        overlay.borderFilter.leftMarginPct || 0,
+        overlay.borderFilter.rightMarginPct || 0
       );
     }
     

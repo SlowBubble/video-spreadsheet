@@ -148,7 +148,9 @@ export class Project {
           borderFilter = new BorderFilter(
             cmd.overlay.borderFilter.topMarginPct,
             cmd.overlay.borderFilter.bottomMarginPct,
-            cmd.overlay.borderFilter.fillStyle
+            cmd.overlay.borderFilter.fillStyle,
+            cmd.overlay.borderFilter.leftMarginPct || 0,
+            cmd.overlay.borderFilter.rightMarginPct || 0
           );
         }
         
@@ -182,7 +184,9 @@ export class Project {
               borderFilter = new BorderFilter(
                 sub.overlay.borderFilter.topMarginPct,
                 sub.overlay.borderFilter.bottomMarginPct,
-                sub.overlay.borderFilter.fillStyle
+                sub.overlay.borderFilter.fillStyle,
+                sub.overlay.borderFilter.leftMarginPct || 0,
+                sub.overlay.borderFilter.rightMarginPct || 0
               );
             }
             
@@ -267,7 +271,9 @@ export class TopLevelProject {
               borderFilter = new BorderFilter(
                 cmd.overlay.borderFilter.topMarginPct,
                 cmd.overlay.borderFilter.bottomMarginPct,
-                cmd.overlay.borderFilter.fillStyle
+                cmd.overlay.borderFilter.fillStyle,
+                cmd.overlay.borderFilter.leftMarginPct || 0,
+                cmd.overlay.borderFilter.rightMarginPct || 0
               );
             }
             
@@ -300,7 +306,9 @@ export class TopLevelProject {
                   borderFilter = new BorderFilter(
                     sub.overlay.borderFilter.topMarginPct,
                     sub.overlay.borderFilter.bottomMarginPct,
-                    sub.overlay.borderFilter.fillStyle
+                    sub.overlay.borderFilter.fillStyle,
+                    sub.overlay.borderFilter.leftMarginPct || 0,
+                    sub.overlay.borderFilter.rightMarginPct || 0
                   );
                 }
                 
@@ -362,7 +370,9 @@ export class TopLevelProject {
             borderFilter = new BorderFilter(
               cmd.overlay.borderFilter.topMarginPct,
               cmd.overlay.borderFilter.bottomMarginPct,
-              cmd.overlay.borderFilter.fillStyle
+              cmd.overlay.borderFilter.fillStyle,
+              cmd.overlay.borderFilter.leftMarginPct || 0,
+              cmd.overlay.borderFilter.rightMarginPct || 0
             );
           }
           
@@ -395,7 +405,9 @@ export class TopLevelProject {
                 borderFilter = new BorderFilter(
                   sub.overlay.borderFilter.topMarginPct,
                   sub.overlay.borderFilter.bottomMarginPct,
-                  sub.overlay.borderFilter.fillStyle
+                  sub.overlay.borderFilter.fillStyle,
+                  sub.overlay.borderFilter.leftMarginPct || 0,
+                  sub.overlay.borderFilter.rightMarginPct || 0
                 );
               }
               

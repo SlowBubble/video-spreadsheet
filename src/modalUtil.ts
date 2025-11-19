@@ -102,7 +102,7 @@ export function showTextareaModal(options: TextareaModalOptions): void {
   const closeModal = () => {
     onModalStateChange(false);
     document.body.removeChild(modal);
-    document.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keydown', handleKeyDown, true);
   };
 
   cancelBtn.onclick = closeModal;
@@ -113,10 +113,15 @@ export function showTextareaModal(options: TextareaModalOptions): void {
   };
 
   // Close modal on Escape key, save on Shift+Enter
+  // Use capture phase (true) to intercept events before they reach the editor
   const handleKeyDown = (e: KeyboardEvent) => {
+    // Stop propagation to prevent editor's window listener from receiving the event
+    e.stopPropagation();
+    
     const shiftEnter = e.key === 'Enter' && e.shiftKey;
     const cmdEnter = e.key === 'Enter' && e.metaKey;
     if (e.key === 'Escape') {
+      e.preventDefault();
       closeModal();
     } else if (shiftEnter || cmdEnter) {
       e.preventDefault();
@@ -124,7 +129,8 @@ export function showTextareaModal(options: TextareaModalOptions): void {
       closeModal();
     }
   };
-  document.addEventListener('keydown', handleKeyDown);
+  // Add listener in capture phase to intercept before bubbling to window
+  window.addEventListener('keydown', handleKeyDown, true);
 
   buttonContainer.appendChild(cancelBtn);
   buttonContainer.appendChild(saveBtn);
