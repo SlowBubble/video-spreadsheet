@@ -37,11 +37,15 @@ export class FullScreenFilter {
 export class BorderFilter {
   topMarginPct: number;
   bottomMarginPct: number;
+  leftMarginPct: number;
+  rightMarginPct: number;
   fillStyle: string;
 
-  constructor(topMarginPct: number, bottomMarginPct: number, fillStyle: string) {
+  constructor(topMarginPct: number, bottomMarginPct: number, fillStyle: string, leftMarginPct: number = 0, rightMarginPct: number = 0) {
     this.topMarginPct = topMarginPct;
     this.bottomMarginPct = bottomMarginPct;
+    this.leftMarginPct = leftMarginPct;
+    this.rightMarginPct = rightMarginPct;
     this.fillStyle = fillStyle;
   }
 }

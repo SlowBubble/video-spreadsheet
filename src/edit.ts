@@ -402,10 +402,16 @@ export class Editor {
     if (overlay.borderFilter) {
       const topHeight = (canvas.height * overlay.borderFilter.topMarginPct) / 100;
       const bottomHeight = (canvas.height * overlay.borderFilter.bottomMarginPct) / 100;
+      const leftWidth = (canvas.width * overlay.borderFilter.leftMarginPct) / 100;
+      const rightWidth = (canvas.width * overlay.borderFilter.rightMarginPct) / 100;
       
       ctx.fillStyle = overlay.borderFilter.fillStyle;
+      // Draw top and bottom borders
       ctx.fillRect(0, 0, canvas.width, topHeight);
       ctx.fillRect(0, canvas.height - bottomHeight, canvas.width, bottomHeight);
+      // Draw left and right borders
+      ctx.fillRect(0, 0, leftWidth, canvas.height);
+      ctx.fillRect(canvas.width - rightWidth, 0, rightWidth, canvas.height);
     }
     
     // Draw text if present
@@ -835,6 +841,8 @@ export class Editor {
       this.cycleFullScreenFilter();
     } else if (matchKey(e, 'b')) {
       this.toggleBorderFilter();
+    } else if (matchKey(e, 'v')) {
+      this.toggleLeftRightBorderFilter();
     } else if (matchKey(e, 'a')) {
       this.toggleTextAlignment();
     } else if (matchKey(e, 't')) {
@@ -974,6 +982,60 @@ export class Editor {
         const nextPct = percentageOptions[currentIndex + 1];
         overlay.borderFilter = new BorderFilter(nextPct, nextPct, fillStyle);
         this.showFilterBanner(`Border Filter: ${nextPct}%`);
+      }
+    }
+  }
+
+  toggleLeftRightBorderFilter() {
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
+    
+    // Cycle through percentage options, then remove
+    const percentageOptions = [4, 8];
+    const fillStyle = 'rgba(0, 0, 0, 0.1)';
+    
+    let overlay: Overlay;
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      overlay = ensureOverlay(cmd);
+    } else {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      if (!subCmd.overlay) {
+        subCmd.overlay = new Overlay();
+      }
+      overlay = subCmd.overlay;
+    }
+    
+    if (!overlay.borderFilter) {
+      // Start with first option - create border filter with left/right margins
+      overlay.borderFilter = new BorderFilter(0, 0, fillStyle, percentageOptions[0], percentageOptions[0]);
+      this.showFilterBanner(`Left/Right Border Filter: ${percentageOptions[0]}%`);
+    } else if (overlay.borderFilter.leftMarginPct === 0 && overlay.borderFilter.rightMarginPct === 0) {
+      // No left/right borders yet, add them
+      overlay.borderFilter.leftMarginPct = percentageOptions[0];
+      overlay.borderFilter.rightMarginPct = percentageOptions[0];
+      this.showFilterBanner(`Left/Right Border Filter: ${percentageOptions[0]}%`);
+    } else {
+      // Find current percentage and move to next
+      const currentPct = overlay.borderFilter.leftMarginPct;
+      const currentIndex = percentageOptions.indexOf(currentPct);
+      
+      if (currentIndex === -1 || currentIndex === percentageOptions.length - 1) {
+        // If not found or at last option, remove left/right filter
+        overlay.borderFilter.leftMarginPct = 0;
+        overlay.borderFilter.rightMarginPct = 0;
+        // If no top/bottom borders either, remove the entire filter
+        if (overlay.borderFilter.topMarginPct === 0 && overlay.borderFilter.bottomMarginPct === 0) {
+          overlay.borderFilter = undefined;
+        }
+        this.showFilterBanner('Left/Right Border Filter: OFF');
+      } else {
+        // Move to next option
+        const nextPct = percentageOptions[currentIndex + 1];
+        overlay.borderFilter.leftMarginPct = nextPct;
+        overlay.borderFilter.rightMarginPct = nextPct;
+        this.showFilterBanner(`Left/Right Border Filter: ${nextPct}%`);
       }
     }
   }

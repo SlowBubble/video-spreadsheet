@@ -160,7 +160,7 @@ export class ReplayManager {
     ctx.fillRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
   }
 
-  drawBorderFilter(topMarginPct: number, bottomMarginPct: number, fillStyle: string) {
+  drawBorderFilter(topMarginPct: number, bottomMarginPct: number, fillStyle: string, leftMarginPct: number = 0, rightMarginPct: number = 0) {
     if (!this.overlayCanvas) return;
     const ctx = this.overlayCanvas.getContext('2d');
     if (!ctx) return;
@@ -168,14 +168,23 @@ export class ReplayManager {
     const canvasHeight = this.overlayCanvas.height;
     const canvasWidth = this.overlayCanvas.width;
     
+    ctx.fillStyle = fillStyle;
+    
     // Draw top rectangle
     const topHeight = (canvasHeight * topMarginPct) / 100;
-    ctx.fillStyle = fillStyle;
     ctx.fillRect(0, 0, canvasWidth, topHeight);
     
     // Draw bottom rectangle
     const bottomHeight = (canvasHeight * bottomMarginPct) / 100;
     ctx.fillRect(0, canvasHeight - bottomHeight, canvasWidth, bottomHeight);
+    
+    // Draw left rectangle
+    const leftWidth = (canvasWidth * leftMarginPct) / 100;
+    ctx.fillRect(0, 0, leftWidth, canvasHeight);
+    
+    // Draw right rectangle
+    const rightWidth = (canvasWidth * rightMarginPct) / 100;
+    ctx.fillRect(canvasWidth - rightWidth, 0, rightWidth, canvasHeight);
   }
 
   drawText(content: string, alignment: string = 'upper-left') {
@@ -278,7 +287,9 @@ export class ReplayManager {
         this.drawBorderFilter(
           overlay.borderFilter.topMarginPct,
           overlay.borderFilter.bottomMarginPct,
-          overlay.borderFilter.fillStyle
+          overlay.borderFilter.fillStyle,
+          overlay.borderFilter.leftMarginPct || 0,
+          overlay.borderFilter.rightMarginPct || 0
         );
       }
       

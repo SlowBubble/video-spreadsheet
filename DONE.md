@@ -12,6 +12,51 @@
 
 See SUBCOMMAND_IMPLEMENTATION.md for full implementation details.
 
+
+# m10d (done)
+Rewrite plan generation (note that the behavior should not change, so if I'm missing any info propagation, feel free to add them as needed to ensure the behavior stays the same):
+- Create a class OpEvtsGroup with OpEvt[] field OpEvts and field ongoingCmdIndices (a set of numbers) where class OpEvt has fields isStart, timeMs and mediaType (enum AUDIO, VISUAL, AUDIO_AND_VISUAL)
+- (Do this in a private method) Process the commands being passed into 2 OpEvt each, and then group them by timeMs and sort the resulting OpEvtsGroup[] groups by ascending timeMs.
+  - If there is extendAudioSec, there should be 3 events (first start AUDIO_AND_VISUAL, then stop VISUAL, then stop AUDIO_AND_VISUAL)
+- (Do this in a private method) Go thru the groups and populate the ongoingCmdIndices (oci) set for each group.
+    - The cmdIdx is defined as the index of the commands.
+    - When passing the start of 1 or more commands, add them to oci
+    - When passing the end of 1 or more commands, remove them to oci
+- (Do this in a private method) Generate PlayVideoAction[].
+- (Do this in a private method) Generate PauseVideoAction[].
+- (Do this in a private method) Generate DisplayAction[], by using the max of the oci for each group.
+  - Have a clean up step where if consecutive display actions have the same cmdIdx deduplicate (the reason to break it up into a separate step is to keep generation logic simple, i.e. only depend on info for a single group)
+- (Do this in a private method) Generate OverlayAction, appending the overlay for cmdIdx being max of oci, 1 per group (okay to have empty overlay).
+  - Have a clean up step where if overlay actions have empty overlay, remove that action
+- Merge them together using the existing sorting impl.
+
+# m10c (done)
+- Change OverlayAction to use a list of overlays instead of 1 overlay
+  - The replayer will then draw the on the canvas by following all the overlays instruction.
+
+# m10b (done)
+- Break PlanAction into these types:
+  1. PlayVideoAction
+    - volume
+    - playbackRate
+  2. OverlayAction. Fields
+    - overlay
+  3. DisplayAction (decide which youtube player iframe to display and the rest will be hidden)
+  4. PauseVideoAction
+- All of them will have these fields, so may just have PlanAction be an abstract class for them to inherit from to have these fields:
+  - replayPositionMs
+  - cmdIdx
+  - debugAssetName (originally assetName; this is just needed to help with debugging, not actually needed for replay)
+- Preserve the existing replay behavior after these changes (the original spec is in `m5o` in DONE.md). Feel free to add extra fields if the ones above are not sufficient to make everything work.
+- Before executing the actions, may sure they are sorted:
+  - ascending in replayPositionMs
+  - if replayPositionMs is tied, sort them in the above listed order (PlayVideoAction first, OverlayAction etc.)
+
+
+# m10a
+- Rename start to replayStartMs and end to replayEndMs within PlanAction and its usages.
+
+
 # m9e (done)
 - Disable replay until players loading is complete. If the user try to replay before that, display a banner that says "Loading is not finished."
 
