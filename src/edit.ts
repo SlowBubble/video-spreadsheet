@@ -1776,13 +1776,7 @@ export class Editor {
         });
       } else if (this.selectedCol === 9) {
         // Fill column - edit subcommand overlay
-        // TODO: implement showOverlayModal for subcommands
-        showBanner('Subcommand overlay editing not yet implemented', {
-          id: 'subcommand-overlay-banner',
-          position: 'bottom',
-          color: 'yellow',
-          duration: 1500
-        });
+        this.showOverlayModal();
       }
     } else if (isEmpty) {
       // Empty row - only allow creating new command in Asset column
@@ -2125,7 +2119,9 @@ export class Editor {
               borderFilter = new BorderFilter(
                 newOverlayData.borderFilter.topMarginPct,
                 newOverlayData.borderFilter.bottomMarginPct,
-                newOverlayData.borderFilter.fillStyle
+                newOverlayData.borderFilter.fillStyle,
+                newOverlayData.borderFilter.leftMarginPct || 0,
+                newOverlayData.borderFilter.rightMarginPct || 0
               );
             }
             

@@ -9,8 +9,9 @@
   - will use mouse drag later.
 
 
-# m11c
+# m11c (done)
 - subcommand editing for the Fill column
+  - mouse double-click or `enter`
 
 # m11d
 
