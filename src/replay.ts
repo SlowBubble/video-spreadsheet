@@ -54,11 +54,11 @@ class PlayVideoAction extends PlanAction {
 }
 
 class OverlayAction extends PlanAction {
-  overlay: Overlay;
+  overlays: Overlay[];
 
-  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, overlay: Overlay) {
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, overlays: Overlay[]) {
     super(replayPositionMs, cmdIdx, debugAssetName);
-    this.overlay = overlay;
+    this.overlays = overlays;
   }
 
   getTypePriority(): number {
@@ -242,30 +242,33 @@ export class ReplayManager {
     });
   }
 
-  updateOverlay(overlay?: Overlay) {
+  updateOverlay(overlays: Overlay[]) {
     // Clear canvas first
     this.clearOverlay();
     
-    if (!overlay) return;
+    if (overlays.length === 0) return;
     
-    // Draw fullScreenFilter if present
-    if (overlay.fullScreenFilter) {
-      this.drawFullScreenFilter(overlay.fullScreenFilter.fillStyle);
-    }
-    
-    // Draw borderFilter if present (on top of fullScreenFilter if both exist)
-    if (overlay.borderFilter) {
-      this.drawBorderFilter(
-        overlay.borderFilter.topMarginPct,
-        overlay.borderFilter.bottomMarginPct,
-        overlay.borderFilter.fillStyle
-      );
-    }
-    
-    // Draw text if present (on top of filters)
-    if (overlay.textDisplay && overlay.textDisplay.content) {
-      this.drawText(overlay.textDisplay.content, overlay.textDisplay.alignment);
-    }
+    // Draw all overlays in order
+    overlays.forEach(overlay => {
+      // Draw fullScreenFilter if present
+      if (overlay.fullScreenFilter) {
+        this.drawFullScreenFilter(overlay.fullScreenFilter.fillStyle);
+      }
+      
+      // Draw borderFilter if present (on top of fullScreenFilter if both exist)
+      if (overlay.borderFilter) {
+        this.drawBorderFilter(
+          overlay.borderFilter.topMarginPct,
+          overlay.borderFilter.bottomMarginPct,
+          overlay.borderFilter.fillStyle
+        );
+      }
+      
+      // Draw text if present (on top of filters)
+      if (overlay.textDisplay && overlay.textDisplay.content) {
+        this.drawText(overlay.textDisplay.content, overlay.textDisplay.alignment);
+      }
+    });
   }
 
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
@@ -532,10 +535,16 @@ export class ReplayManager {
           actions.push(new PlayVideoAction(current.timeMs, cmdIdx, assetName, cmd.volume, rate));
         });
         
-        // Create OverlayAction if the visible command has an overlay
-        if (visibleCmdIdx >= 0 && enabledCommands[visibleCmdIdx].overlay) {
+        // Create OverlayAction with all overlays from active commands
+        const overlays: Overlay[] = [];
+        activeCommands.forEach((cmdIdx) => {
+          if (enabledCommands[cmdIdx].overlay) {
+            overlays.push(enabledCommands[cmdIdx].overlay);
+          }
+        });
+        if (overlays.length > 0) {
           const assetName = this.getCommandName(visibleCmdIdx);
-          actions.push(new OverlayAction(current.timeMs, visibleCmdIdx, assetName, enabledCommands[visibleCmdIdx].overlay));
+          actions.push(new OverlayAction(current.timeMs, visibleCmdIdx, assetName, overlays));
         }
         
         // Create DisplayAction for the visible command
@@ -749,7 +758,7 @@ export class ReplayManager {
     
     // Update overlay based on OverlayAction
     const overlayAction = overlayActions[0]; // Should only be one OverlayAction per time point
-    this.updateOverlay(overlayAction?.overlay);
+    this.updateOverlay(overlayAction?.overlays || []);
   }
 
   seekAndPlayAllActiveVideos(resumeFromMs: number, visibleIdx: number, enabledCommands: any[]) {

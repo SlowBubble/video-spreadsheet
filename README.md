@@ -2,12 +2,12 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# m10c
+# m10c (done)
 - Change OverlayAction to use a list of overlays instead of 1 overlay
   - The replayer will then draw the on the canvas by following all the overlays instruction.
 
 # m10d
-Rewrite plan generation:
+Rewrite plan generation (note that the behavior should not change, so if I'm missing any info propagation, feel free to add them as needed to ensure the behavior stays the same):
 - Create a class OpEvtsGroup with OpEvt[] field OpEvts and field ongoingCmdIndices (a set of numbers) where class OpEvt has fields isStart, timeMs and mediaType (enum AUDIO, VISUAL, AUDIO_AND_VISUAL)
 - (Do this in a private method) Process the commands being passed into 2 OpEvt each, and then group them by timeMs and sort the resulting OpEvtsGroup[] groups by ascending timeMs.
   - If there is extendAudioSec, there should be 3 events (first start AUDIO_AND_VISUAL, then stop VISUAL, then stop AUDIO_AND_VISUAL)
