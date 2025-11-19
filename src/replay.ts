@@ -23,8 +23,8 @@ export class Surrounding {
 }
 
 export class PlanAction {
-  start: number;
-  end: number;
+  replayPositionStartMs: number;
+  replayPositionEndMs: number;
   cmdIdx: number; // Command index in original project commands array (-1 for black screen)
   playFromStart: boolean; // Start this video from beginning
   showVideo: boolean; // Show this video's iframe
@@ -33,8 +33,8 @@ export class PlanAction {
   pauseVideo: boolean; // Whether to pause this video when it's not in the active list
 
   constructor(
-    start: number,
-    end: number,
+    replayPositionStartMs: number,
+    replayPositionEndMs: number,
     cmdIdx: number,
     playFromStart: boolean,
     showVideo: boolean,
@@ -42,8 +42,8 @@ export class PlanAction {
     overlay?: Overlay,
     pauseVideo: boolean = true
   ) {
-    this.start = start;
-    this.end = end;
+    this.replayPositionStartMs = replayPositionStartMs;
+    this.replayPositionEndMs = replayPositionEndMs;
     this.cmdIdx = cmdIdx;
     this.playFromStart = playFromStart;
     this.showVideo = showVideo;
@@ -820,16 +820,16 @@ export class ReplayManager {
       const truncatedPlan: PlanAction[] = [];
       
       for (const action of plan) {
-        if (action.start >= endMs) {
+        if (action.replayPositionStartMs >= endMs) {
           // Action starts at or after endMs, skip it
           break;
-        } else if (action.end <= endMs) {
+        } else if (action.replayPositionEndMs <= endMs) {
           // Action ends before endMs, keep it as is
           truncatedPlan.push(action);
         } else {
           // Action spans across endMs, truncate it
           truncatedPlan.push(new PlanAction(
-            action.start,
+            action.replayPositionStartMs,
             endMs,
             action.cmdIdx,
             action.playFromStart,
@@ -859,7 +859,7 @@ export class ReplayManager {
     
     if (plan.length === 0) return;
     
-    const endTime = plan[plan.length - 1].start;
+    const endTime = plan[plan.length - 1].replayPositionStartMs;
     
     // If resuming from or past the end, restart from beginning
     if (resumeFromMs !== undefined && resumeFromMs >= endTime) {
@@ -868,24 +868,24 @@ export class ReplayManager {
     
     // Subtask 3.3: Find the starting step for resume
     let startStep = 0;
-    let initialDelay = plan.length > 0 ? plan[0].start : 0;
+    let initialDelay = plan.length > 0 ? plan[0].replayPositionStartMs : 0;
     
     if (resumeFromMs !== undefined && resumeFromMs > 0) {
       // Find the plan step where resumeFromMs falls
       for (let i = 0; i < plan.length; i++) {
-        if (plan[i].start <= resumeFromMs && resumeFromMs < plan[i].end) {
+        if (plan[i].replayPositionStartMs <= resumeFromMs && resumeFromMs < plan[i].replayPositionEndMs) {
           // Found a matching action, but we need to find the FIRST action at this time point
           // (since multiple actions can have the same start time)
-          const matchingTime = plan[i].start;
-          while (startStep < i && plan[startStep].start === matchingTime) {
+          const matchingTime = plan[i].replayPositionStartMs;
+          while (startStep < i && plan[startStep].replayPositionStartMs === matchingTime) {
             startStep++;
           }
-          if (plan[startStep].start !== matchingTime) {
+          if (plan[startStep].replayPositionStartMs !== matchingTime) {
             startStep = i;
           }
           // Actually, let's just find the first action with this start time
           startStep = i;
-          while (startStep > 0 && plan[startStep - 1].start === matchingTime) {
+          while (startStep > 0 && plan[startStep - 1].replayPositionStartMs === matchingTime) {
             startStep--;
           }
           initialDelay = 0; // Start immediately when resuming
@@ -917,7 +917,7 @@ export class ReplayManager {
     
     // Update replayStart and replayOffset for position tracking
     this.replayStart = Date.now();
-    this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (plan.length > 0 ? plan[0].start : 0);
+    this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (plan.length > 0 ? plan[0].replayPositionStartMs : 0);
     
     const updatePositionDisplay = () => {
       if (hideTime) return;
@@ -947,9 +947,9 @@ export class ReplayManager {
       const isStartingStep = (step === startStep);
       
       // Group actions by time point (all actions with the same start time)
-      const currentTime = plan[step].start;
+      const currentTime = plan[step].replayPositionStartMs;
       const actions: PlanAction[] = [];
-      while (step < plan.length && plan[step].start === currentTime) {
+      while (step < plan.length && plan[step].replayPositionStartMs === currentTime) {
         actions.push(plan[step]);
         step++;
       }
@@ -959,8 +959,8 @@ export class ReplayManager {
       // Handle automatic pause at playback end
       // When reaching the final black screen step, pause at that position
       if (step >= plan.length && action.cmdIdx === -1) {
-        // TODO see whether to use action.start or action.end here to be correct.
-        this.pausedAtMs = action.end;
+        // TODO see whether to use action.replayPositionStartMs or action.replayPositionEndMs here to be correct.
+        this.pausedAtMs = action.replayPositionEndMs;
         this.isPlaying = false;
         this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
         this._intervalId && clearInterval(this._intervalId);
@@ -981,14 +981,14 @@ export class ReplayManager {
       }
       
       // Subtask 3.3: Calculate remaining duration for the current step when resuming
-      const isResumingMidStep = isStartingStep && resumeFromMs !== undefined && resumeFromMs > action.start;
-      let stepDuration = action.end - action.start;
+      const isResumingMidStep = isStartingStep && resumeFromMs !== undefined && resumeFromMs > action.replayPositionStartMs;
+      let stepDuration = action.replayPositionEndMs - action.replayPositionStartMs;
       if (isResumingMidStep && resumeFromMs !== undefined) {
-        stepDuration = action.end - resumeFromMs;
+        stepDuration = action.replayPositionEndMs - resumeFromMs;
       }
       
       this.replayStart = Date.now();
-      this.replayOffset = (isResumingMidStep && resumeFromMs !== undefined) ? resumeFromMs : action.start;
+      this.replayOffset = (isResumingMidStep && resumeFromMs !== undefined) ? resumeFromMs : action.replayPositionStartMs;
       
       // Find which video should be visible and check for black screen
       const visibleAction = actions.find(a => a.showVideo);

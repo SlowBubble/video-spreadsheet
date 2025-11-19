@@ -1,5 +1,24 @@
 
 
+# m11
+- Make subcommands work for overlay
+
+## m11a
+- Define its own class called Subcommand with these fields
+```
+  startMs: number;
+  endMs: number;
+  name: string;
+  overlay?: Overlay;
+```
+- Add a field, subcommands of type []Subcommand to ProjectCommand
+  - Make persisting subcommands work (serialize to and deserialize from JSON string)
+- How to add a subcommand in the UI?
+  - When the user press `cmd+enter` for a row that is a command, add a subcommand with the following fields:
+    - startMs: same as startMs of the command
+    - endMs: same as endMs of the command
+- How to interpret a subcommand? Convert the subcommand to a command, so that it can just be
+
 # Wishlist
 
 P1:

@@ -2,7 +2,11 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
+# m10
+Clean up PlanAction
 
+# m10a
+- Rename start to replayStartMs and end to replayEndMs within PlanAction and its usages.
 
 # wishlist
 - better shortcuts for borders in various directions.
@@ -19,5 +23,4 @@
   - remove tether if the 2 rows have
 - Load a bigger window so that the players don't constantly need to reload
   - Test with just the entire player window
-- Make subcommands work for overlay
 - Need to migrate from startMs to inputStartMs and endMs to inputEndMs, and positionMs to outputStartMs
