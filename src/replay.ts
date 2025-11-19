@@ -22,7 +22,7 @@ export class Surrounding {
   }
 }
 
-export class PlanAction {
+class PlanAction {
   replayPositionStartMs: number;
   replayPositionEndMs: number;
   cmdIdx: number; // Command index in original project commands array (-1 for black screen)

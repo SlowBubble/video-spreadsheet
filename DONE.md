@@ -214,7 +214,6 @@ E.g. playVideoFromStart without resumeVisual means the viewer will just hear the
 E.g. resumeVisual without playVideoFromStart means the video will be visible again, but not restarting because it is previously playing in the background
 
 # m5o
-
 At this point it is simpler to rewrite generateReplayPlan in a separate method, called generateReplayPlan2
 - Given the commands from the project, we know the commandIdx for each command is 0, 1, 2, etc. This is used to determine precedence for what is visible (higher commandIdx, higher precendence when there is overlap)
 - Find all the important points:

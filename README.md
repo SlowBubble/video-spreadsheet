@@ -5,10 +5,30 @@
 # m10
 Clean up PlanAction
 
+# m10b
+- Break PlanAction into these types:
+  1. PlayVideoAction
+    - volume
+    - playbackRate
+  2. OverlayAction. Fields
+    - overlay
+  3. DisplayAction (decide which youtube player iframe to display and the rest will be hidden)
+  4. PauseVideoAction
+- All of them will have these fields, so may just have PlanAction be an abstract class for them to inherit from to have these fields:
+  - replayPositionMs
+  - cmdIdx
+  - debugAssetName (originally assetName; this is just needed to help with debugging, not actually needed for replay)
+- Preserve the existing replay behavior after these changes (the original spec is in `m5o` in DONE.md). Feel free to add extra fields if the ones above are not sufficient to make everything work.
+- Before executing the actions, may sure they are sorted:
+  - ascending in replayPositionMs
+  - if replayPositionMs is tied, sort them in the above listed order (PlayVideoAction first, OverlayAction etc.)
+
+
 # m10a
 - Rename start to replayStartMs and end to replayEndMs within PlanAction and its usages.
 
 # wishlist
+- Consider getting rid of cmdIdx once we have a good way to id things (may be use name + id to identify html elements to avoid dealing with cmdIdx)
 - better shortcuts for borders in various directions.
   - shift+arrow to increase border, shift+cmd+arrow to decrease border
   - o to cycle through opacity [0.25, 0.5, 1], defaulting to 1.
