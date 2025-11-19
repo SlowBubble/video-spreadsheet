@@ -1,4 +1,4 @@
-export type TextAlignment = 'upper-left' | 'lower-left' | 'upper-right' | 'lower-right' | 'center';
+export type TextAlignment = 'upper-left' | 'lower-left' | 'upper-right' | 'lower-right' | 'center' | 'lower-center' | 'upper-center';
 
 export class TextDisplay {
   content: string;
@@ -6,7 +6,7 @@ export class TextDisplay {
 
   constructor(content: string, alignment?: TextAlignment) {
     this.content = content;
-    this.alignment = alignment || 'lower-left';
+    this.alignment = alignment || 'lower-center';
   }
 }
 

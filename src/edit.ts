@@ -375,6 +375,16 @@ export class Editor {
           y = (canvas.height - textHeight - padding * 2) / 2;
           ctx.textBaseline = 'top';
           break;
+        case 'lower-center':
+          x = (canvas.width - textWidth - padding * 2) / 2;
+          y = canvas.height - margin - textHeight - padding * 2;
+          ctx.textBaseline = 'top';
+          break;
+        case 'upper-center':
+          x = (canvas.width - textWidth - padding * 2) / 2;
+          y = margin;
+          ctx.textBaseline = 'top';
+          break;
         default:
           x = margin;
           y = margin;
@@ -859,11 +869,13 @@ export class Editor {
       return;
     }
     
-    const alignments: Array<'upper-left' | 'lower-left' | 'upper-right' | 'lower-right' | 'center'> = [
+    const alignments: Array<'upper-left' | 'lower-left' | 'upper-right' | 'lower-right' | 'center' | 'lower-center' | 'upper-center'> = [
       'lower-left',
-      'center',
+      'lower-center',
       'lower-right',
+      'center',
       'upper-right',
+      'upper-center',
       'upper-left',
     ];
     

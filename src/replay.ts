@@ -183,6 +183,16 @@ export class ReplayManager {
         y = (this.overlayCanvas.height - textHeight - padding * 2) / 2;
         ctx.textBaseline = 'top';
         break;
+      case 'lower-center':
+        x = (this.overlayCanvas.width - textWidth - padding * 2) / 2;
+        y = this.overlayCanvas.height - margin - textHeight - padding * 2;
+        ctx.textBaseline = 'top';
+        break;
+      case 'upper-center':
+        x = (this.overlayCanvas.width - textWidth - padding * 2) / 2;
+        y = margin;
+        ctx.textBaseline = 'top';
+        break;
       default:
         x = margin;
         y = margin;
