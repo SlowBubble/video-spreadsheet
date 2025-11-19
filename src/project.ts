@@ -1,5 +1,21 @@
 export type TextAlignment = 'upper-left' | 'lower-left' | 'upper-right' | 'lower-right' | 'center' | 'lower-center' | 'upper-center';
 
+export class Subcommand {
+  startMs: number;
+  endMs: number;
+  name: string;
+  overlay?: Overlay;
+
+  constructor(startMs: number, endMs: number, name: string, overlay?: Overlay) {
+    this.startMs = startMs;
+    this.endMs = endMs;
+    this.name = name;
+    if (overlay) {
+      this.overlay = overlay;
+    }
+  }
+}
+
 export class TextDisplay {
   content: string;
   alignment: TextAlignment;
@@ -53,6 +69,7 @@ export class ProjectCommand {
   overlay?: Overlay;
   disabled?: boolean;
   extendAudioSec: number;
+  subcommands: Subcommand[];
 
   constructor(
     asset: string,
@@ -64,7 +81,8 @@ export class ProjectCommand {
     name?: string,
     overlay?: Overlay,
     disabled?: boolean,
-    extendAudioSec?: number
+    extendAudioSec?: number,
+    subcommands?: Subcommand[]
   ) {
     this.asset = asset;
     this.positionMs = positionMs;
@@ -74,6 +92,7 @@ export class ProjectCommand {
     this.speed = speed !== undefined && speed > 0 ? speed : 1;
     this.name = name || '';
     this.extendAudioSec = extendAudioSec !== undefined && extendAudioSec >= 0 ? extendAudioSec : 0;
+    this.subcommands = subcommands || [];
     if (overlay) {
       this.overlay = overlay;
     }
@@ -142,6 +161,43 @@ export class Project {
           overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
         }
       }
+      
+      // Parse subcommands
+      let subcommands: Subcommand[] = [];
+      if (cmd.subcommands && Array.isArray(cmd.subcommands)) {
+        subcommands = cmd.subcommands.map((sub: any) => {
+          let subOverlay: Overlay | undefined = undefined;
+          if (sub.overlay) {
+            let fullScreenFilter: FullScreenFilter | undefined = undefined;
+            if (sub.overlay.fullScreenFilter) {
+              fullScreenFilter = new FullScreenFilter(sub.overlay.fullScreenFilter.fillStyle);
+            }
+            
+            let borderFilter: BorderFilter | undefined = undefined;
+            if (sub.overlay.borderFilter) {
+              borderFilter = new BorderFilter(
+                sub.overlay.borderFilter.topMarginPct,
+                sub.overlay.borderFilter.bottomMarginPct,
+                sub.overlay.borderFilter.fillStyle
+              );
+            }
+            
+            let textDisplay: TextDisplay | undefined = undefined;
+            if (sub.overlay.textDisplay) {
+              textDisplay = new TextDisplay(
+                sub.overlay.textDisplay.content,
+                sub.overlay.textDisplay.alignment
+              );
+            }
+            
+            if (fullScreenFilter || borderFilter || textDisplay) {
+              subOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+            }
+          }
+          return new Subcommand(sub.startMs, sub.endMs, sub.name, subOverlay);
+        });
+      }
+      
       return new ProjectCommand(
         cmd.asset,
         cmd.positionMs,
@@ -152,7 +208,8 @@ export class Project {
         cmd.name,
         overlay,
         cmd.disabled,
-        cmd.extendAudioSec
+        cmd.extendAudioSec,
+        subcommands
       );
     }), data.shortStartMs, data.shortEndMs);
   }
@@ -222,6 +279,43 @@ export class TopLevelProject {
               overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
             }
           }
+          
+          // Parse subcommands
+          let subcommands: Subcommand[] = [];
+          if (cmd.subcommands && Array.isArray(cmd.subcommands)) {
+            subcommands = cmd.subcommands.map((sub: any) => {
+              let subOverlay: Overlay | undefined = undefined;
+              if (sub.overlay) {
+                let fullScreenFilter: FullScreenFilter | undefined = undefined;
+                if (sub.overlay.fullScreenFilter) {
+                  fullScreenFilter = new FullScreenFilter(sub.overlay.fullScreenFilter.fillStyle);
+                }
+                
+                let borderFilter: BorderFilter | undefined = undefined;
+                if (sub.overlay.borderFilter) {
+                  borderFilter = new BorderFilter(
+                    sub.overlay.borderFilter.topMarginPct,
+                    sub.overlay.borderFilter.bottomMarginPct,
+                    sub.overlay.borderFilter.fillStyle
+                  );
+                }
+                
+                let textDisplay: TextDisplay | undefined = undefined;
+                if (sub.overlay.textDisplay) {
+                  textDisplay = new TextDisplay(
+                    sub.overlay.textDisplay.content,
+                    sub.overlay.textDisplay.alignment
+                  );
+                }
+                
+                if (fullScreenFilter || borderFilter || textDisplay) {
+                  subOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+                }
+              }
+              return new Subcommand(sub.startMs, sub.endMs, sub.name, subOverlay);
+            });
+          }
+          
           return new ProjectCommand(
             cmd.asset,
             cmd.positionMs,
@@ -232,7 +326,8 @@ export class TopLevelProject {
             cmd.name,
             overlay,
             cmd.disabled,
-            cmd.extendAudioSec
+            cmd.extendAudioSec,
+            subcommands
           );
         }),
         data.project.shortStartMs,
@@ -279,6 +374,43 @@ export class TopLevelProject {
             overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
           }
         }
+        
+        // Parse subcommands
+        let subcommands: Subcommand[] = [];
+        if (cmd.subcommands && Array.isArray(cmd.subcommands)) {
+          subcommands = cmd.subcommands.map((sub: any) => {
+            let subOverlay: Overlay | undefined = undefined;
+            if (sub.overlay) {
+              let fullScreenFilter: FullScreenFilter | undefined = undefined;
+              if (sub.overlay.fullScreenFilter) {
+                fullScreenFilter = new FullScreenFilter(sub.overlay.fullScreenFilter.fillStyle);
+              }
+              
+              let borderFilter: BorderFilter | undefined = undefined;
+              if (sub.overlay.borderFilter) {
+                borderFilter = new BorderFilter(
+                  sub.overlay.borderFilter.topMarginPct,
+                  sub.overlay.borderFilter.bottomMarginPct,
+                  sub.overlay.borderFilter.fillStyle
+                );
+              }
+              
+              let textDisplay: TextDisplay | undefined = undefined;
+              if (sub.overlay.textDisplay) {
+                textDisplay = new TextDisplay(
+                  sub.overlay.textDisplay.content,
+                  sub.overlay.textDisplay.alignment
+                );
+              }
+              
+              if (fullScreenFilter || borderFilter || textDisplay) {
+                subOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
+              }
+            }
+            return new Subcommand(sub.startMs, sub.endMs, sub.name, subOverlay);
+          });
+        }
+        
         return new ProjectCommand(
           cmd.asset,
           cmd.positionMs,
@@ -289,7 +421,8 @@ export class TopLevelProject {
           cmd.name,
           overlay,
           cmd.disabled,
-          cmd.extendAudioSec
+          cmd.extendAudioSec,
+          subcommands
         );
       }),
       data.shortStartMs,

@@ -11,30 +11,38 @@ function speedToRate(speed: number): number {
 enum OpType {
   START_VIDEO = 'START_VIDEO',
   PAUSE_VIDEO = 'PAUSE_VIDEO',
-  HIDE_VISUAL = 'HIDE_VISUAL'
+  HIDE_VISUAL = 'HIDE_VISUAL',
+  ADD_OVERLAY = 'ADD_OVERLAY',
+  REMOVE_OVERLAY = 'REMOVE_OVERLAY'
 }
 
 class OpEvt {
   opType: OpType;
   timeMs: number;
   cmdIdx: number;
+  subcommandIdx?: number;
 
-  constructor(opType: OpType, timeMs: number, cmdIdx: number) {
+  constructor(opType: OpType, timeMs: number, cmdIdx: number, subcommandIdx?: number) {
     this.opType = opType;
     this.timeMs = timeMs;
     this.cmdIdx = cmdIdx;
+    if (subcommandIdx !== undefined) {
+      this.subcommandIdx = subcommandIdx;
+    }
   }
 }
 
 class OpEvtsGroup {
   opEvts: OpEvt[];
   ongoingCmdIndices: Set<number>;
+  cmdIdxToOngoingSubcmdIndices: Map<number, Set<number>>; // ci2osi
   timeMs: number;
 
   constructor(timeMs: number, opEvts: OpEvt[]) {
     this.timeMs = timeMs;
     this.opEvts = opEvts;
     this.ongoingCmdIndices = new Set<number>();
+    this.cmdIdxToOngoingSubcmdIndices = new Map<number, Set<number>>();
   }
 }
 
@@ -447,6 +455,23 @@ export class ReplayManager {
         opEvts.push(new OpEvt(OpType.START_VIDEO, startTime, idx));
         opEvts.push(new OpEvt(OpType.PAUSE_VIDEO, endTime, idx));
       }
+      
+      // Add subcommand events
+      if (cmd.subcommands && Array.isArray(cmd.subcommands)) {
+        cmd.subcommands.forEach((subCmd: any, subIdx: number) => {
+          // Calculate absolute time for subcommand based on command's position and speed
+          const subStartOffset = subCmd.startMs - cmd.startMs;
+          const subEndOffset = subCmd.endMs - cmd.startMs;
+          const subStartTime = startTime + (subStartOffset / rate);
+          const subEndTime = startTime + (subEndOffset / rate);
+          
+          console.log(`[createOpEvts] Subcommand ${subIdx}: startMs=${subCmd.startMs}, endMs=${subCmd.endMs}, subStartTime=${subStartTime}, subEndTime=${subEndTime}`);
+          
+          // Add ADD_OVERLAY event for subcommand start and REMOVE_OVERLAY for end
+          opEvts.push(new OpEvt(OpType.ADD_OVERLAY, subStartTime, idx, subIdx));
+          opEvts.push(new OpEvt(OpType.REMOVE_OVERLAY, subEndTime, idx, subIdx));
+        });
+      }
     });
     
     return opEvts;
@@ -476,12 +501,19 @@ export class ReplayManager {
 
   private populateOngoingCmdIndices(groups: OpEvtsGroup[]): void {
     const oci = new Set<number>();
+    const ci2osi = new Map<number, Set<number>>();
     
     groups.forEach(group => {
       // Sort events: process HIDE_VISUAL and PAUSE_VIDEO before START_VIDEO to ensure correct state
       const sortedEvts = [...group.opEvts].sort((a, b) => {
-        // Order: HIDE_VISUAL, PAUSE_VIDEO, then START_VIDEO
-        const order = { [OpType.HIDE_VISUAL]: 0, [OpType.PAUSE_VIDEO]: 1, [OpType.START_VIDEO]: 2 };
+        // Order: HIDE_VISUAL, PAUSE_VIDEO, REMOVE_OVERLAY, ADD_OVERLAY, then START_VIDEO
+        const order = { 
+          [OpType.HIDE_VISUAL]: 0, 
+          [OpType.PAUSE_VIDEO]: 1, 
+          [OpType.REMOVE_OVERLAY]: 2,
+          [OpType.ADD_OVERLAY]: 3,
+          [OpType.START_VIDEO]: 4 
+        };
         return order[a.opType] - order[b.opType];
       });
       
@@ -492,11 +524,30 @@ export class ReplayManager {
         } else if (evt.opType === OpType.HIDE_VISUAL || evt.opType === OpType.PAUSE_VIDEO) {
           // Remove from ongoing when visual is hidden or video is paused
           oci.delete(evt.cmdIdx);
+          // Also clear subcommands for this command
+          ci2osi.delete(evt.cmdIdx);
+        } else if (evt.opType === OpType.ADD_OVERLAY && evt.subcommandIdx !== undefined) {
+          // Add subcommand to ongoing set
+          if (!ci2osi.has(evt.cmdIdx)) {
+            ci2osi.set(evt.cmdIdx, new Set<number>());
+          }
+          const osi = ci2osi.get(evt.cmdIdx)!;
+          osi.add(evt.subcommandIdx);
+        } else if (evt.opType === OpType.REMOVE_OVERLAY && evt.subcommandIdx !== undefined) {
+          // Remove subcommand from ongoing set
+          const osi = ci2osi.get(evt.cmdIdx);
+          if (osi) {
+            osi.delete(evt.subcommandIdx);
+          }
         }
       });
       
-      // Copy current oci to this group
+      // Copy current oci and ci2osi to this group
       group.ongoingCmdIndices = new Set(oci);
+      group.cmdIdxToOngoingSubcmdIndices = new Map();
+      ci2osi.forEach((osi, cmdIdx) => {
+        group.cmdIdxToOngoingSubcmdIndices.set(cmdIdx, new Set(osi));
+      });
     });
   }
 
@@ -557,10 +608,26 @@ export class ReplayManager {
         ? Math.max(...Array.from(group.ongoingCmdIndices))
         : -1;
       
-      // Only collect overlay from the visible command
+      // Collect overlays from the visible command and its ongoing subcommands
       const overlays: Overlay[] = [];
-      if (visibleCmdIdx >= 0 && enabledCommands[visibleCmdIdx].overlay) {
-        overlays.push(enabledCommands[visibleCmdIdx].overlay);
+      if (visibleCmdIdx >= 0) {
+        const cmd = enabledCommands[visibleCmdIdx];
+        
+        // Add command overlay if present
+        if (cmd.overlay) {
+          overlays.push(cmd.overlay);
+        }
+        
+        // Add subcommand overlays if present
+        const osi = group.cmdIdxToOngoingSubcmdIndices.get(visibleCmdIdx);
+        if (osi && osi.size > 0 && cmd.subcommands) {
+          osi.forEach(subIdx => {
+            const subCmd = cmd.subcommands[subIdx];
+            if (subCmd && subCmd.overlay) {
+              overlays.push(subCmd.overlay);
+            }
+          });
+        }
       }
       
       const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx) : '[Black Screen]';
@@ -568,10 +635,6 @@ export class ReplayManager {
     });
     
     return actions;
-  }
-
-  private removeEmptyOverlayActions(actions: OverlayAction[]): OverlayAction[] {
-    return actions.filter(action => action.overlays.length > 0);
   }
 
   private deduplicateDisplayActions(actions: DisplayAction[]): DisplayAction[] {
@@ -612,7 +675,7 @@ export class ReplayManager {
     
     // Clean up
     displayActions = this.deduplicateDisplayActions(displayActions);
-    overlayActions = this.removeEmptyOverlayActions(overlayActions);
+    // Note: We don't deduplicate overlay actions because we need empty overlays to clear them
     
     // Merge all actions
     const actions: PlanAction[] = [

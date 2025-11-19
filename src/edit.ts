@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay, Overlay, TopLevelProject, Metadata } from './project';
+import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay, Overlay, TopLevelProject, Metadata, Subcommand } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
@@ -121,6 +121,12 @@ function computeCommandEndTimeMs(cmd: ProjectCommand): number {
   return cmd.positionMs + actualDuration;
 }
 
+// Row type to distinguish between commands and subcommands
+type RowType = 
+  | { type: 'command'; cmdIdx: number }
+  | { type: 'subcommand'; cmdIdx: number; subIdx: number }
+  | { type: 'empty' };
+
 export class Editor {
   projectId: string;
   topLevelProject!: TopLevelProject;
@@ -132,6 +138,7 @@ export class Editor {
   isModalOpen: boolean = false;
   dao: IDao;
   numDecimalPlacesForTimeDisplay: number = 0;
+  rowTypes: RowType[] = []; // Maps visual row index to command/subcommand
 
   get project(): Project {
     return this.topLevelProject.project;
@@ -215,94 +222,161 @@ export class Editor {
   }
 
   getDisplayValue(rowIdx: number, colIdx: number): string {
-    // Empty row at the end
-    if (rowIdx >= this.project.commands.length) return '';
+    const rowType = this.rowTypes[rowIdx];
+    if (!rowType || rowType.type === 'empty') return '';
     
-    const cmd = this.project.commands[rowIdx];
     const precision = this.numDecimalPlacesForTimeDisplay;
     
-    switch (colIdx) {
-      case 0: // Checkbox (enabled/disabled)
-        return cmd.disabled ? '☐' : '☑';
-      case 1: // Asset
-        return cmd.name ? cmd.name : cmd.asset;
-      case 2: // Pos 0 (start position)
-        return msToTimeString(cmd.positionMs, precision);
-      case 3: // Pos 1 (end position, calculated)
-        return msToTimeString(computeCommandEndTimeMs(cmd), precision);
-      case 4: // Start
-        return msToTimeString(cmd.startMs, precision);
-      case 5: // Dur (duration accounting for speed)
-        const videoDuration = cmd.endMs - cmd.startMs;
-        const actualDuration = videoDuration / (cmd.speed / 100);
-        return msToTimeString(actualDuration, precision);
-      case 6: // Volume
-        return cmd.volume.toString();
-      case 7: // Speed (display as percentage)
-        return cmd.speed.toString();
-      case 8: // Text
-        return cmd.overlay?.textDisplay?.content || '';
-      case 9: // Fill (canvas preview)
-        return ''; // Canvas will be rendered separately
-      default:
-        return '';
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      
+      switch (colIdx) {
+        case 0: // Checkbox (enabled/disabled)
+          return cmd.disabled ? '☐' : '☑';
+        case 1: // Asset
+          return cmd.name ? cmd.name : cmd.asset;
+        case 2: // Pos 0 (start position)
+          return msToTimeString(cmd.positionMs, precision);
+        case 3: // Pos 1 (end position, calculated)
+          return msToTimeString(computeCommandEndTimeMs(cmd), precision);
+        case 4: // Start
+          return msToTimeString(cmd.startMs, precision);
+        case 5: // Dur (duration accounting for speed)
+          const videoDuration = cmd.endMs - cmd.startMs;
+          const actualDuration = videoDuration / (cmd.speed / 100);
+          return msToTimeString(actualDuration, precision);
+        case 6: // Volume
+          return cmd.volume.toString();
+        case 7: // Speed (display as percentage)
+          return cmd.speed.toString();
+        case 8: // Text
+          return cmd.overlay?.textDisplay?.content || '';
+        case 9: // Fill (canvas preview)
+          return ''; // Canvas will be rendered separately
+        default:
+          return '';
+      }
+    } else {
+      // Subcommand row
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      
+      switch (colIdx) {
+        case 0: // Empty for subcommands
+          return '';
+        case 1: // Show subcommand name with indent
+          return `  ↳ ${subCmd.name}`;
+        case 2: // Empty
+          return '';
+        case 3: // Empty
+          return '';
+        case 4: // Start (relative to command)
+          return msToTimeString(subCmd.startMs, precision);
+        case 5: // Dur (duration of subcommand)
+          const duration = subCmd.endMs - subCmd.startMs;
+          return msToTimeString(duration, precision);
+        case 6: // Empty
+          return '';
+        case 7: // Empty
+          return '';
+        case 8: // Text
+          return subCmd.overlay?.textDisplay?.content || '';
+        case 9: // Fill (canvas preview)
+          return ''; // Canvas will be rendered separately
+        default:
+          return '';
+      }
     }
   }
 
   getCellContent(rowIdx: number, colIdx: number, cellValue: string): string {
-    // Empty row at the end
-    if (rowIdx >= this.project.commands.length) return cellValue;
+    const rowType = this.rowTypes[rowIdx];
+    if (!rowType || rowType.type === 'empty') return cellValue;
     
-    const cmd = this.project.commands[rowIdx];
-    
-    // For Pos 0 and Pos 1 columns, create clickable buttons
-    if (colIdx === 2 || colIdx === 3) {
-      const timeMs = colIdx === 2 ? cmd.positionMs : computeCommandEndTimeMs(cmd);
-      const dimStyle = colIdx === 3 ? 'opacity: 0.5;' : '';
-      return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
-    }
-    
-    // For Start column, create clickable link
-    if (colIdx === 4) {
-      const timeMs = cmd.startMs;
-      const timeInSeconds = Math.floor(timeMs / 1000);
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
       
-      // Get the asset URL and remove existing 't' parameter
-      const assetUrl = cmd.asset;
-      if (!assetUrl) return cellValue;
+      // For Pos 0 and Pos 1 columns, create clickable buttons
+      if (colIdx === 2 || colIdx === 3) {
+        const timeMs = colIdx === 2 ? cmd.positionMs : computeCommandEndTimeMs(cmd);
+        const dimStyle = colIdx === 3 ? 'opacity: 0.5;' : '';
+        return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
+      }
       
-      try {
-        const url = new URL(assetUrl);
-        // Remove existing 't' parameter
-        url.searchParams.delete('t');
-        // Add new 't' parameter with the time value
-        url.searchParams.set('t', `${timeInSeconds}s`);
+      // For Start column, create clickable link
+      if (colIdx === 4) {
+        const timeMs = cmd.startMs;
+        const timeInSeconds = Math.floor(timeMs / 1000);
         
-        const linkUrl = url.toString();
-        return `<a href="${linkUrl}" target="_blank" style="color: black; text-decoration: underline;">${cellValue}</a>`;
-      } catch (e) {
-        // If URL parsing fails, just return the cell value
+        // Get the asset URL and remove existing 't' parameter
+        const assetUrl = cmd.asset;
+        if (!assetUrl) return cellValue;
+        
+        try {
+          const url = new URL(assetUrl);
+          // Remove existing 't' parameter
+          url.searchParams.delete('t');
+          // Add new 't' parameter with the time value
+          url.searchParams.set('t', `${timeInSeconds}s`);
+          
+          const linkUrl = url.toString();
+          return `<a href="${linkUrl}" target="_blank" style="color: black; text-decoration: underline;">${cellValue}</a>`;
+        } catch (e) {
+          // If URL parsing fails, just return the cell value
+          return cellValue;
+        }
+      }
+      
+      // For Dur column, just show the duration (no link)
+      if (colIdx === 5) {
         return cellValue;
       }
-    }
-    
-    // For Dur column, just show the duration (no link)
-    if (colIdx === 5) {
+      
+      // For Fill column, create a canvas with overlay preview
+      if (colIdx === 9) {
+        const canvasId = `fill-canvas-cmd-${rowType.cmdIdx}`;
+        return `<canvas id="${canvasId}" width="47" height="27" style="border: 1px solid #ccc;"></canvas>`;
+      }
+      
+      return cellValue;
+    } else {
+      // Subcommand row
+      // For Fill column, create a canvas with overlay preview
+      if (colIdx === 9) {
+        const canvasId = `fill-canvas-sub-${rowType.cmdIdx}-${rowType.subIdx}`;
+        return `<canvas id="${canvasId}" width="47" height="27" style="border: 1px solid #ccc;"></canvas>`;
+      }
+      
       return cellValue;
     }
+  }
+
+  buildRowTypes(): RowType[] {
+    const rowTypes: RowType[] = [];
     
-    // For Fill column, create a canvas with overlay preview
-    if (colIdx === 9) {
-      const canvasId = `fill-canvas-${rowIdx}`;
-      return `<canvas id="${canvasId}" width="47" height="27" style="border: 1px solid #ccc;"></canvas>`;
-    }
+    this.project.commands.forEach((cmd, cmdIdx) => {
+      // Add command row
+      rowTypes.push({ type: 'command', cmdIdx });
+      
+      // Add subcommand rows
+      cmd.subcommands.forEach((_, subIdx) => {
+        rowTypes.push({ type: 'subcommand', cmdIdx, subIdx });
+      });
+    });
     
-    return cellValue;
+    // Add empty row at the end
+    rowTypes.push({ type: 'empty' });
+    
+    return rowTypes;
   }
 
   getRowCount(): number {
-    // Always show at least one empty row
-    return Math.max(1, this.project.commands.length + 1);
+    // Count commands + subcommands + 1 empty row
+    let count = 0;
+    this.project.commands.forEach(cmd => {
+      count += 1 + cmd.subcommands.length;
+    });
+    return Math.max(1, count + 1);
   }
 
   drawFillCanvas(canvasId: string, overlay?: Overlay) {
@@ -423,25 +497,35 @@ export class Editor {
       ${editIcon}<span>${this.project.title}</span>
     </div>`;
 
-    const rowCount = this.getRowCount();
+    // Build row types mapping
+    this.rowTypes = this.buildRowTypes();
+    const rowCount = this.rowTypes.length;
     const tableRows: string[] = [];
     
     for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+      const rowType = this.rowTypes[rowIdx];
+      const isSubcommand = rowType && rowType.type === 'subcommand';
       const cells: string[] = [];
+      
       for (let colIdx = 0; colIdx < columns.length; colIdx++) {
         const isSelected = rowIdx === this.selectedRow && colIdx === this.selectedCol;
         const cellValue = this.getDisplayValue(rowIdx, colIdx);
         const cellContent = this.getCellContent(rowIdx, colIdx, cellValue);
         
         // Add background colors for Asset and Vol columns based on volume
-        const cmd = rowIdx < this.project.commands.length ? this.project.commands[rowIdx] : null;
         let bgColor = 'transparent';
-        if ((colIdx === 6) && cmd) {
+        if (rowType && rowType.type === 'command' && colIdx === 6) {
+          const cmd = this.project.commands[rowType.cmdIdx];
           if (cmd.volume === 100) {
             bgColor = '#eeeecc';
           } else if (cmd.volume > 0 && cmd.volume < 100) {
             bgColor = '#ffffdd';
           }
+        }
+        
+        // Light gray background for subcommand rows
+        if (isSubcommand) {
+          bgColor = '#f5f5f5';
         }
         
         // Right-align time, volume, and speed columns (Pos 0, Pos 1, Start, Dur, Vol, Speed)
@@ -624,11 +708,18 @@ export class Editor {
     setupShortcutsModal();
     
     // Draw fill canvases for each row
-    for (let rowIdx = 0; rowIdx < this.project.commands.length; rowIdx++) {
-      const cmd = this.project.commands[rowIdx];
-      const canvasId = `fill-canvas-${rowIdx}`;
-      this.drawFillCanvas(canvasId, cmd.overlay);
-    }
+    this.rowTypes.forEach((rowType) => {
+      if (rowType.type === 'command') {
+        const cmd = this.project.commands[rowType.cmdIdx];
+        const canvasId = `fill-canvas-cmd-${rowType.cmdIdx}`;
+        this.drawFillCanvas(canvasId, cmd.overlay);
+      } else if (rowType.type === 'subcommand') {
+        const cmd = this.project.commands[rowType.cmdIdx];
+        const subCmd = cmd.subcommands[rowType.subIdx];
+        const canvasId = `fill-canvas-sub-${rowType.cmdIdx}-${rowType.subIdx}`;
+        this.drawFillCanvas(canvasId, subCmd.overlay);
+      }
+    });
   }
 
 
@@ -692,6 +783,8 @@ export class Editor {
       this.selectedCol = Math.min(columns.length - 1, this.selectedCol + 1);
     } else if (matchKey(e, 'shift+tab')) {
       this.selectedCol = Math.max(0, this.selectedCol - 1);
+    } else if (matchKey(e, 'cmd+enter')) {
+      this.handleCmdEnterKey();
     } else if (matchKey(e, 'enter')) {
       this.handleEnterKey();
     } else if (matchKey(e, '0')) {
@@ -712,8 +805,10 @@ export class Editor {
       } else {
         // Check if selected cell is on Pos 0 or Pos 1
         let resumeTime = this.replayManager.pausedAtMs;
-        if (this.selectedRow < this.project.commands.length && (this.selectedCol === 2 || this.selectedCol === 3)) {
-          const cmd = this.project.commands[this.selectedRow];
+        const rowType = this.rowTypes[this.selectedRow];
+        
+        if (rowType && rowType.type === 'command' && (this.selectedCol === 2 || this.selectedCol === 3)) {
+          const cmd = this.project.commands[rowType.cmdIdx];
           if (this.selectedCol === 2) {
             // Pos 0 column - use positionMs
             resumeTime = cmd.positionMs - offsetMs;
@@ -798,43 +893,68 @@ export class Editor {
   }
 
   cycleFullScreenFilter() {
-    // Only toggle if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
-    
-    const cmd = this.project.commands[this.selectedRow];
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
     
     // Cycle through: red -> green -> off
     const redFilter = 'rgba(255, 0, 0, 0.15)';
     const greenFilter = 'rgba(0, 100, 100, 0.15)';
     
-    const overlay = ensureOverlay(cmd);
-    
-    if (!overlay.fullScreenFilter) {
-      // Start with red
-      overlay.fullScreenFilter = new FullScreenFilter(redFilter);
-      this.showFilterBanner('Fullscreen Filter: Red');
-    } else if (overlay.fullScreenFilter.fillStyle === redFilter) {
-      // Move to green
-      overlay.fullScreenFilter = new FullScreenFilter(greenFilter);
-      this.showFilterBanner('Fullscreen Filter: Green');
-    } else {
-      // Remove filter
-      overlay.fullScreenFilter = undefined;
-      this.showFilterBanner('Fullscreen Filter: OFF');
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const overlay = ensureOverlay(cmd);
+      
+      if (!overlay.fullScreenFilter) {
+        overlay.fullScreenFilter = new FullScreenFilter(redFilter);
+        this.showFilterBanner('Fullscreen Filter: Red');
+      } else if (overlay.fullScreenFilter.fillStyle === redFilter) {
+        overlay.fullScreenFilter = new FullScreenFilter(greenFilter);
+        this.showFilterBanner('Fullscreen Filter: Green');
+      } else {
+        overlay.fullScreenFilter = undefined;
+        this.showFilterBanner('Fullscreen Filter: OFF');
+      }
+    } else if (rowType.type === 'subcommand') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      if (!subCmd.overlay) {
+        subCmd.overlay = new Overlay();
+      }
+      const overlay = subCmd.overlay;
+      
+      if (!overlay.fullScreenFilter) {
+        overlay.fullScreenFilter = new FullScreenFilter(redFilter);
+        this.showFilterBanner('Subcommand Filter: Red');
+      } else if (overlay.fullScreenFilter.fillStyle === redFilter) {
+        overlay.fullScreenFilter = new FullScreenFilter(greenFilter);
+        this.showFilterBanner('Subcommand Filter: Green');
+      } else {
+        overlay.fullScreenFilter = undefined;
+        this.showFilterBanner('Subcommand Filter: OFF');
+      }
     }
   }
 
   toggleBorderFilter() {
-    // Only toggle if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
-    
-    const cmd = this.project.commands[this.selectedRow];
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
     
     // Cycle through percentage options, then remove
     const percentageOptions = [4, 7, 10, 13, 16, 19];
     const fillStyle = 'rgba(0, 0, 0, 0.95)';
     
-    const overlay = ensureOverlay(cmd);
+    let overlay: Overlay;
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      overlay = ensureOverlay(cmd);
+    } else {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      if (!subCmd.overlay) {
+        subCmd.overlay = new Overlay();
+      }
+      overlay = subCmd.overlay;
+    }
     
     if (!overlay.borderFilter) {
       // Start with first option
@@ -859,13 +979,21 @@ export class Editor {
   }
 
   toggleTextAlignment() {
-    // Only toggle if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
     
-    const cmd = this.project.commands[this.selectedRow];
+    let overlay: Overlay | undefined;
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      overlay = cmd.overlay;
+    } else {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      overlay = subCmd.overlay;
+    }
     
     // Only toggle if there is text
-    if (!cmd.overlay?.textDisplay || !cmd.overlay.textDisplay.content) {
+    if (!overlay?.textDisplay || !overlay.textDisplay.content) {
       return;
     }
     
@@ -879,19 +1007,19 @@ export class Editor {
       'upper-left',
     ];
     
-    const currentAlignment = cmd.overlay.textDisplay.alignment;
+    const currentAlignment = overlay.textDisplay.alignment;
     const currentIndex = alignments.indexOf(currentAlignment);
     const nextIndex = (currentIndex + 1) % alignments.length;
     const nextAlignment = alignments[nextIndex];
     
-    cmd.overlay.textDisplay.alignment = nextAlignment;
+    overlay.textDisplay.alignment = nextAlignment;
     this.showFilterBanner(`Text Alignment: ${nextAlignment}`);
   }
 
   tetherToPreviousRow() {
-    // Only tether if we have a valid command selected and it's not the first row
-    if (this.selectedRow >= this.project.commands.length || this.selectedRow === 0) {
-      showBanner('Cannot tether: No previous row', {
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type !== 'command' || rowType.cmdIdx === 0) {
+      showBanner('Cannot tether: No previous command', {
         id: 'tether-banner',
         position: 'bottom',
         color: 'red',
@@ -900,8 +1028,8 @@ export class Editor {
       return;
     }
     
-    const currentCmd = this.project.commands[this.selectedRow];
-    const previousCmd = this.project.commands[this.selectedRow - 1];
+    const currentCmd = this.project.commands[rowType.cmdIdx];
+    const previousCmd = this.project.commands[rowType.cmdIdx - 1];
     
     // Set current row's positionMs to previous row's end time
     const previousEndTime = computeCommandEndTimeMs(previousCmd);
@@ -944,92 +1072,147 @@ export class Editor {
   }
 
   removeAsset() {
-    // Only remove if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
     
-    // Remove the command
-    this.project.commands.splice(this.selectedRow, 1);
-    
-    // Adjust selected row if needed
-    if (this.selectedRow >= this.project.commands.length && this.selectedRow > 0) {
-      this.selectedRow--;
+    if (rowType.type === 'command') {
+      // Remove the command
+      this.project.commands.splice(rowType.cmdIdx, 1);
+      
+      // Adjust selected row if needed
+      if (this.selectedRow > 0) {
+        this.selectedRow--;
+      }
+      
+      showBanner('Command removed', {
+        id: 'remove-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 1000
+      });
+
+    } else if (rowType.type === 'subcommand') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      cmd.subcommands.splice(rowType.subIdx, 1);
+      
+      // Adjust selected row if needed
+      if (this.selectedRow > 0) {
+        this.selectedRow--;
+      }
+      
+      showBanner('Subcommand removed', {
+        id: 'remove-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 1000
+      });
     }
   }
 
   moveCommandUp() {
-    // Only move if we have a valid command selected and it's not the first one
-    if (this.selectedRow >= this.project.commands.length || this.selectedRow === 0) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type !== 'command') return;
+    
+    // Can't move first command up
+    if (rowType.cmdIdx === 0) return;
     
     // Swap with the command above
-    const temp = this.project.commands[this.selectedRow];
-    this.project.commands[this.selectedRow] = this.project.commands[this.selectedRow - 1];
-    this.project.commands[this.selectedRow - 1] = temp;
+    const temp = this.project.commands[rowType.cmdIdx];
+    this.project.commands[rowType.cmdIdx] = this.project.commands[rowType.cmdIdx - 1];
+    this.project.commands[rowType.cmdIdx - 1] = temp;
     
-    // Move selection up
-    this.selectedRow--;
+    // Move selection up (accounting for subcommands of the command above)
+    const prevCmd = this.project.commands[rowType.cmdIdx];
+    this.selectedRow -= (1 + prevCmd.subcommands.length);
   }
 
   moveCommandDown() {
-    // Only move if we have a valid command selected and it's not the last one
-    if (this.selectedRow >= this.project.commands.length - 1) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type !== 'command') return;
+    
+    // Can't move last command down
+    if (rowType.cmdIdx >= this.project.commands.length - 1) return;
     
     // Swap with the command below
-    const temp = this.project.commands[this.selectedRow];
-    this.project.commands[this.selectedRow] = this.project.commands[this.selectedRow + 1];
-    this.project.commands[this.selectedRow + 1] = temp;
+    const temp = this.project.commands[rowType.cmdIdx];
+    this.project.commands[rowType.cmdIdx] = this.project.commands[rowType.cmdIdx + 1];
+    this.project.commands[rowType.cmdIdx + 1] = temp;
     
-    // Move selection down
-    this.selectedRow++;
+    // Move selection down (accounting for subcommands of current command)
+    const currentCmd = this.project.commands[rowType.cmdIdx + 1];
+    this.selectedRow += (1 + currentCmd.subcommands.length);
   }
 
   adjustTimeValue(deltaMs: number) {
-    // Only adjust if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
     
-    const cmd = this.project.commands[this.selectedRow];
-    
-    // Check which column we're on and adjust accordingly
-    if (this.selectedCol === 2) {
-      // Pos 0 column
-      cmd.positionMs = Math.max(0, cmd.positionMs + deltaMs);
-      showBanner(`Position: ${msToTimeString(cmd.positionMs)}`, {
-        id: 'adjust-banner',
-        position: 'bottom',
-        color: 'blue',
-        duration: 800
-      });
-    } else if (this.selectedCol === 3) {
-      // Pos 1 column - not editable, do nothing
-      return;
-    } else if (this.selectedCol === 4) {
-      // Start column
-      cmd.startMs = Math.max(0, cmd.startMs + deltaMs);
-      showBanner(`Start: ${msToTimeString(cmd.startMs)}`, {
-        id: 'adjust-banner',
-        position: 'bottom',
-        color: 'blue',
-        duration: 800
-      });
-    } else if (this.selectedCol === 5) {
-      // Dur column (displays duration but adjusts endMs)
-      cmd.endMs = Math.max(0, cmd.endMs + deltaMs);
-      showBanner(`End: ${msToTimeString(cmd.endMs)}`, {
-        id: 'adjust-banner',
-        position: 'bottom',
-        color: 'blue',
-        duration: 800
-      });
-    } else {
-      // Not on a time column, do nothing
-      return;
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      
+      // Check which column we're on and adjust accordingly
+      if (this.selectedCol === 2) {
+        // Pos 0 column
+        cmd.positionMs = Math.max(0, cmd.positionMs + deltaMs);
+        showBanner(`Position: ${msToTimeString(cmd.positionMs)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
+      } else if (this.selectedCol === 3) {
+        // Pos 1 column - not editable, do nothing
+        return;
+      } else if (this.selectedCol === 4) {
+        // Start column
+        cmd.startMs = Math.max(0, cmd.startMs + deltaMs);
+        showBanner(`Start: ${msToTimeString(cmd.startMs)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
+      } else if (this.selectedCol === 5) {
+        // Dur column (displays duration but adjusts endMs)
+        cmd.endMs = Math.max(0, cmd.endMs + deltaMs);
+        showBanner(`End: ${msToTimeString(cmd.endMs)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
+      }
+    } else if (rowType.type === 'subcommand') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      
+      if (this.selectedCol === 4) {
+        // Start column
+        subCmd.startMs = Math.max(0, subCmd.startMs + deltaMs);
+        showBanner(`Subcommand Start: ${msToTimeString(subCmd.startMs)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
+      } else if (this.selectedCol === 5) {
+        // Dur column (adjusts endMs)
+        subCmd.endMs = Math.max(0, subCmd.endMs + deltaMs);
+        showBanner(`Subcommand End: ${msToTimeString(subCmd.endMs)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
+      }
     }
   }
 
   cycleColumnValue(direction: number) {
-    // Only cycle if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type !== 'command') return;
     
-    const cmd = this.project.commands[this.selectedRow];
+    const cmd = this.project.commands[rowType.cmdIdx];
     
     if (this.selectedCol === 6) {
       // Volume column
@@ -1075,10 +1258,10 @@ export class Editor {
   }
 
   adjustExtendAudioSec(deltaSec: number) {
-    // Only adjust if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type !== 'command') return;
     
-    const cmd = this.project.commands[this.selectedRow];
+    const cmd = this.project.commands[rowType.cmdIdx];
     
     // Adjust extendAudioSec, keeping it >= 0
     cmd.extendAudioSec = Math.max(0, cmd.extendAudioSec + deltaSec);
@@ -1092,40 +1275,63 @@ export class Editor {
   }
 
   async copyCell() {
-    // Only copy if we have a valid command selected
-    if (this.selectedRow >= this.project.commands.length) return;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
     
-    const cmd = this.project.commands[this.selectedRow];
     let textToCopy = '';
     
-    // Store the value based on column type
-    if (this.selectedCol === 0) {
-      // Checkbox column - copy entire row/command as JSON
-      textToCopy = JSON.stringify(cmd, null, 2);
-    } else if (this.selectedCol === 1) {
-      // Asset column - copy the underlying asset link
-      textToCopy = cmd.asset;
-    } else if (this.selectedCol === 2) {
-      // Pos 0 column - store as ms integer string
-      textToCopy = cmd.positionMs.toString();
-    } else if (this.selectedCol === 3) {
-      // Pos 1 column - store as ms integer string
-      textToCopy = computeCommandEndTimeMs(cmd).toString();
-    } else if (this.selectedCol === 4) {
-      // Start column - store as ms integer string
-      textToCopy = cmd.startMs.toString();
-    } else if (this.selectedCol === 5) {
-      // Dur column (displays duration but copies endMs)
-      textToCopy = cmd.endMs.toString();
-    } else if (this.selectedCol === 6) {
-      // Volume column - store as string
-      textToCopy = cmd.volume.toString();
-    } else if (this.selectedCol === 7) {
-      // Speed column - store as percentage string
-      textToCopy = cmd.speed.toString();
-    } else if (this.selectedCol === 8) {
-      // Text column - store as string
-      textToCopy = cmd.overlay?.textDisplay?.content || '';
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      
+      // Store the value based on column type
+      if (this.selectedCol === 0) {
+        // Checkbox column - copy entire row/command as JSON
+        textToCopy = JSON.stringify(cmd, null, 2);
+      } else if (this.selectedCol === 1) {
+        // Asset column - copy the underlying asset link
+        textToCopy = cmd.asset;
+      } else if (this.selectedCol === 2) {
+        // Pos 0 column - store as ms integer string
+        textToCopy = cmd.positionMs.toString();
+      } else if (this.selectedCol === 3) {
+        // Pos 1 column - store as ms integer string
+        textToCopy = computeCommandEndTimeMs(cmd).toString();
+      } else if (this.selectedCol === 4) {
+        // Start column - store as ms integer string
+        textToCopy = cmd.startMs.toString();
+      } else if (this.selectedCol === 5) {
+        // Dur column (displays duration but copies endMs)
+        textToCopy = cmd.endMs.toString();
+      } else if (this.selectedCol === 6) {
+        // Volume column - store as string
+        textToCopy = cmd.volume.toString();
+      } else if (this.selectedCol === 7) {
+        // Speed column - store as percentage string
+        textToCopy = cmd.speed.toString();
+      } else if (this.selectedCol === 8) {
+        // Text column - store as string
+        textToCopy = cmd.overlay?.textDisplay?.content || '';
+      }
+    } else if (rowType.type === 'subcommand') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      
+      if (this.selectedCol === 0) {
+        // Copy entire subcommand as JSON
+        textToCopy = JSON.stringify(subCmd, null, 2);
+      } else if (this.selectedCol === 1) {
+        // Name
+        textToCopy = subCmd.name;
+      } else if (this.selectedCol === 4) {
+        // Start
+        textToCopy = subCmd.startMs.toString();
+      } else if (this.selectedCol === 5) {
+        // End
+        textToCopy = subCmd.endMs.toString();
+      } else if (this.selectedCol === 8) {
+        // Text
+        textToCopy = subCmd.overlay?.textDisplay?.content || '';
+      }
     }
     
     // Copy to system clipboard
@@ -1166,7 +1372,10 @@ export class Editor {
     
     if (!clipboardText) return;
     
-    const isNewRow = this.selectedRow >= this.project.commands.length;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType) return;
+    
+    const isNewRow = rowType.type === 'empty';
     
     // For new rows, only allow pasting in the asset column or checkbox column
     if (isNewRow) {
@@ -1219,7 +1428,18 @@ export class Editor {
       return;
     }
     
-    const cmd = this.project.commands[this.selectedRow];
+    // Only support pasting for commands (not subcommands yet)
+    if (rowType.type !== 'command') {
+      showBanner('Paste not supported for subcommands yet', {
+        id: 'paste-banner',
+        position: 'bottom',
+        color: 'yellow',
+        duration: 1500
+      });
+      return;
+    }
+    
+    const cmd = this.project.commands[rowType.cmdIdx];
     
     // Paste based on column type
     if (this.selectedCol === 0) {
@@ -1347,12 +1567,18 @@ export class Editor {
   }
 
   handleEnterKey() {
-    const isExistingCommand = this.selectedRow < this.project.commands.length;
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType) return;
     
-    if (this.selectedCol === 0) {
-      // Checkbox column - toggle disabled state
-      if (isExistingCommand) {
-        const cmd = this.project.commands[this.selectedRow];
+    const isCommand = rowType.type === 'command';
+    const isSubcommand = rowType.type === 'subcommand';
+    const isEmpty = rowType.type === 'empty';
+    
+    if (isCommand) {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      
+      if (this.selectedCol === 0) {
+        // Checkbox column - toggle disabled state
         cmd.disabled = cmd.disabled ? undefined : true;
         showBanner(cmd.disabled ? 'Command disabled' : 'Command enabled', {
           id: 'toggle-banner',
@@ -1360,68 +1586,38 @@ export class Editor {
           color: cmd.disabled ? 'red' : 'green',
           duration: 800
         });
-      }
-    } else if (this.selectedCol === 1) {
-      // Asset column
-      if (isExistingCommand) {
-        // Edit name
-        const cmd = this.project.commands[this.selectedRow];
+      } else if (this.selectedCol === 1) {
+        // Asset column - edit name
         const newName = prompt('Edit name:', cmd.name);
         if (newName !== null) {
           cmd.name = newName;
         }
-      } else {
-        // Create new command with asset URL
-        const assetUrl = prompt('Edit Asset URL:', '');
-        if (assetUrl !== null) {
-          if (assetUrl.trim() === '') {
-            // Empty asset URL creates a black screen
-            const currentMs = this.replayManager.getCurrentPosition() || 0;
-            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 100, 'Black', undefined, undefined, 0);
-            this.project.commands.push(newCmd);
-          } else {
-            const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
-            this.project.commands.push(newCmd);
-          }
-        }
-      }
-    } else if (this.selectedCol === 2) {
-      // Pos 0 column - edit position start time
-      if (isExistingCommand) {
-        const cmd = this.project.commands[this.selectedRow];
+      } else if (this.selectedCol === 2) {
+        // Pos 0 column - edit position start time
         const currentValue = msToEditString(cmd.positionMs);
         const newValue = prompt('Edit Position:', currentValue);
         if (newValue !== null) {
           cmd.positionMs = this.timeStringToMs(newValue);
         }
-      }
-    } else if (this.selectedCol === 3) {
-      // Pos 1 column - not editable, do nothing
-      return;
-    } else if (this.selectedCol === 4) {
-      // Start column
-      if (isExistingCommand) {
-        const cmd = this.project.commands[this.selectedRow];
+      } else if (this.selectedCol === 3) {
+        // Pos 1 column - not editable
+        return;
+      } else if (this.selectedCol === 4) {
+        // Start column
         const currentValue = msToEditString(cmd.startMs);
         const newValue = prompt('Edit Start:', currentValue);
         if (newValue !== null) {
           cmd.startMs = this.timeStringToMs(newValue);
         }
-      }
-    } else if (this.selectedCol === 5) {
-      // Dur column (displays duration but edits endMs)
-      if (isExistingCommand) {
-        const cmd = this.project.commands[this.selectedRow];
+      } else if (this.selectedCol === 5) {
+        // Dur column (displays duration but edits endMs)
         const currentValue = msToEditString(cmd.endMs);
         const newValue = prompt('Edit End:', currentValue);
         if (newValue !== null) {
           cmd.endMs = this.timeStringToMs(newValue);
         }
-      }
-    } else if (this.selectedCol === 6) {
-      // Volume column
-      if (isExistingCommand) {
-        const cmd = this.project.commands[this.selectedRow];
+      } else if (this.selectedCol === 6) {
+        // Volume column
         const newValue = prompt('Edit Volume:', cmd.volume.toString());
         if (newValue !== null) {
           const volume = Number(newValue);
@@ -1429,11 +1625,8 @@ export class Editor {
             cmd.volume = volume;
           }
         }
-      }
-    } else if (this.selectedCol === 7) {
-      // Speed column (as percentage)
-      if (isExistingCommand) {
-        const cmd = this.project.commands[this.selectedRow];
+      } else if (this.selectedCol === 7) {
+        // Speed column (as percentage)
         const newValue = prompt('Edit Speed (%):', cmd.speed.toString());
         if (newValue !== null) {
           const speed = Number(newValue);
@@ -1441,11 +1634,8 @@ export class Editor {
             cmd.speed = speed;
           }
         }
-      }
-    } else if (this.selectedCol === 8) {
-      // Text column
-      if (isExistingCommand) {
-        const cmd = this.project.commands[this.selectedRow];
+      } else if (this.selectedCol === 8) {
+        // Text column
         const currentText = cmd.overlay?.textDisplay?.content || '';
         
         showTextareaModal({
@@ -1468,13 +1658,105 @@ export class Editor {
             this.maybeSave();
           }
         });
-      }
-    } else if (this.selectedCol === 9) {
-      // Fill column - edit overlay JSON
-      if (isExistingCommand) {
+      } else if (this.selectedCol === 9) {
+        // Fill column - edit overlay JSON
         this.showOverlayModal();
       }
+    } else if (isSubcommand) {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      
+      if (this.selectedCol === 1) {
+        // Edit subcommand name
+        const newName = prompt('Edit subcommand name:', subCmd.name);
+        if (newName !== null) {
+          subCmd.name = newName;
+        }
+      } else if (this.selectedCol === 4) {
+        // Start column - edit subcommand start time
+        const currentValue = msToEditString(subCmd.startMs);
+        const newValue = prompt('Edit Subcommand Start:', currentValue);
+        if (newValue !== null) {
+          subCmd.startMs = this.timeStringToMs(newValue);
+        }
+      } else if (this.selectedCol === 5) {
+        // Dur column - edit subcommand end time
+        const currentValue = msToEditString(subCmd.endMs);
+        const newValue = prompt('Edit Subcommand End:', currentValue);
+        if (newValue !== null) {
+          subCmd.endMs = this.timeStringToMs(newValue);
+        }
+      } else if (this.selectedCol === 8) {
+        // Text column
+        const currentText = subCmd.overlay?.textDisplay?.content || '';
+        
+        showTextareaModal({
+          title: 'Edit Subcommand Text',
+          initialValue: currentText,
+          maxWidth: '600px',
+          minHeight: '200px',
+          onModalStateChange: (isOpen) => {
+            this.isModalOpen = isOpen;
+          },
+          onSave: (newValue) => {
+            // Update overlay textDisplay
+            if (newValue.trim() !== '') {
+              if (!subCmd.overlay) {
+                subCmd.overlay = new Overlay();
+              }
+              subCmd.overlay.textDisplay = new TextDisplay(newValue);
+            } else if (subCmd.overlay) {
+              subCmd.overlay.textDisplay = undefined;
+            }
+            this.renderTable();
+            this.maybeSave();
+          }
+        });
+      } else if (this.selectedCol === 9) {
+        // Fill column - edit subcommand overlay
+        // TODO: implement showOverlayModal for subcommands
+        showBanner('Subcommand overlay editing not yet implemented', {
+          id: 'subcommand-overlay-banner',
+          position: 'bottom',
+          color: 'yellow',
+          duration: 1500
+        });
+      }
+    } else if (isEmpty) {
+      // Empty row - only allow creating new command in Asset column
+      if (this.selectedCol === 1) {
+        const assetUrl = prompt('Edit Asset URL:', '');
+        if (assetUrl !== null) {
+          if (assetUrl.trim() === '') {
+            // Empty asset URL creates a black screen
+            const currentMs = this.replayManager.getCurrentPosition() || 0;
+            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 100, 'Black', undefined, undefined, 0, []);
+            this.project.commands.push(newCmd);
+          } else {
+            const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
+            this.project.commands.push(newCmd);
+          }
+        }
+      }
     }
+  }
+
+  handleCmdEnterKey() {
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type !== 'command') return;
+    
+    const cmd = this.project.commands[rowType.cmdIdx];
+    
+    // Create a new subcommand with the same time range as the command
+    const newSubcommand = new Subcommand(cmd.startMs, cmd.endMs, 'Subcommand', undefined);
+    cmd.subcommands.push(newSubcommand);
+    
+    showBanner(`Subcommand added (${cmd.subcommands.length} total)`, {
+      id: 'subcommand-banner',
+      position: 'bottom',
+      color: 'green',
+      duration: 1500
+    });
   }
 
   async saveProject() {
@@ -1742,8 +2024,20 @@ export class Editor {
   }
 
   showOverlayModal() {
-    const cmd = this.project.commands[this.selectedRow];
-    const overlayJson = cmd.overlay ? JSON.stringify(cmd.overlay, null, 2) : '{}';
+    const rowType = this.rowTypes[this.selectedRow];
+    if (!rowType || rowType.type === 'empty') return;
+    
+    let overlay: Overlay | undefined;
+    if (rowType.type === 'command') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      overlay = cmd.overlay;
+    } else {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      overlay = subCmd.overlay;
+    }
+    
+    const overlayJson = overlay ? JSON.stringify(overlay, null, 2) : '{}';
     
     showTextareaModal({
       title: 'Edit Overlay JSON',
@@ -1786,7 +2080,16 @@ export class Editor {
             }
           }
           
-          cmd.overlay = newOverlay;
+          // Save overlay to the correct location
+          if (rowType.type === 'command') {
+            const cmd = this.project.commands[rowType.cmdIdx];
+            cmd.overlay = newOverlay;
+          } else {
+            const cmd = this.project.commands[rowType.cmdIdx];
+            const subCmd = cmd.subcommands[rowType.subIdx];
+            subCmd.overlay = newOverlay;
+          }
+          
           this.renderTable();
           this.maybeSave();
           

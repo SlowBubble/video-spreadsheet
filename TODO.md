@@ -3,7 +3,7 @@
 # m11
 - Make subcommands work for overlay
 
-## m11a
+## m11a - COMPLETED ✓
 - Define its own class called Subcommand with these fields
 ```
   startMs: number;
@@ -17,7 +17,17 @@
   - When the user press `cmd+enter` for a row that is a command, add a subcommand with the following fields:
     - startMs: same as startMs of the command
     - endMs: same as endMs of the command
-- How to interpret a subcommand? Convert the subcommand to a command, so that it can just be
+    - name: 'Subcommand'
+- How to interpret a subcommand?
+  - Plan generation changes:
+    - Add a OpType option, ADD_OVERLAY
+    - Add a field cmdIdxToOngoingSubcmdIndices (ci2osi) to OpEvtsGroup, tracking what are the ongoing subcommands for each ongoing command
+    - The subcommandIdx is defined as the index of the subcommand array of a given command.
+    - When passing the start of 1 or more subcommands, add them to ci2osi
+    - When passing the end of 1 or more subcommands, remove them from ci2osi
+    - Update generateOverlayActions if there are osi with overlay for the currently visible cmdIdx.
+
+See SUBCOMMAND_IMPLEMENTATION.md for full details.
 
 # Wishlist
 

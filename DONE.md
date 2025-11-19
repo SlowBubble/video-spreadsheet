@@ -1,4 +1,17 @@
 
+# m11a (done)
+- Implemented Subcommand class with fields: startMs, endMs, name, overlay
+- Added subcommands field to ProjectCommand
+- Implemented serialization/deserialization for subcommands
+- Added cmd+enter keyboard shortcut to create subcommands
+- Updated replay logic to handle subcommand overlays:
+  - Added ADD_OVERLAY OpType
+  - Added cmdIdxToOngoingSubcmdIndices tracking to OpEvtsGroup
+  - Updated plan generation to create overlay events for subcommands
+  - Subcommand overlays are rendered on top of command overlays
+
+See SUBCOMMAND_IMPLEMENTATION.md for full implementation details.
+
 # m9e (done)
 - Disable replay until players loading is complete. If the user try to replay before that, display a banner that says "Loading is not finished."
 

@@ -20,6 +20,8 @@
     - startMs: same as startMs of the command
     - endMs: same as endMs of the command
     - name: 'Subcommand'
+  - The table will then render the subcommands as rows right below the parent command in the table
+    - The user can be able to edit the Start, Dur, Text and Fill columns when pressing enter, simmilar to how editing the command row work.
     
 ### How to interpret a subcommand?
 
