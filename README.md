@@ -2,11 +2,36 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# m10c (done)
-- Change OverlayAction to use a list of overlays instead of 1 overlay
-  - The replayer will then draw the on the canvas by following all the overlays instruction.
+# m11
+- Make subcommands work for overlay
 
-# m10d
+## m11a
+- Define its own class called Subcommand with these fields
+```
+  startMs: number;
+  endMs: number;
+  name: string;
+  overlay?: Overlay;
+```
+- Add a field, subcommands of type []Subcommand to ProjectCommand
+  - Make persisting subcommands work (serialize to and deserialize from JSON string)
+- How to add a subcommand in the UI?
+  - When the user press `cmd+enter` for a row that is a command, add a subcommand with the following fields:
+    - startMs: same as startMs of the command
+    - endMs: same as endMs of the command
+    - name: 'Subcommand'
+    
+### How to interpret a subcommand?
+
+Plan generation changes:
+- Add a OpType option, ADD_OVERLAY
+- Add a field cmdIdxToOngoingSubcmdIndices (ci2osi) to OpEvtsGroup, tracking what are the ongoing subcommands for each ongoing command
+  - The subcommandIdx is defined as the index of the subcommand array of a given command.
+  - When passing the start of 1 or more subcommands, add them to ci2osi
+  - When passing the end of 1 or more subcommands, remove them from ci2osi
+- Update generateOverlayActions if there are osi with overlay for the currently visible cmdIdx.
+
+# m10d (done)
 Rewrite plan generation (note that the behavior should not change, so if I'm missing any info propagation, feel free to add them as needed to ensure the behavior stays the same):
 - Create a class OpEvtsGroup with OpEvt[] field OpEvts and field ongoingCmdIndices (a set of numbers) where class OpEvt has fields isStart, timeMs and mediaType (enum AUDIO, VISUAL, AUDIO_AND_VISUAL)
 - (Do this in a private method) Process the commands being passed into 2 OpEvt each, and then group them by timeMs and sort the resulting OpEvtsGroup[] groups by ascending timeMs.
@@ -23,6 +48,9 @@ Rewrite plan generation (note that the behavior should not change, so if I'm mis
   - Have a clean up step where if overlay actions have empty overlay, remove that action
 - Merge them together using the existing sorting impl.
 
+# m10c (done)
+- Change OverlayAction to use a list of overlays instead of 1 overlay
+  - The replayer will then draw the on the canvas by following all the overlays instruction.
 
 # m10b (done)
 - Break PlanAction into these types:
@@ -50,23 +78,9 @@ Rewrite plan generation (note that the behavior should not change, so if I'm mis
 
 - cmd+c cmd+v append row
 - alwaysTether defaults to true as an Editor field.
- 
-Rewrite plan generation:
-- Track the potentiallyVisibleCmdIndices (pvci) set.
-  - The cmdIdx is defined as the index of the commands.
-  - When passing the start of 1 or more commands, add them to pvci
-  - When passing the end of 1 or more commands, remove them to pvci
-- Track the cmdIndexToPotentiallyVisibleSubcommandIndices (ci2pvsi)
-  - The subcommandIdx is defined as the index of the subcommand array of a given command.
-  - When passing the start of 1 or more subcommands, add them to ci2pvsi
-  - When passing the end of 1 or more subcommands, remove them to ci2pvsi
-- For each group of events (grouped by time) in ascending order:
-  - Update the tracking of pvci and ci2pvsi
-  - Generate PlayVideoAction and PauseVideoAction for each event with isSubcommand === false
-  - Generate DisplayAction for the max of pvci
-  - Generate OverlayAction appending the overlay for cmdIdx being max of pvci, and then appending overlays from subcommands by looking them up in ci2pvsi.
+- instead of needsReplayManagerReinit check, just have a map in replayer to store what players are loaded and the duration and load new players as needed.
 
-- Consider getting rid of cmdIdx once we have a good way to id things (may be use name + id to identify html elements to avoid dealing with cmdIdx)
+
 - better shortcuts for borders in various directions.
   - shift+arrow to increase border, shift+cmd+arrow to decrease border
   - o to cycle through opacity [0.25, 0.5, 1], defaulting to 1.

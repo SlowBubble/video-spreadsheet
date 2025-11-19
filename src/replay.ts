@@ -43,17 +43,25 @@ abstract class PlanAction {
   replayPositionMs: number;
   cmdIdx: number; // Command index in original project commands array (-1 for black screen)
   debugAssetName: string; // For debugging purposes only
-  debugActionType: string; // For debugging purposes only
+  actionType: string;
 
-  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, debugActionType: string) {
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, actionType: string) {
     this.replayPositionMs = replayPositionMs;
     this.cmdIdx = cmdIdx;
     this.debugAssetName = debugAssetName;
-    this.debugActionType = debugActionType;
+    this.actionType = actionType;
   }
+}
 
-  // For sorting: PlayVideoAction=1, OverlayAction=2, DisplayAction=3, PauseVideoAction=4
-  abstract getTypePriority(): number;
+// Helper function to get action priority for sorting
+function getActionPriority(action: PlanAction): number {
+  const priorityMap: { [key: string]: number } = {
+    'PlayVideoAction': 1,
+    'OverlayAction': 2,
+    'DisplayAction': 3,
+    'PauseVideoAction': 4
+  };
+  return priorityMap[action.actionType] || 999;
 }
 
 class PlayVideoAction extends PlanAction {
@@ -65,10 +73,6 @@ class PlayVideoAction extends PlanAction {
     this.volume = volume;
     this.playbackRate = playbackRate;
   }
-
-  getTypePriority(): number {
-    return 1;
-  }
 }
 
 class OverlayAction extends PlanAction {
@@ -78,10 +82,6 @@ class OverlayAction extends PlanAction {
     super(replayPositionMs, cmdIdx, debugAssetName, 'OverlayAction');
     this.overlays = overlays;
   }
-
-  getTypePriority(): number {
-    return 2;
-  }
 }
 
 class DisplayAction extends PlanAction {
@@ -89,19 +89,11 @@ class DisplayAction extends PlanAction {
   constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
     super(replayPositionMs, cmdIdx, debugAssetName, 'DisplayAction');
   }
-
-  getTypePriority(): number {
-    return 3;
-  }
 }
 
 class PauseVideoAction extends PlanAction {
   constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
     super(replayPositionMs, cmdIdx, debugAssetName, 'PauseVideoAction');
-  }
-
-  getTypePriority(): number {
-    return 4;
   }
 }
 
@@ -635,7 +627,7 @@ export class ReplayManager {
       if (a.replayPositionMs !== b.replayPositionMs) {
         return a.replayPositionMs - b.replayPositionMs;
       }
-      return a.getTypePriority() - b.getTypePriority();
+      return getActionPriority(a) - getActionPriority(b);
     });
 
     // console.log('[Plan Generated] Replay plan:', JSON.stringify(actions, null, 2));
