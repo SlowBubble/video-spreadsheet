@@ -565,12 +565,11 @@ export class ReplayManager {
         ? Math.max(...Array.from(group.ongoingCmdIndices))
         : -1;
       
+      // Only collect overlay from the visible command
       const overlays: Overlay[] = [];
-      Array.from(group.ongoingCmdIndices).forEach(cmdIdx => {
-        if (enabledCommands[cmdIdx].overlay) {
-          overlays.push(enabledCommands[cmdIdx].overlay);
-        }
-      });
+      if (visibleCmdIdx >= 0 && enabledCommands[visibleCmdIdx].overlay) {
+        overlays.push(enabledCommands[visibleCmdIdx].overlay);
+      }
       
       const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx) : '[Black Screen]';
       actions.push(new OverlayAction(group.timeMs, visibleCmdIdx, assetName, overlays));
