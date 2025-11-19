@@ -992,7 +992,7 @@ export class Editor {
     
     // Cycle through percentage options, then remove
     const percentageOptions = [4, 7, 10, 13, 16, 19];
-    const fillStyle = 'rgba(0, 0, 0, 0.95)';
+    const fillStyle = 'rgba(0, 0, 0, 1)';
     
     let overlay: Overlay;
     if (rowType.type === 'command') {
@@ -1035,7 +1035,7 @@ export class Editor {
     
     // Cycle through percentage options, then remove
     const percentageOptions = [4, 8];
-    const fillStyle = 'rgba(0, 0, 0, 0.1)';
+    const fillStyle = 'rgba(0, 0, 0, 0.5)';
     
     let overlay: Overlay;
     if (rowType.type === 'command') {

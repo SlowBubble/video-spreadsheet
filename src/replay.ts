@@ -515,21 +515,8 @@ export class ReplayManager {
     const ci2osi = new Map<number, Set<number>>();
     
     groups.forEach(group => {
-      // Sort events: process HIDE_VISUAL and PAUSE_VIDEO before START_VIDEO to ensure correct state
-      const sortedEvts = [...group.opEvts].sort((a, b) => {
-        // Order: HIDE_VISUAL, PAUSE_VIDEO, REMOVE_OVERLAY, ADD_OVERLAY, then START_VIDEO
-        const order = { 
-          [OpType.HIDE_VISUAL]: 0, 
-          [OpType.PAUSE_VIDEO]: 1, 
-          [OpType.REMOVE_OVERLAY]: 2,
-          [OpType.ADD_OVERLAY]: 3,
-          [OpType.START_VIDEO]: 4 
-        };
-        return order[a.opType] - order[b.opType];
-      });
-      
       // Process events in this group
-      sortedEvts.forEach(evt => {
+      group.opEvts.forEach(evt => {
         if (evt.opType === OpType.START_VIDEO) {
           oci.add(evt.cmdIdx);
         } else if (evt.opType === OpType.HIDE_VISUAL || evt.opType === OpType.PAUSE_VIDEO) {
