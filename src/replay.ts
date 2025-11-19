@@ -22,36 +22,68 @@ export class Surrounding {
   }
 }
 
-class PlanAction {
-  replayPositionStartMs: number;
-  replayPositionEndMs: number;
+// Abstract base class for all plan actions
+abstract class PlanAction {
+  replayPositionMs: number;
   cmdIdx: number; // Command index in original project commands array (-1 for black screen)
-  playFromStart: boolean; // Start this video from beginning
-  showVideo: boolean; // Show this video's iframe
-  assetName: string;
-  overlay?: Overlay;
-  pauseVideo: boolean; // Whether to pause this video when it's not in the active list
+  debugAssetName: string; // For debugging purposes only
 
-  constructor(
-    replayPositionStartMs: number,
-    replayPositionEndMs: number,
-    cmdIdx: number,
-    playFromStart: boolean,
-    showVideo: boolean,
-    assetName: string,
-    overlay?: Overlay,
-    pauseVideo: boolean = true
-  ) {
-    this.replayPositionStartMs = replayPositionStartMs;
-    this.replayPositionEndMs = replayPositionEndMs;
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
+    this.replayPositionMs = replayPositionMs;
     this.cmdIdx = cmdIdx;
-    this.playFromStart = playFromStart;
-    this.showVideo = showVideo;
-    this.assetName = assetName;
-    this.pauseVideo = pauseVideo;
-    if (overlay) {
-      this.overlay = overlay;
-    }
+    this.debugAssetName = debugAssetName;
+  }
+
+  // For sorting: PlayVideoAction=1, OverlayAction=2, DisplayAction=3, PauseVideoAction=4
+  abstract getTypePriority(): number;
+}
+
+class PlayVideoAction extends PlanAction {
+  volume: number;
+  playbackRate: number;
+
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, volume: number, playbackRate: number) {
+    super(replayPositionMs, cmdIdx, debugAssetName);
+    this.volume = volume;
+    this.playbackRate = playbackRate;
+  }
+
+  getTypePriority(): number {
+    return 1;
+  }
+}
+
+class OverlayAction extends PlanAction {
+  overlay: Overlay;
+
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, overlay: Overlay) {
+    super(replayPositionMs, cmdIdx, debugAssetName);
+    this.overlay = overlay;
+  }
+
+  getTypePriority(): number {
+    return 2;
+  }
+}
+
+class DisplayAction extends PlanAction {
+  // This action indicates which iframe should be displayed (all others hidden)
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
+    super(replayPositionMs, cmdIdx, debugAssetName);
+  }
+
+  getTypePriority(): number {
+    return 3;
+  }
+}
+
+class PauseVideoAction extends PlanAction {
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string) {
+    super(replayPositionMs, cmdIdx, debugAssetName);
+  }
+
+  getTypePriority(): number {
+    return 4;
   }
 }
 
@@ -431,12 +463,16 @@ export class ReplayManager {
         const rate = speedToRate(cmd.speed);
         const actualDuration = videoDuration / rate;
         const endTime = cmd.positionMs + actualDuration;
+        const extendAudioSec = cmd.extendAudioSec || 0;
+        const audioEndTime = endTime + (extendAudioSec * 1000);
 
         if (timeMs === startTime) {
           starting.push(idx);
-        } else if (timeMs === endTime) {
+        } else if (timeMs === endTime || (extendAudioSec > 0 && timeMs === audioEndTime)) {
+          // A command is ending if we're at its visual end OR its audio end
           ending.push(idx);
-        } else if (timeMs > startTime && timeMs < endTime) {
+        } else if (timeMs > startTime && timeMs < audioEndTime) {
+          // A command is ongoing if we're between start and audio end (not just visual end)
           ongoing.push(idx);
         }
       });
@@ -445,11 +481,10 @@ export class ReplayManager {
     });
 
     // Step 3: Generate Plan Actions based on surroundings
-    const plan: PlanAction[] = [];
+    const actions: PlanAction[] = [];
 
-    for (let i = 0; i < surroundings.length - 1; i++) {
+    for (let i = 0; i < surroundings.length; i++) {
       const current = surroundings[i];
-      const next = surroundings[i + 1];
       
       const visibleCmdIdx = this.getVisibleCommand(current.timeMs, surroundings);
       
@@ -459,6 +494,7 @@ export class ReplayManager {
       // Check for commands that are ending but have extended audio
       const endingWithAudio: number[] = [];
       const audioEnding: number[] = [];
+      const regularEnding: number[] = [];
       
       current.ending.forEach((cmdIdx) => {
         const cmd = enabledCommands[cmdIdx];
@@ -478,87 +514,64 @@ export class ReplayManager {
           else if (current.timeMs === audioEndTime) {
             audioEnding.push(cmdIdx);
           }
+        } else {
+          // No extended audio, this is a regular ending
+          regularEnding.push(cmdIdx);
         }
       });
 
       if (activeCommands.length === 0 && endingWithAudio.length === 0) {
         // No active commands, show black screen
-        plan.push(new PlanAction(
-          current.timeMs,
-          next.timeMs,
-          -1,
-          false,
-          true,
-          '[Black Screen]'
-        ));
+        actions.push(new DisplayAction(current.timeMs, -1, '[Black Screen]'));
       } else {
-        // Create actions for each active command
-        activeCommands.forEach((cmdIdx) => {
-          const playFromStart = current.starting.includes(cmdIdx);
-          const showVideo = (cmdIdx === visibleCmdIdx);
-          const overlay = showVideo ? enabledCommands[cmdIdx].overlay : undefined;
+        // Create PlayVideoAction for each starting command
+        current.starting.forEach((cmdIdx) => {
+          const cmd = enabledCommands[cmdIdx];
           const assetName = this.getCommandName(cmdIdx);
-
-          plan.push(new PlanAction(
-            current.timeMs,
-            next.timeMs,
-            cmdIdx,
-            playFromStart,
-            showVideo,
-            assetName,
-            overlay,
-            false // pauseVideo = false (keep playing)
-          ));
+          const rate = speedToRate(cmd.speed);
+          actions.push(new PlayVideoAction(current.timeMs, cmdIdx, assetName, cmd.volume, rate));
         });
         
-        // Create actions for commands with extended audio (don't pause yet)
-        endingWithAudio.forEach((cmdIdx) => {
-          const assetName = this.getCommandName(cmdIdx);
-          
-          plan.push(new PlanAction(
-            current.timeMs,
-            next.timeMs,
-            cmdIdx,
-            false, // playFromStart = false (already playing)
-            false, // showVideo = false (visual has ended)
-            assetName,
-            undefined, // no overlay
-            false // pauseVideo = false (keep audio playing)
-          ));
-        });
+        // Create OverlayAction if the visible command has an overlay
+        if (visibleCmdIdx >= 0 && enabledCommands[visibleCmdIdx].overlay) {
+          const assetName = this.getCommandName(visibleCmdIdx);
+          actions.push(new OverlayAction(current.timeMs, visibleCmdIdx, assetName, enabledCommands[visibleCmdIdx].overlay));
+        }
+        
+        // Create DisplayAction for the visible command
+        if (visibleCmdIdx >= 0) {
+          const assetName = this.getCommandName(visibleCmdIdx);
+          actions.push(new DisplayAction(current.timeMs, visibleCmdIdx, assetName));
+        } else {
+          // No visible command, show black screen
+          actions.push(new DisplayAction(current.timeMs, -1, '[Black Screen]'));
+        }
       }
       
-      // Create pause actions for commands whose audio is ending
+      // Create PauseVideoAction for commands that are ending
+      // This includes both regular endings and audio endings
+      regularEnding.forEach((cmdIdx) => {
+        const assetName = this.getCommandName(cmdIdx);
+        actions.push(new PauseVideoAction(current.timeMs, cmdIdx, assetName));
+      });
+      
       audioEnding.forEach((cmdIdx) => {
         const assetName = this.getCommandName(cmdIdx);
-        
-        plan.push(new PlanAction(
-          current.timeMs,
-          next.timeMs,
-          cmdIdx,
-          false, // playFromStart = false
-          false, // showVideo = false
-          assetName,
-          undefined, // no overlay
-          true // pauseVideo = true (now pause it)
-        ));
+        actions.push(new PauseVideoAction(current.timeMs, cmdIdx, assetName));
       });
     }
 
-    // Handle the last point - show black screen
-    const lastSurrounding = surroundings[surroundings.length - 1];
-    plan.push(new PlanAction(
-      lastSurrounding.timeMs,
-      lastSurrounding.timeMs + 1000,
-      -1,
-      false,
-      true,
-      '[Black Screen]'
-    ));
+    // Sort actions: ascending by replayPositionMs, then by type priority
+    actions.sort((a, b) => {
+      if (a.replayPositionMs !== b.replayPositionMs) {
+        return a.replayPositionMs - b.replayPositionMs;
+      }
+      return a.getTypePriority() - b.getTypePriority();
+    });
 
-    console.log('[Plan Generated] Replay plan:', JSON.stringify(plan, null, 2));
+    console.log('[Plan Generated] Replay plan:', JSON.stringify(actions, null, 2));
     
-    return plan;
+    return actions;
   }
 
   stopReplay() {
@@ -682,53 +695,61 @@ export class ReplayManager {
   executeActions(actions: PlanAction[], enabledCommands: any[]) {
     const debugMode = this.isDebugMode();
     
+    // Group actions by type for easier processing
+    const playActions = actions.filter(a => a instanceof PlayVideoAction) as PlayVideoAction[];
+    const displayActions = actions.filter(a => a instanceof DisplayAction) as DisplayAction[];
+    const pauseActions = actions.filter(a => a instanceof PauseVideoAction) as PauseVideoAction[];
+    const overlayActions = actions.filter(a => a instanceof OverlayAction) as OverlayAction[];
+    
+    // Determine which iframe should be displayed
+    const displayAction = displayActions[0]; // Should only be one DisplayAction per time point
+    const visibleCmdIdx = displayAction ? displayAction.cmdIdx : -1;
+    
+    // Show/hide black screen
+    if (this.blackDiv) {
+      if (debugMode) {
+        this.blackDiv.style.display = 'none';
+      } else {
+        const isBlackScreen = visibleCmdIdx === -1 || 
+          (visibleCmdIdx >= 0 && this.commands[visibleCmdIdx].asset === '');
+        this.blackDiv.style.display = isBlackScreen ? 'block' : 'none';
+      }
+    }
+    
     // Process each player
     this.players.forEach((player, i) => {
       const div = document.getElementById(`yt-player-edit-${i}`);
-      const action = actions.find(a => a.cmdIdx === i);
       
-      if (action) {
-        // This video has an action
-        
-        // Check if we should pause it (for audio-ending actions)
-        if (action.pauseVideo && player) {
-          player.pauseVideo();
+      // Check if this player should play from start
+      const playAction = playActions.find(a => a.cmdIdx === i);
+      if (playAction && player) {
+        const cmd = enabledCommands[i];
+        const startSec = cmd.startMs / 1000;
+        player.seekTo(startSec);
+        player.setVolume(playAction.volume);
+        player.setPlaybackRate(playAction.playbackRate);
+        player.playVideo();
+      }
+      
+      // Check if this player should be paused
+      const pauseAction = pauseActions.find(a => a.cmdIdx === i);
+      if (pauseAction && player) {
+        player.pauseVideo();
+      }
+      
+      // Show/hide iframe based on DisplayAction
+      if (div) {
+        if (debugMode) {
+          div.style.display = 'block';
         } else {
-          // Normal playback
-          if (action.playFromStart && player) {
-            // Start this video from the beginning
-            const cmd = enabledCommands[i];
-            const startSec = cmd.startMs / 1000;
-            const rate = speedToRate(cmd.speed);
-            player.seekTo(startSec);
-            player.setVolume(cmd.volume);
-            player.setPlaybackRate(rate);
-            player.playVideo();
-          } else if (player) {
-            // Continue playing (already started)
-            player.playVideo();
-          }
-        }
-        
-        // Show iframe only if this is the visible video
-        if (div) {
-          if (debugMode) {
-            div.style.display = 'block';
-          } else {
-            div.style.display = action.showVideo ? 'block' : 'none';
-          }
-        }
-      } else {
-        // This video should not be playing, pause it and hide
-        // (Only pause if not found in actions at all)
-        if (player) {
-          player.pauseVideo();
-        }
-        if (div && !debugMode) {
-          div.style.display = 'none';
+          div.style.display = (i === visibleCmdIdx) ? 'block' : 'none';
         }
       }
     });
+    
+    // Update overlay based on OverlayAction
+    const overlayAction = overlayActions[0]; // Should only be one OverlayAction per time point
+    this.updateOverlay(overlayAction?.overlay);
   }
 
   seekAndPlayAllActiveVideos(resumeFromMs: number, visibleIdx: number, enabledCommands: any[]) {
@@ -814,52 +835,20 @@ export class ReplayManager {
     let plan = this.generateReplayPlan2(enabledCommands);
     if (plan.length === 0) return;
     
-    // If endMs is specified, truncate the plan at that time
+    // If endMs is specified, filter actions that occur at or after endMs
     if (endMs !== undefined) {
-      // Filter and truncate actions
-      const truncatedPlan: PlanAction[] = [];
-      
-      for (const action of plan) {
-        if (action.replayPositionStartMs >= endMs) {
-          // Action starts at or after endMs, skip it
-          break;
-        } else if (action.replayPositionEndMs <= endMs) {
-          // Action ends before endMs, keep it as is
-          truncatedPlan.push(action);
-        } else {
-          // Action spans across endMs, truncate it
-          truncatedPlan.push(new PlanAction(
-            action.replayPositionStartMs,
-            endMs,
-            action.cmdIdx,
-            action.playFromStart,
-            action.showVideo,
-            action.assetName,
-            action.overlay,
-            action.pauseVideo
-          ));
-        }
-      }
-      
-      plan = truncatedPlan;
+      plan = plan.filter(action => action.replayPositionMs < endMs);
       
       // Add a black screen action at endMs if plan is not empty
-      // Use a very short duration (1ms) so it immediately triggers the end-of-plan logic
       if (plan.length > 0) {
-        plan.push(new PlanAction(
-          endMs,
-          endMs + 1,
-          -1,
-          false,
-          true,
-          '[Black Screen]'
-        ));
+        plan.push(new DisplayAction(endMs, -1, '[Black Screen]'));
       }
     }
     
     if (plan.length === 0) return;
     
-    const endTime = plan[plan.length - 1].replayPositionStartMs;
+    // Find the last time point in the plan
+    const endTime = Math.max(...plan.map(a => a.replayPositionMs));
     
     // If resuming from or past the end, restart from beginning
     if (resumeFromMs !== undefined && resumeFromMs >= endTime) {
@@ -867,27 +856,17 @@ export class ReplayManager {
     }
     
     // Subtask 3.3: Find the starting step for resume
-    let startStep = 0;
-    let initialDelay = plan.length > 0 ? plan[0].replayPositionStartMs : 0;
+    // Get unique time points in the plan
+    const timePoints = Array.from(new Set(plan.map(a => a.replayPositionMs))).sort((a, b) => a - b);
+    
+    let startTimeIdx = 0;
+    let initialDelay = timePoints.length > 0 ? timePoints[0] : 0;
     
     if (resumeFromMs !== undefined && resumeFromMs > 0) {
-      // Find the plan step where resumeFromMs falls
-      for (let i = 0; i < plan.length; i++) {
-        if (plan[i].replayPositionStartMs <= resumeFromMs && resumeFromMs < plan[i].replayPositionEndMs) {
-          // Found a matching action, but we need to find the FIRST action at this time point
-          // (since multiple actions can have the same start time)
-          const matchingTime = plan[i].replayPositionStartMs;
-          while (startStep < i && plan[startStep].replayPositionStartMs === matchingTime) {
-            startStep++;
-          }
-          if (plan[startStep].replayPositionStartMs !== matchingTime) {
-            startStep = i;
-          }
-          // Actually, let's just find the first action with this start time
-          startStep = i;
-          while (startStep > 0 && plan[startStep - 1].replayPositionStartMs === matchingTime) {
-            startStep--;
-          }
+      // Find the time point where resumeFromMs falls or the closest one before it
+      for (let i = timePoints.length - 1; i >= 0; i--) {
+        if (timePoints[i] <= resumeFromMs) {
+          startTimeIdx = i;
           initialDelay = 0; // Start immediately when resuming
           break;
         }
@@ -917,7 +896,7 @@ export class ReplayManager {
     
     // Update replayStart and replayOffset for position tracking
     this.replayStart = Date.now();
-    this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (plan.length > 0 ? plan[0].replayPositionStartMs : 0);
+    this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (timePoints.length > 0 ? timePoints[0] : 0);
     
     const updatePositionDisplay = () => {
       if (hideTime) return;
@@ -927,11 +906,11 @@ export class ReplayManager {
       posDiv.style.display = 'block';
     };
     
-    let step = startStep;
+    let timeIdx = startTimeIdx;
     
     const nextStep = () => {
       if (!this.isPlaying) return;
-      if (step >= plan.length) {
+      if (timeIdx >= timePoints.length) {
         this.hideAllPlayers();
         this.clearOverlay();
         if (blackDiv) blackDiv.style.display = 'block';
@@ -944,79 +923,63 @@ export class ReplayManager {
       }
       
       // Check if this is the starting step BEFORE we increment
-      const isStartingStep = (step === startStep);
+      const isStartingStep = (timeIdx === startTimeIdx);
       
-      // Group actions by time point (all actions with the same start time)
-      const currentTime = plan[step].replayPositionStartMs;
-      const actions: PlanAction[] = [];
-      while (step < plan.length && plan[step].replayPositionStartMs === currentTime) {
-        actions.push(plan[step]);
-        step++;
-      }
+      // Get current time point and all actions at this time
+      const currentTime = timePoints[timeIdx];
+      const actions = plan.filter(a => a.replayPositionMs === currentTime);
       
-      const action = actions[0]; // Use first action for timing info
+      // Move to next time point
+      timeIdx++;
       
       // Handle automatic pause at playback end
-      // When reaching the final black screen step, pause at that position
-      if (step >= plan.length && action.cmdIdx === -1) {
-        // TODO see whether to use action.replayPositionStartMs or action.replayPositionEndMs here to be correct.
-        this.pausedAtMs = action.replayPositionEndMs;
-        this.isPlaying = false;
-        this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
-        this._intervalId && clearInterval(this._intervalId);
-        this._stepTimeoutId = null;
-        this._intervalId = null;
-        this.clearOverlay();
-        
-        // Hide all players and show black screen
-        this.hideAllPlayers();
-        if (blackDiv) blackDiv.style.display = 'block';
-        
-        // Update position display to show paused at end
-        if (!hideTime && posDiv) {
-          posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused at end)`;
-          posDiv.style.display = 'block';
+      // When reaching the final time point with a black screen DisplayAction, pause
+      if (timeIdx >= timePoints.length) {
+        const displayAction = actions.find(a => a instanceof DisplayAction) as DisplayAction | undefined;
+        if (displayAction && displayAction.cmdIdx === -1) {
+          this.pausedAtMs = currentTime;
+          this.isPlaying = false;
+          this._stepTimeoutId && clearTimeout(this._stepTimeoutId);
+          this._intervalId && clearInterval(this._intervalId);
+          this._stepTimeoutId = null;
+          this._intervalId = null;
+          this.clearOverlay();
+          
+          // Hide all players and show black screen
+          this.hideAllPlayers();
+          if (blackDiv) blackDiv.style.display = 'block';
+          
+          // Update position display to show paused at end
+          if (!hideTime && posDiv) {
+            posDiv.textContent = `Position: ${(this.pausedAtMs / 1000).toFixed(1)}s (Paused at end)`;
+            posDiv.style.display = 'block';
+          }
+          return;
         }
-        return;
       }
       
-      // Subtask 3.3: Calculate remaining duration for the current step when resuming
-      const isResumingMidStep = isStartingStep && resumeFromMs !== undefined && resumeFromMs > action.replayPositionStartMs;
-      let stepDuration = action.replayPositionEndMs - action.replayPositionStartMs;
+      // Calculate step duration (time until next time point)
+      const nextTime = timeIdx < timePoints.length ? timePoints[timeIdx] : currentTime + 1000;
+      const isResumingMidStep = isStartingStep && resumeFromMs !== undefined && resumeFromMs > currentTime;
+      let stepDuration = nextTime - currentTime;
       if (isResumingMidStep && resumeFromMs !== undefined) {
-        stepDuration = action.replayPositionEndMs - resumeFromMs;
+        stepDuration = nextTime - resumeFromMs;
       }
       
       this.replayStart = Date.now();
-      this.replayOffset = (isResumingMidStep && resumeFromMs !== undefined) ? resumeFromMs : action.replayPositionStartMs;
-      
-      // Find which video should be visible and check for black screen
-      const visibleAction = actions.find(a => a.showVideo);
-      const isBlackScreen = !visibleAction || visibleAction.cmdIdx === -1 || 
-        (visibleAction.cmdIdx >= 0 && this.commands[visibleAction.cmdIdx].asset === '');
-      
-      // In debug mode, hide black div; otherwise show it for black screens
-      if (blackDiv) {
-        if (this.isDebugMode()) {
-          blackDiv.style.display = 'none';
-        } else {
-          blackDiv.style.display = isBlackScreen ? 'block' : 'none';
-        }
-      }
+      this.replayOffset = (isResumingMidStep && resumeFromMs !== undefined) ? resumeFromMs : currentTime;
       
       // Execute all plan actions for this time point
       const isResuming = isStartingStep && resumeFromMs !== undefined && resumeFromMs > 0;
       if (isResuming && resumeFromMs !== undefined) {
         // When resuming mid-playback, seek all active videos to the correct position
-        const visibleIdx = visibleAction ? visibleAction.cmdIdx : -1;
+        const displayAction = actions.find(a => a instanceof DisplayAction) as DisplayAction | undefined;
+        const visibleIdx = displayAction ? displayAction.cmdIdx : -1;
         this.seekAndPlayAllActiveVideos(resumeFromMs, visibleIdx, enabledCommands);
       } else {
         // Normal playback: execute all actions
         this.executeActions(actions, enabledCommands);
       }
-      
-      // Update overlay based on visible action
-      this.updateOverlay(visibleAction?.overlay);
       
       this._intervalId && clearInterval(this._intervalId);
       this._intervalId = setInterval(updatePositionDisplay, 500);
@@ -1029,6 +992,10 @@ export class ReplayManager {
     
     this.hideAllPlayers();
     if (blackDiv) blackDiv.style.display = 'block';
+    
+    // Update replayStart and replayOffset for initial position tracking
+    this.replayStart = Date.now();
+    this.replayOffset = resumeFromMs !== undefined ? resumeFromMs : (timePoints.length > 0 ? timePoints[0] : 0);
     
     if (initialDelay > 0) {
       this._stepTimeoutId = setTimeout(() => {
