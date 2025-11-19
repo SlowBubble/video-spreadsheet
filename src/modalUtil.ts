@@ -112,18 +112,17 @@ export function showTextareaModal(options: TextareaModalOptions): void {
     closeModal();
   };
 
-  // Close modal on Escape key, save on Shift+Enter
+  // Close modal on Escape key, save on Enter
   // Use capture phase (true) to intercept events before they reach the editor
   const handleKeyDown = (e: KeyboardEvent) => {
     // Stop propagation to prevent editor's window listener from receiving the event
     e.stopPropagation();
     
-    const shiftEnter = e.key === 'Enter' && e.shiftKey;
-    const cmdEnter = e.key === 'Enter' && e.metaKey;
     if (e.key === 'Escape') {
       e.preventDefault();
       closeModal();
-    } else if (shiftEnter || cmdEnter) {
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      // Enter saves, Shift+Enter inserts newline (default behavior)
       e.preventDefault();
       onSave(textarea.value);
       closeModal();
