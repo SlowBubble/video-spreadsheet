@@ -107,6 +107,7 @@ class PauseVideoAction extends PlanAction {
 
 export class ReplayManager {
   players: Map<number, any> = new Map(); // Map from command ID to YouTube player
+  playerRanges: Map<number, { startMs: number; endMs: number }> = new Map(); // Track loaded ranges for each player
   blackDiv: HTMLDivElement | null = null;
   container: HTMLDivElement | null = null;
   overlayCanvas: HTMLCanvasElement | null = null;
@@ -119,6 +120,7 @@ export class ReplayManager {
   isInitialized: boolean = false;
   playersReadyCount: number = 0;
   totalPlayersExpected: number = 0;
+  getYouTubeId: ((url: string) => string | null) | null = null;
 
   isDebugMode(): boolean {
     const params = getHashParams();
@@ -305,6 +307,9 @@ export class ReplayManager {
     // Keep commands in original order - cmdIdx refers to position in this array
     commands = [...commands];
     
+    // Store getYouTubeId for later use
+    this.getYouTubeId = getYouTubeId;
+    
     const isPresentMode = this.isPresentMode();
     
     // Container for players and black screen
@@ -365,61 +370,22 @@ export class ReplayManager {
     // Wait for YT API
     const onYouTubeIframeAPIReady = () => {
       this.players = new Map();
+      this.playerRanges = new Map();
       this.playersReadyCount = 0;
       this.totalPlayersExpected = commands.filter((cmd: any) => getYouTubeId(cmd.asset) !== null).length;
       
       commands.forEach((cmd: any) => {
         const ytId = getYouTubeId(cmd.asset);
-        const startSec = cmd.startMs / 1000;
-        const endSec = cmd.endMs / 1000;
-        const extendAudioSec = cmd.extendAudioSec || 0;
-        const cmdId = cmd.id;
-        const div = document.createElement('div');
-        div.id = `yt-player-edit-${cmdId}`;
-        // In debug mode, position players vertically; otherwise stack them
-        if (this.isDebugMode()) {
-          div.style.position = 'relative';
-          div.style.marginBottom = '20px';
-          div.style.display = 'block';
-        } else {
-          div.style.position = 'absolute';
-          div.style.top = '0';
-          div.style.left = '0';
-          div.style.display = 'none';
-        }
-        container.appendChild(div);
         if (ytId) {
-          const player = new (window as any).YT.Player(div.id, {
-            width: '854',
-            height: '480',
-            videoId: ytId,
-            playerVars: {
-              autoplay: 0,
-              controls: 0,
-              start: startSec,
-              end: endSec + extendAudioSec,
-              modestbranding: 1,
-              rel: 0,
-            },
-            events: {
-              onReady: (event: any) => {
-                const rate = speedToRate(cmd.speed);
-                event.target.seekTo(startSec);
-                event.target.pauseVideo();
-                event.target.setVolume(cmd.volume);
-                event.target.setPlaybackRate(rate);
-                
-                // Track initialization progress
-                this.playersReadyCount++;
-                
-                if (this.playersReadyCount === this.totalPlayersExpected) {
-                  this.isInitialized = true;
-                  this.showInitBanner();
-                }
-              }
+          this.loadPlayer(cmd, () => {
+            // Track initialization progress
+            this.playersReadyCount++;
+            
+            if (this.playersReadyCount === this.totalPlayersExpected) {
+              this.isInitialized = true;
+              this.showInitBanner();
             }
           });
-          this.players.set(cmdId, player);
         }
       });
       // Show black screen initially
@@ -438,6 +404,94 @@ export class ReplayManager {
     if (idx < 0 || idx >= commands.length) return `[${idx}]`;
     const cmd = commands[idx];
     return cmd.name || `[${idx}]`;
+  }
+
+  loadPlayer(cmd: any, onReady?: () => void): void {
+    if (!this.getYouTubeId || !this.container) return;
+    
+    const ytId = this.getYouTubeId(cmd.asset);
+    if (!ytId) return;
+    
+    const cmdId = cmd.id;
+    const startSec = cmd.startMs / 1000;
+    const endSec = cmd.endMs / 1000;
+    const extendAudioSec = cmd.extendAudioSec || 0;
+    
+    console.log(`[loadPlayer] Loading player for cmdId=${cmdId}, startMs=${cmd.startMs}, endMs=${cmd.endMs}`);
+    
+    // Check if div already exists, if not create it
+    let div = document.getElementById(`yt-player-edit-${cmdId}`);
+    if (!div) {
+      div = document.createElement('div');
+      div.id = `yt-player-edit-${cmdId}`;
+      // In debug mode, position players vertically; otherwise stack them
+      if (this.isDebugMode()) {
+        div.style.position = 'relative';
+        div.style.marginBottom = '20px';
+        div.style.display = 'block';
+      } else {
+        div.style.position = 'absolute';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.display = 'none';
+      }
+      this.container.appendChild(div);
+    }
+    
+    // If player already exists, destroy it first
+    const existingPlayer = this.players.get(cmdId);
+    if (existingPlayer) {
+      existingPlayer.destroy();
+    }
+    
+    const player = new (window as any).YT.Player(div.id, {
+      width: '854',
+      height: '480',
+      videoId: ytId,
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        start: startSec,
+        end: endSec + extendAudioSec,
+        modestbranding: 1,
+        rel: 0,
+      },
+      events: {
+        onReady: (event: any) => {
+          const rate = speedToRate(cmd.speed);
+          event.target.seekTo(startSec);
+          event.target.pauseVideo();
+          event.target.setVolume(cmd.volume);
+          event.target.setPlaybackRate(rate);
+          
+          console.log(`[loadPlayer] Done loading player for cmdId=${cmdId}`);
+          
+          if (onReady) {
+            onReady();
+          }
+        }
+      }
+    });
+    
+    this.players.set(cmdId, player);
+    this.playerRanges.set(cmdId, { startMs: cmd.startMs, endMs: cmd.endMs });
+  }
+
+  needsPlayerReload(cmd: any): boolean {
+    const cmdId = cmd.id;
+    const range = this.playerRanges.get(cmdId);
+    
+    // If player doesn't exist, it needs to be loaded
+    if (!range) {
+      return true;
+    }
+    
+    // Check if startMs or endMs is outside the loaded range
+    if (cmd.startMs < range.startMs || cmd.endMs > range.endMs) {
+      return true;
+    }
+    
+    return false;
   }
 
 

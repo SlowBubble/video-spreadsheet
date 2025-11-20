@@ -2160,15 +2160,8 @@ export class Editor {
     const currentJsonString = this.project.serialize();
     const hasChanged = this.undoManager.hasChanged(currentJsonString);
     if (hasChanged) {
-      // TODO: consider whether we should just force caller to specify this for simplicity.
-      // Fine-grain check: only reinit replay manager if assets, startMs, or endMs changed
-      const needsReplayReinit = this.needsReplayManagerReinit(currentJsonString);
-      
+      this.reloadPlayersIfNeeded();
       this.undoManager.updateIfChanged(currentJsonString);
-      
-      if (needsReplayReinit) {
-        this.initReplayManager();
-      }
     }
     if (hasChanged || forceSave) {
       this.saveProject();
@@ -2178,37 +2171,15 @@ export class Editor {
     }
   }
 
-  needsReplayManagerReinit(newJsonString: string): boolean {
-    const oldJsonString = this.undoManager.getCurrentState();
+  reloadPlayersIfNeeded(): void {
+    const enabledCommands = this.getEnabledCommands();
     
-    try {
-      const oldProject = Project.fromJSONString(oldJsonString);
-      const newProject = Project.fromJSONString(newJsonString);
-      const oldCommands = oldProject.getEnabledCommands();
-      const newCommands = newProject.getEnabledCommands();
-      
-      // Check if number of commands changed (new asset added or removed)
-      if (oldCommands.length < newCommands.length) {
-        return true;
+    // Check each enabled command to see if its player needs reloading
+    for (const cmd of enabledCommands) {
+      if (this.replayManager.needsPlayerReload(cmd)) {
+        // Reload just this player
+        this.replayManager.loadPlayer(cmd);
       }
-      
-      // Check if any asset, startMs, endMs, or extendAudioSec changed
-      for (let i = 0; i < newCommands.length; i++) {
-        const oldCmd = oldCommands[i];
-        const newCmd = newCommands[i];
-        
-        if (oldCmd.asset !== newCmd.asset ||
-            oldCmd.startMs !== newCmd.startMs ||
-            oldCmd.endMs !== newCmd.endMs ||
-            oldCmd.extendAudioSec !== newCmd.extendAudioSec) {
-          return true;
-        }
-      }
-      
-      return false;
-    } catch (e) {
-      // If parsing fails, reinit to be safe
-      return true;
     }
   }
 
