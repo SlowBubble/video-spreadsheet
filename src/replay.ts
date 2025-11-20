@@ -106,7 +106,7 @@ class PauseVideoAction extends PlanAction {
 }
 
 export class ReplayManager {
-  players: any[] = [];
+  players: Map<number, any> = new Map(); // Map from command ID to YouTube player
   blackDiv: HTMLDivElement | null = null;
   container: HTMLDivElement | null = null;
   overlayCanvas: HTMLCanvasElement | null = null;
@@ -364,17 +364,18 @@ export class ReplayManager {
     
     // Wait for YT API
     const onYouTubeIframeAPIReady = () => {
-      this.players = [];
+      this.players = new Map();
       this.playersReadyCount = 0;
       this.totalPlayersExpected = commands.filter((cmd: any) => getYouTubeId(cmd.asset) !== null).length;
       
-      commands.forEach((cmd: any, idx: number) => {
+      commands.forEach((cmd: any) => {
         const ytId = getYouTubeId(cmd.asset);
         const startSec = cmd.startMs / 1000;
         const endSec = cmd.endMs / 1000;
         const extendAudioSec = cmd.extendAudioSec || 0;
+        const cmdId = cmd.id;
         const div = document.createElement('div');
-        div.id = `yt-player-edit-${idx}`;
+        div.id = `yt-player-edit-${cmdId}`;
         // In debug mode, position players vertically; otherwise stack them
         if (this.isDebugMode()) {
           div.style.position = 'relative';
@@ -418,9 +419,7 @@ export class ReplayManager {
               }
             }
           });
-          this.players.push(player);
-        } else {
-          this.players.push(null);
+          this.players.set(cmdId, player);
         }
       });
       // Show black screen initially
@@ -802,8 +801,8 @@ export class ReplayManager {
 
   hideAllPlayers() {
     const debugMode = this.isDebugMode();
-    this.players.forEach((player, idx) => {
-      const div = document.getElementById(`yt-player-edit-${idx}`);
+    this.players.forEach((player, cmdId) => {
+      const div = document.getElementById(`yt-player-edit-${cmdId}`);
       // In debug mode, keep players visible; otherwise hide them
       if (div && !debugMode) div.style.display = 'none';
       if (player) {
@@ -827,6 +826,7 @@ export class ReplayManager {
     // Only update display if there's a DisplayAction
     if (displayAction) {
       const visibleCmdIdx = displayAction.cmdIdx;
+      const visibleCmdId = visibleCmdIdx >= 0 ? enabledCommands[visibleCmdIdx].id : -1;
       
       // Show/hide black screen
       if (this.blackDiv) {
@@ -840,34 +840,35 @@ export class ReplayManager {
       }
       
       // Show/hide iframes based on DisplayAction
-      this.players.forEach((_player, i) => {
-        const div = document.getElementById(`yt-player-edit-${i}`);
+      this.players.forEach((_player, cmdId) => {
+        const div = document.getElementById(`yt-player-edit-${cmdId}`);
         if (div) {
           if (debugMode) {
             div.style.display = 'block';
           } else {
-            div.style.display = (i === visibleCmdIdx) ? 'block' : 'none';
+            div.style.display = (cmdId === visibleCmdId) ? 'block' : 'none';
           }
         }
       });
     }
     
     // Process play and pause actions
-    this.players.forEach((player, i) => {
-      // Check if this player should play from start
-      const playAction = playActions.find(a => a.cmdIdx === i);
-      if (playAction && player) {
-        const cmd = enabledCommands[i];
+    playActions.forEach(playAction => {
+      const cmd = enabledCommands[playAction.cmdIdx];
+      const player = this.players.get(cmd.id);
+      if (player) {
         const startSec = cmd.startMs / 1000;
         player.seekTo(startSec);
         player.setVolume(playAction.volume);
         player.setPlaybackRate(playAction.playbackRate);
         player.playVideo();
       }
-      
-      // Check if this player should be paused
-      const pauseAction = pauseActions.find(a => a.cmdIdx === i);
-      if (pauseAction && player) {
+    });
+    
+    pauseActions.forEach(pauseAction => {
+      const cmd = enabledCommands[pauseAction.cmdIdx];
+      const player = this.players.get(cmd.id);
+      if (player) {
         player.pauseVideo();
       }
     });
@@ -879,7 +880,7 @@ export class ReplayManager {
 
   seekAndPlayAllActiveVideos(resumeFromMs: number, visibleIdx: number, enabledCommands: any[]) {
     // Find all enabled commands that should be playing at resumeFromMs
-    const activeCommands: number[] = [];
+    const activeCommandIndices: number[] = [];
     enabledCommands.forEach((cmd, idx) => {
       const cmdStart = cmd.positionMs;
       const videoDuration = cmd.endMs - cmd.startMs;
@@ -889,16 +890,21 @@ export class ReplayManager {
       
       // Check if this command overlaps with resumeFromMs
       if (resumeFromMs >= cmdStart && resumeFromMs < cmdEnd) {
-        activeCommands.push(idx);
+        activeCommandIndices.push(idx);
       }
     });
     
+    const visibleCmdId = visibleIdx >= 0 ? enabledCommands[visibleIdx].id : -1;
+    
     // Seek and play all active commands
-    this.players.forEach((player, i) => {
-      const div = document.getElementById(`yt-player-edit-${i}`);
+    this.players.forEach((player, cmdId) => {
+      const div = document.getElementById(`yt-player-edit-${cmdId}`);
       
-      if (activeCommands.includes(i) && player) {
-        const cmd = enabledCommands[i];
+      // Find the command index for this player
+      const cmdIdx = enabledCommands.findIndex((cmd: any) => cmd.id === cmdId);
+      
+      if (cmdIdx >= 0 && activeCommandIndices.includes(cmdIdx) && player) {
+        const cmd = enabledCommands[cmdIdx];
         const cmdStart = cmd.positionMs;
         const elapsedInCmd = resumeFromMs - cmdStart;
         const rate = speedToRate(cmd.speed);
@@ -912,7 +918,7 @@ export class ReplayManager {
           if (this.isDebugMode()) {
             div.style.display = 'block';
           } else {
-            div.style.display = i === visibleIdx ? 'block' : 'none';
+            div.style.display = cmdId === visibleCmdId ? 'block' : 'none';
           }
         }
         

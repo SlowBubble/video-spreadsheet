@@ -4,14 +4,12 @@
 
 # m12
 
-# m12a
+# m12a (done)
 - For each command, add an number field id. If the id does not exist or is 0, then set it to the next smallest number that is not in use among all the commands.
 
-# m12b
-- In the replayer, it may be simpler to use command id instead of idx, which can change as we move commands around.
-- Instead of specifying start and end for the youtube player, load the entire video
-- Instead of needsReplayManagerReinit check, just have a set of ids of what youtube player is loaded. Once a player for that id is loaded, you won't need to reload.
-  - If a new command is created with an asset link, then you can just load a player for that player is that of having to reload everything
+# m12b (done)
+- In the replayer, it may be simpler to use command id instead of idx to track the yt players, which can change as we move commands around.
+  - Keep using the cmdIdx for the action generation flow though.
 
 # wishlist
 - alwaysTether defaults to true as an Editor field.
