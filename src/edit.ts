@@ -1473,6 +1473,17 @@ export class Editor {
       } else if (this.selectedCol === 8) {
         // Text column - store as string
         textToCopy = cmd.overlay?.textDisplay?.content || '';
+      } else if (this.selectedCol === 9) {
+        // Fill column - copy overlay without TextDisplay
+        if (cmd.overlay) {
+          const overlayCopy = {
+            fullScreenFilter: cmd.overlay.fullScreenFilter,
+            borderFilter: cmd.overlay.borderFilter
+          };
+          textToCopy = JSON.stringify(overlayCopy, null, 2);
+        } else {
+          textToCopy = '';
+        }
       }
     } else if (rowType.type === 'subcommand') {
       const cmd = this.project.commands[rowType.cmdIdx];
@@ -1493,6 +1504,17 @@ export class Editor {
       } else if (this.selectedCol === 8) {
         // Text
         textToCopy = subCmd.overlay?.textDisplay?.content || '';
+      } else if (this.selectedCol === 9) {
+        // Fill column - copy overlay without TextDisplay
+        if (subCmd.overlay) {
+          const overlayCopy = {
+            fullScreenFilter: subCmd.overlay.fullScreenFilter,
+            borderFilter: subCmd.overlay.borderFilter
+          };
+          textToCopy = JSON.stringify(overlayCopy, null, 2);
+        } else {
+          textToCopy = '';
+        }
       }
     }
     
@@ -1590,14 +1612,68 @@ export class Editor {
       return;
     }
     
-    // Only support pasting for commands (not subcommands yet)
-    if (rowType.type !== 'command') {
-      showBanner('Paste not supported for subcommands yet', {
-        id: 'paste-banner',
-        position: 'bottom',
-        color: 'yellow',
-        duration: 1500
-      });
+    // Handle subcommand pasting (limited support)
+    if (rowType.type === 'subcommand') {
+      const cmd = this.project.commands[rowType.cmdIdx];
+      const subCmd = cmd.subcommands[rowType.subIdx];
+      
+      if (this.selectedCol === 9) {
+        // Fill column - paste overlay (excluding TextDisplay)
+        try {
+          const parsedOverlay = JSON.parse(clipboardText);
+          
+          if (!subCmd.overlay) {
+            subCmd.overlay = new Overlay();
+          }
+          const overlay = subCmd.overlay;
+          
+          // Preserve existing TextDisplay
+          const existingTextDisplay = overlay.textDisplay;
+          
+          // Update filters from pasted data
+          if (parsedOverlay.fullScreenFilter) {
+            overlay.fullScreenFilter = new FullScreenFilter(parsedOverlay.fullScreenFilter.fillStyle);
+          } else {
+            overlay.fullScreenFilter = undefined;
+          }
+          
+          if (parsedOverlay.borderFilter) {
+            overlay.borderFilter = new BorderFilter(
+              parsedOverlay.borderFilter.topMarginPct,
+              parsedOverlay.borderFilter.bottomMarginPct,
+              parsedOverlay.borderFilter.fillStyle,
+              parsedOverlay.borderFilter.leftMarginPct || 0,
+              parsedOverlay.borderFilter.rightMarginPct || 0
+            );
+          } else {
+            overlay.borderFilter = undefined;
+          }
+          
+          // Restore TextDisplay
+          overlay.textDisplay = existingTextDisplay;
+          
+          showBanner('Pasted!', {
+            id: 'paste-banner',
+            position: 'bottom',
+            color: 'green',
+            duration: 500
+          });
+        } catch (e) {
+          showBanner('Failed: Invalid overlay JSON', {
+            id: 'paste-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 1500
+          });
+        }
+      } else {
+        showBanner('Paste not supported for subcommands yet', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'yellow',
+          duration: 1500
+        });
+      }
       return;
     }
     
@@ -1605,19 +1681,29 @@ export class Editor {
     
     // Paste based on column type
     if (this.selectedCol === 0) {
-      // Checkbox column - try to parse as JSON command and replace entire row
+      // Checkbox column - try to parse as JSON command and insert below current row
       try {
         const parsedCmd = JSON.parse(clipboardText);
-        cmd.asset = parsedCmd.asset;
-        cmd.positionMs = parsedCmd.positionMs;
-        cmd.startMs = parsedCmd.startMs;
-        cmd.endMs = parsedCmd.endMs;
-        cmd.volume = parsedCmd.volume;
-        cmd.speed = parsedCmd.speed;
-        cmd.name = parsedCmd.name;
-        cmd.overlay = parsedCmd.overlay;
-        cmd.disabled = parsedCmd.disabled;
-        showBanner('Pasted row!', {
+        const newCmd = new ProjectCommand(
+          parsedCmd.asset,
+          parsedCmd.positionMs,
+          parsedCmd.startMs,
+          parsedCmd.endMs,
+          parsedCmd.volume,
+          parsedCmd.speed,
+          parsedCmd.name,
+          parsedCmd.overlay,
+          parsedCmd.disabled,
+          parsedCmd.extendAudioSec,
+          parsedCmd.subcommands || []
+        );
+        // Insert below the current command
+        this.project.commands.splice(rowType.cmdIdx + 1, 0, newCmd);
+        
+        // Move cursor to the newly pasted row (accounting for subcommands of current command)
+        this.selectedRow += (1 + cmd.subcommands.length);
+        
+        showBanner('Pasted row below!', {
           id: 'paste-banner',
           position: 'bottom',
           color: 'green',
@@ -1717,6 +1803,45 @@ export class Editor {
         overlay.textDisplay = new TextDisplay(clipboardText);
       } else if (cmd.overlay) {
         cmd.overlay.textDisplay = undefined;
+      }
+    } else if (this.selectedCol === 9) {
+      // Fill column - paste overlay (excluding TextDisplay)
+      try {
+        const parsedOverlay = JSON.parse(clipboardText);
+        const overlay = ensureOverlay(cmd);
+        
+        // Preserve existing TextDisplay
+        const existingTextDisplay = overlay.textDisplay;
+        
+        // Update filters from pasted data
+        if (parsedOverlay.fullScreenFilter) {
+          overlay.fullScreenFilter = new FullScreenFilter(parsedOverlay.fullScreenFilter.fillStyle);
+        } else {
+          overlay.fullScreenFilter = undefined;
+        }
+        
+        if (parsedOverlay.borderFilter) {
+          overlay.borderFilter = new BorderFilter(
+            parsedOverlay.borderFilter.topMarginPct,
+            parsedOverlay.borderFilter.bottomMarginPct,
+            parsedOverlay.borderFilter.fillStyle,
+            parsedOverlay.borderFilter.leftMarginPct || 0,
+            parsedOverlay.borderFilter.rightMarginPct || 0
+          );
+        } else {
+          overlay.borderFilter = undefined;
+        }
+        
+        // Restore TextDisplay
+        overlay.textDisplay = existingTextDisplay;
+      } catch (e) {
+        showBanner('Failed: Invalid overlay JSON', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
       }
     }
     

@@ -3,13 +3,18 @@
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
 
-# m11f
+# m11f (done)
 
 alt+up for subcommand
 
+# m11g (done)
+- copy-paste the overlay, excluding TextDisplay
+- cmd+c cmd+v append row
+
 # wishlist
 
-- cmd+c cmd+v append row
+- Need to refactor fromJSON to be available all classes used inside Project
+  - Motivation: there are many instances of `new ProjectCommand` with lots of args, but I want to see if we can avoid expanding like this.
 - alwaysTether defaults to true as an Editor field.
 - instead of needsReplayManagerReinit check, just have a map in replayer to store what players are loaded and the duration and load new players as needed.
 
@@ -17,9 +22,7 @@ alt+up for subcommand
   - `enter`, `alt+left` and `alt+right`
 - Add links back to Dur by computing the footage end time in seconds (round down)
 - Add links for the subcommands based on the parent command
-- copy-paste the overlay, excluding TextDisplay
 - Add `d` shortcut to get debug info based on the current play
-
 
 - better shortcuts for borders in various directions.
   - shift+arrow to increase border, shift+cmd+arrow to decrease border
