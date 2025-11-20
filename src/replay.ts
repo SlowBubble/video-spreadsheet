@@ -107,7 +107,6 @@ class PauseVideoAction extends PlanAction {
 
 export class ReplayManager {
   players: any[] = [];
-  commands: any[] = [];
   blackDiv: HTMLDivElement | null = null;
   container: HTMLDivElement | null = null;
   overlayCanvas: HTMLCanvasElement | null = null;
@@ -432,14 +431,13 @@ export class ReplayManager {
     } else {
       (window as any).onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
     }
-    this.commands = commands;
     // Show black screen initially
     blackDiv.style.display = 'block';
   }
 
-  getCommandName(idx: number): string {
-    if (idx < 0 || idx >= this.commands.length) return `[${idx}]`;
-    const cmd = this.commands[idx];
+  getCommandName(idx: number, commands: any[]): string {
+    if (idx < 0 || idx >= commands.length) return `[${idx}]`;
+    const cmd = commands[idx];
     return cmd.name || `[${idx}]`;
   }
 
@@ -556,7 +554,7 @@ export class ReplayManager {
       group.opEvts.forEach(evt => {
         if (evt.opType === OpType.START_VIDEO) {
           const cmd = enabledCommands[evt.cmdIdx];
-          const assetName = this.getCommandName(evt.cmdIdx);
+          const assetName = this.getCommandName(evt.cmdIdx, enabledCommands);
           const rate = speedToRate(cmd.speed);
           actions.push(new PlayVideoAction(group.timeMs, evt.cmdIdx, assetName, cmd.volume, rate));
         }
@@ -566,13 +564,13 @@ export class ReplayManager {
     return actions;
   }
 
-  private generatePauseVideoActions(groups: OpEvtsGroup[]): PauseVideoAction[] {
+  private generatePauseVideoActions(groups: OpEvtsGroup[], enabledCommands: any[]): PauseVideoAction[] {
     const actions: PauseVideoAction[] = [];
     
     groups.forEach(group => {
       group.opEvts.forEach(evt => {
         if (evt.opType === OpType.PAUSE_VIDEO) {
-          const assetName = this.getCommandName(evt.cmdIdx);
+          const assetName = this.getCommandName(evt.cmdIdx, enabledCommands);
           actions.push(new PauseVideoAction(group.timeMs, evt.cmdIdx, assetName));
         }
       });
@@ -581,7 +579,7 @@ export class ReplayManager {
     return actions;
   }
 
-  private generateDisplayActions(groups: OpEvtsGroup[]): DisplayAction[] {
+  private generateDisplayActions(groups: OpEvtsGroup[], enabledCommands: any[]): DisplayAction[] {
     const actions: DisplayAction[] = [];
     
     groups.forEach(group => {
@@ -589,7 +587,7 @@ export class ReplayManager {
         ? Math.max(...Array.from(group.ongoingCmdIndices))
         : -1;
       
-      const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx) : '[Black Screen]';
+      const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx, enabledCommands) : '[Black Screen]';
       actions.push(new DisplayAction(group.timeMs, visibleCmdIdx, assetName));
     });
     
@@ -628,7 +626,7 @@ export class ReplayManager {
         }
       }
       
-      const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx) : '[Black Screen]';
+      const assetName = visibleCmdIdx >= 0 ? this.getCommandName(visibleCmdIdx, enabledCommands) : '[Black Screen]';
       actions.push(new OverlayAction(group.timeMs, visibleCmdIdx, assetName, overlays));
     });
     
@@ -667,8 +665,8 @@ export class ReplayManager {
     
     // Generate actions
     const playActions = this.generatePlayVideoActions(groups, enabledCommands);
-    const pauseActions = this.generatePauseVideoActions(groups);
-    let displayActions = this.generateDisplayActions(groups);
+    const pauseActions = this.generatePauseVideoActions(groups, enabledCommands);
+    let displayActions = this.generateDisplayActions(groups, enabledCommands);
     let overlayActions = this.generateOverlayActions(groups, enabledCommands);
     
     // Clean up
@@ -836,7 +834,7 @@ export class ReplayManager {
           this.blackDiv.style.display = 'none';
         } else {
           const isBlackScreen = visibleCmdIdx === -1 || 
-            (visibleCmdIdx >= 0 && this.commands[visibleCmdIdx].asset === '');
+            (visibleCmdIdx >= 0 && enabledCommands[visibleCmdIdx].asset === '');
           this.blackDiv.style.display = isBlackScreen ? 'block' : 'none';
         }
       }
@@ -954,9 +952,8 @@ export class ReplayManager {
     }
     
     const players = this.players;
-    const commands = this.commands;
     const blackDiv = this.blackDiv;
-    if (!players || !commands || !blackDiv) return;
+    if (!players || !blackDiv || !enabledCommands || enabledCommands.length === 0) return;
     
     // Subtask 3.2: Generate the full replay plan and detect resume-from-end
     let plan = this.generateReplayPlan2(enabledCommands);
