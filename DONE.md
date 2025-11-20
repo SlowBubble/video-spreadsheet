@@ -1,4 +1,24 @@
 
+# m11b (done)
+
+- Implement left and right border using the shortcut `v`, similar to what `b` is doing with top and bottom border.
+  - will use mouse drag later.
+
+
+# m11c (done)
+- subcommand editing for the Fill column
+  - mouse double-click or `enter`
+
+# m11d (done)
+
+- Display Pos 0 and Pos 1
+- Allow editing Pos 0 of a subcommand row
+  - `enter` will open up a prompt with the computed value as in the cell and if the user change it, you will need to compute the corresponding startMs for the subcommand
+  - Make `alt+left` and `alt+right` work for subcommand rows at Pos 0 column as well
+
+# m11e (done)
+- Fix replay at non-zero time (certain visuals are not displayed; I suspect some DisplayAction from before the resume time is skipped) 
+
 # m11a (done)
 - Implemented Subcommand class with fields: startMs, endMs, name, overlay
 - Added subcommands field to ProjectCommand

@@ -3,40 +3,22 @@
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
 
-# m11b (done)
-
-- Implement left and right border using the shortcut `v`, similar to what `b` is doing with top and bottom border.
-  - will use mouse drag later.
-
-
-# m11c (done)
-- subcommand editing for the Fill column
-  - mouse double-click or `enter`
-
-# m11d
-
-- Display Pos 0 and Pos 1
-- Allow editing Pos 0 of a subcommand row
-  - `enter` will open up a prompt with the computed value as in the cell and if the user change it, you will need to compute the corresponding startMs for the subcommand
-  - Make `alt+left` and `alt+right` work for subcommand rows at Pos 0 column as well
-
-# m11e
-- Fix replay at non-zero time (certain visuals are not displayed; I suspect some DisplayAction from before the resume time is skipped) 
-
 # m11f
-- Allow editing pos 1 column
-  - `enter`, `alt+left` and `alt+right`
-- Add links back to Dur by computing the footage end time in seconds (round down)
-- Add links for the subcommands based on the parent command
-- copy-paste the overlay, excluding TextDisplay
-- Add `d` shortcut to get debug info based on the current play
 
+alt+up for subcommand
 
 # wishlist
 
 - cmd+c cmd+v append row
 - alwaysTether defaults to true as an Editor field.
 - instead of needsReplayManagerReinit check, just have a map in replayer to store what players are loaded and the duration and load new players as needed.
+
+- Allow editing pos 1 column
+  - `enter`, `alt+left` and `alt+right`
+- Add links back to Dur by computing the footage end time in seconds (round down)
+- Add links for the subcommands based on the parent command
+- copy-paste the overlay, excluding TextDisplay
+- Add `d` shortcut to get debug info based on the current play
 
 
 - better shortcuts for borders in various directions.

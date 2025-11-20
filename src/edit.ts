@@ -1216,36 +1216,68 @@ export class Editor {
 
   moveCommandUp() {
     const rowType = this.rowTypes[this.selectedRow];
-    if (!rowType || rowType.type !== 'command') return;
+    if (!rowType || rowType.type === 'empty') return;
     
-    // Can't move first command up
-    if (rowType.cmdIdx === 0) return;
-    
-    // Swap with the command above
-    const temp = this.project.commands[rowType.cmdIdx];
-    this.project.commands[rowType.cmdIdx] = this.project.commands[rowType.cmdIdx - 1];
-    this.project.commands[rowType.cmdIdx - 1] = temp;
-    
-    // Move selection up (accounting for subcommands of the command above)
-    const prevCmd = this.project.commands[rowType.cmdIdx];
-    this.selectedRow -= (1 + prevCmd.subcommands.length);
+    if (rowType.type === 'command') {
+      // Can't move first command up
+      if (rowType.cmdIdx === 0) return;
+      
+      // Swap with the command above
+      const temp = this.project.commands[rowType.cmdIdx];
+      this.project.commands[rowType.cmdIdx] = this.project.commands[rowType.cmdIdx - 1];
+      this.project.commands[rowType.cmdIdx - 1] = temp;
+      
+      // Move selection up (accounting for subcommands of the command above)
+      const prevCmd = this.project.commands[rowType.cmdIdx];
+      this.selectedRow -= (1 + prevCmd.subcommands.length);
+    } else if (rowType.type === 'subcommand') {
+      // Move subcommand within its parent command
+      const cmd = this.project.commands[rowType.cmdIdx];
+      
+      // Can't move first subcommand up
+      if (rowType.subIdx === 0) return;
+      
+      // Swap with the subcommand above
+      const temp = cmd.subcommands[rowType.subIdx];
+      cmd.subcommands[rowType.subIdx] = cmd.subcommands[rowType.subIdx - 1];
+      cmd.subcommands[rowType.subIdx - 1] = temp;
+      
+      // Move selection up by one row
+      this.selectedRow -= 1;
+    }
   }
 
   moveCommandDown() {
     const rowType = this.rowTypes[this.selectedRow];
-    if (!rowType || rowType.type !== 'command') return;
+    if (!rowType || rowType.type === 'empty') return;
     
-    // Can't move last command down
-    if (rowType.cmdIdx >= this.project.commands.length - 1) return;
-    
-    // Swap with the command below
-    const temp = this.project.commands[rowType.cmdIdx];
-    this.project.commands[rowType.cmdIdx] = this.project.commands[rowType.cmdIdx + 1];
-    this.project.commands[rowType.cmdIdx + 1] = temp;
-    
-    // Move selection down (accounting for subcommands of current command)
-    const currentCmd = this.project.commands[rowType.cmdIdx + 1];
-    this.selectedRow += (1 + currentCmd.subcommands.length);
+    if (rowType.type === 'command') {
+      // Can't move last command down
+      if (rowType.cmdIdx >= this.project.commands.length - 1) return;
+      
+      // Swap with the command below
+      const temp = this.project.commands[rowType.cmdIdx];
+      this.project.commands[rowType.cmdIdx] = this.project.commands[rowType.cmdIdx + 1];
+      this.project.commands[rowType.cmdIdx + 1] = temp;
+      
+      // Move selection down (accounting for subcommands of current command)
+      const currentCmd = this.project.commands[rowType.cmdIdx + 1];
+      this.selectedRow += (1 + currentCmd.subcommands.length);
+    } else if (rowType.type === 'subcommand') {
+      // Move subcommand within its parent command
+      const cmd = this.project.commands[rowType.cmdIdx];
+      
+      // Can't move last subcommand down
+      if (rowType.subIdx >= cmd.subcommands.length - 1) return;
+      
+      // Swap with the subcommand below
+      const temp = cmd.subcommands[rowType.subIdx];
+      cmd.subcommands[rowType.subIdx] = cmd.subcommands[rowType.subIdx + 1];
+      cmd.subcommands[rowType.subIdx + 1] = temp;
+      
+      // Move selection down by one row
+      this.selectedRow += 1;
+    }
   }
 
   adjustTimeValue(deltaMs: number) {
@@ -1894,7 +1926,7 @@ export class Editor {
     const cmd = this.project.commands[rowType.cmdIdx];
     
     // Create a new subcommand with the same time range as the command
-    const newSubcommand = new Subcommand(cmd.startMs, cmd.endMs, 'Subcommand', undefined);
+    const newSubcommand = new Subcommand(cmd.startMs, cmd.endMs, '', undefined);
     cmd.subcommands.push(newSubcommand);
     
     showBanner(`Subcommand added (${cmd.subcommands.length} total)`, {

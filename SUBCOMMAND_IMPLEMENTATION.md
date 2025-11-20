@@ -130,9 +130,13 @@ Press `Enter` on a subcommand row to edit:
 - **alt+left/right**: Adjust time values for Start/Dur columns (works on subcommands)
 
 ### Command-Only Shortcuts
-- **alt+up/down**: Move command up/down (reorders in list)
 - **[/]**: Adjust extendAudioSec
 - **Volume/Speed cycling**: Only works on commands
+
+### Reordering
+- **alt+up/down**: Move command or subcommand up/down
+  - For commands: Reorders in the main command list
+  - For subcommands: Reorders within the parent command
 
 ## Fixed Issues
 - **Backspace removal**: Now correctly handles row offsets when subcommands are present
@@ -145,6 +149,5 @@ Press `Enter` on a subcommand row to edit:
 
 ## Future Enhancements
 - Paste support for subcommands
-- Ability to reorder subcommands within a command
 - Keyboard shortcuts to move subcommands between commands
 - Bulk operations on subcommands
