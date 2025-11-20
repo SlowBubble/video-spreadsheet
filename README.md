@@ -16,8 +16,6 @@ alt+up for subcommand
   - See if this is possible: there are many instances of `new ProjectCommand` with lots of args, but I want to see if we have fromJSON individually, we can avoid expanding like this.
 
 # wishlist
-
-
 - alwaysTether defaults to true as an Editor field.
 - instead of needsReplayManagerReinit check, just have a map in replayer to store what players are loaded and the duration and load new players as needed.
 

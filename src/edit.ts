@@ -1562,17 +1562,7 @@ export class Editor {
         // Try to parse as JSON command
         try {
           const parsedCmd = JSON.parse(clipboardText);
-          const newCmd = new ProjectCommand(
-            parsedCmd.asset,
-            parsedCmd.positionMs,
-            parsedCmd.startMs,
-            parsedCmd.endMs,
-            parsedCmd.volume,
-            parsedCmd.speed,
-            parsedCmd.name,
-            parsedCmd.overlay,
-            parsedCmd.disabled
-          );
+          const newCmd = ProjectCommand.fromJSON(parsedCmd);
           this.project.commands.push(newCmd);
           showBanner('Pasted row!', {
             id: 'paste-banner',
@@ -1679,19 +1669,7 @@ export class Editor {
       // Checkbox column - try to parse as JSON command and insert below current row
       try {
         const parsedCmd = JSON.parse(clipboardText);
-        const newCmd = new ProjectCommand(
-          parsedCmd.asset,
-          parsedCmd.positionMs,
-          parsedCmd.startMs,
-          parsedCmd.endMs,
-          parsedCmd.volume,
-          parsedCmd.speed,
-          parsedCmd.name,
-          parsedCmd.overlay,
-          parsedCmd.disabled,
-          parsedCmd.extendAudioSec,
-          parsedCmd.subcommands || []
-        );
+        const newCmd = ProjectCommand.fromJSON(parsedCmd);
         // Insert below the current command
         this.project.commands.splice(rowType.cmdIdx + 1, 0, newCmd);
         
@@ -2248,66 +2226,24 @@ export class Editor {
     // Generate new ID using timestamp
     const newId = Date.now().toString();
     
-    // Clone the project (metadata will have the new ID)
-    const clonedProject = new Project(
-      this.project.title + '*',
-      // Deep clone commands
-      this.project.commands.map(cmd => new ProjectCommand(
-        cmd.asset,
-        cmd.positionMs,
-        cmd.startMs,
-        cmd.endMs,
-        cmd.volume,
-        cmd.speed,
-        cmd.name,
-        cmd.overlay ? this.cloneOverlay(cmd.overlay) : undefined,
-        cmd.disabled,
-        cmd.extendAudioSec
-      )),
-      this.project.shortStartMs,
-      this.project.shortEndMs
-    );
+    // Serialize and deserialize to deep clone the entire project
+    const serialized = this.topLevelProject.serialize();
+    const cloned = TopLevelProject.fromJSON(JSON.parse(serialized));
     
-    // Create new metadata for the cloned project
+    // Modify the specific fields for the clone
+    cloned.project.title = this.project.title + '*';
+    cloned.metadata.id = newId;
     const currentUser = getCurrentUser();
-    const currentUserId = currentUser?.uid || '';
-    const metadata = new Metadata(newId, currentUserId);
-    const topLevelProject = new TopLevelProject(clonedProject, metadata);
+    cloned.metadata.owner = currentUser?.uid || '';
+    cloned.metadata.createdAt = Date.now();
+    cloned.metadata.lastEditedAt = Date.now();
     
     // Save the cloned project
-    const data = JSON.parse(topLevelProject.serialize());
+    const data = JSON.parse(cloned.serialize());
     await this.dao.set(newId, data);
     
     // Navigate to the new project
     window.location.hash = `id=${newId}`;
-  }
-
-  cloneOverlay(overlay: Overlay): Overlay {
-    let fullScreenFilter: FullScreenFilter | undefined = undefined;
-    if (overlay.fullScreenFilter) {
-      fullScreenFilter = new FullScreenFilter(overlay.fullScreenFilter.fillStyle);
-    }
-    
-    let borderFilter: BorderFilter | undefined = undefined;
-    if (overlay.borderFilter) {
-      borderFilter = new BorderFilter(
-        overlay.borderFilter.topMarginPct,
-        overlay.borderFilter.bottomMarginPct,
-        overlay.borderFilter.fillStyle,
-        overlay.borderFilter.leftMarginPct || 0,
-        overlay.borderFilter.rightMarginPct || 0
-      );
-    }
-    
-    let textDisplay: TextDisplay | undefined = undefined;
-    if (overlay.textDisplay) {
-      textDisplay = new TextDisplay(
-        overlay.textDisplay.content,
-        overlay.textDisplay.alignment
-      );
-    }
-    
-    return new Overlay(fullScreenFilter, borderFilter, textDisplay);
   }
 
   async deleteProject() {
