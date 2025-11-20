@@ -1255,14 +1255,16 @@ export class Editor {
       // Can't move last command down
       if (rowType.cmdIdx >= this.project.commands.length - 1) return;
       
+      // Get the command below (before swap) to account for its subcommands
+      const cmdBelow = this.project.commands[rowType.cmdIdx + 1];
+      
       // Swap with the command below
       const temp = this.project.commands[rowType.cmdIdx];
-      this.project.commands[rowType.cmdIdx] = this.project.commands[rowType.cmdIdx + 1];
+      this.project.commands[rowType.cmdIdx] = cmdBelow;
       this.project.commands[rowType.cmdIdx + 1] = temp;
       
-      // Move selection down (accounting for subcommands of current command)
-      const currentCmd = this.project.commands[rowType.cmdIdx + 1];
-      this.selectedRow += (1 + currentCmd.subcommands.length);
+      // Move selection down (accounting for subcommands of the command that was below)
+      this.selectedRow += (1 + cmdBelow.subcommands.length);
     } else if (rowType.type === 'subcommand') {
       // Move subcommand within its parent command
       const cmd = this.project.commands[rowType.cmdIdx];
