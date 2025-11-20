@@ -2,14 +2,12 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# m12
+# m12c
+- track the startMs and endMs of each yt player using cmdId
+- refactor the loading of each yt player into a method
+  - console.log the cmdId of the yt player being reloaded and done reloading
+- instead of needsReplayManagerReinit loading every players, just see if the given cmdId has startMs and endMs outside of the loaded yt players, and if so load that.
 
-# m12a (done)
-- For each command, add an number field id. If the id does not exist or is 0, then set it to the next smallest number that is not in use among all the commands.
-
-# m12b (done)
-- In the replayer, it may be simpler to use command id instead of idx to track the yt players, which can change as we move commands around.
-  - Keep using the cmdIdx for the action generation flow though.
 
 # wishlist
 - alwaysTether defaults to true as an Editor field.

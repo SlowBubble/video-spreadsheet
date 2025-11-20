@@ -1,4 +1,10 @@
+# m12a (done)
+- For each command, add an number field id. If the id does not exist or is 0, then set it to the next smallest number that is not in use among all the commands.
 
+# m12b (done)
+- In the replayer, it may be simpler to use command id instead of idx to track the yt players, which can change as we move commands around.
+  - Keep using the cmdIdx for the action generation flow though.
+  
 # m11f (done)
 
 alt+up for subcommand
