@@ -14,6 +14,11 @@ export class Subcommand {
       this.overlay = overlay;
     }
   }
+
+  static fromJSON(data: any): Subcommand {
+    const overlay = Overlay.fromJSON(data.overlay);
+    return new Subcommand(data.startMs, data.endMs, data.name, overlay);
+  }
 }
 
 export class TextDisplay {
@@ -24,6 +29,10 @@ export class TextDisplay {
     this.content = content;
     this.alignment = alignment || 'lower-center';
   }
+
+  static fromJSON(data: any): TextDisplay {
+    return new TextDisplay(data.content, data.alignment);
+  }
 }
 
 export class FullScreenFilter {
@@ -31,6 +40,10 @@ export class FullScreenFilter {
 
   constructor(fillStyle: string) {
     this.fillStyle = fillStyle;
+  }
+
+  static fromJSON(data: any): FullScreenFilter {
+    return new FullScreenFilter(data.fillStyle);
   }
 }
 
@@ -48,6 +61,16 @@ export class BorderFilter {
     this.rightMarginPct = rightMarginPct;
     this.fillStyle = fillStyle;
   }
+
+  static fromJSON(data: any): BorderFilter {
+    return new BorderFilter(
+      data.topMarginPct,
+      data.bottomMarginPct,
+      data.fillStyle,
+      data.leftMarginPct || 0,
+      data.rightMarginPct || 0
+    );
+  }
 }
 
 export class Overlay {
@@ -59,6 +82,19 @@ export class Overlay {
     if (fullScreenFilter) this.fullScreenFilter = fullScreenFilter;
     if (borderFilter) this.borderFilter = borderFilter;
     if (textDisplay) this.textDisplay = textDisplay;
+  }
+
+  static fromJSON(data: any): Overlay | undefined {
+    if (!data) return undefined;
+    
+    const fullScreenFilter = data.fullScreenFilter ? FullScreenFilter.fromJSON(data.fullScreenFilter) : undefined;
+    const borderFilter = data.borderFilter ? BorderFilter.fromJSON(data.borderFilter) : undefined;
+    const textDisplay = data.textDisplay ? TextDisplay.fromJSON(data.textDisplay) : undefined;
+    
+    if (fullScreenFilter || borderFilter || textDisplay) {
+      return new Overlay(fullScreenFilter, borderFilter, textDisplay);
+    }
+    return undefined;
   }
 }
 
@@ -104,6 +140,27 @@ export class ProjectCommand {
       this.disabled = disabled;
     }
   }
+
+  static fromJSON(data: any): ProjectCommand {
+    const overlay = Overlay.fromJSON(data.overlay);
+    const subcommands = data.subcommands && Array.isArray(data.subcommands)
+      ? data.subcommands.map((sub: any) => Subcommand.fromJSON(sub))
+      : [];
+    
+    return new ProjectCommand(
+      data.asset,
+      data.positionMs,
+      data.startMs,
+      data.endMs,
+      data.volume,
+      data.speed,
+      data.name,
+      overlay,
+      data.disabled,
+      data.extendAudioSec,
+      subcommands
+    );
+  }
 }
 
 export class Project {
@@ -132,94 +189,14 @@ export class Project {
     return this.commands.filter(cmd => !cmd.disabled);
   }
 
-  // TODO see if we should clean this up by having fromJSON for the children classes
-  static fromJSON(json: string): Project {
+  static fromJSONString(json: string): Project {
     const data = JSON.parse(json);
-    return new Project(data.title, data.commands.map((cmd: any) => {
-      let overlay: Overlay | undefined = undefined;
-      if (cmd.overlay) {
-        let fullScreenFilter: FullScreenFilter | undefined = undefined;
-        if (cmd.overlay.fullScreenFilter) {
-          fullScreenFilter = new FullScreenFilter(cmd.overlay.fullScreenFilter.fillStyle);
-        }
-        
-        let borderFilter: BorderFilter | undefined = undefined;
-        if (cmd.overlay.borderFilter) {
-          borderFilter = new BorderFilter(
-            cmd.overlay.borderFilter.topMarginPct,
-            cmd.overlay.borderFilter.bottomMarginPct,
-            cmd.overlay.borderFilter.fillStyle,
-            cmd.overlay.borderFilter.leftMarginPct || 0,
-            cmd.overlay.borderFilter.rightMarginPct || 0
-          );
-        }
-        
-        let textDisplay: TextDisplay | undefined = undefined;
-        if (cmd.overlay.textDisplay) {
-          textDisplay = new TextDisplay(
-            cmd.overlay.textDisplay.content,
-            cmd.overlay.textDisplay.alignment
-          );
-        }
-        
-        // Only create overlay if at least one filter/text is present
-        if (fullScreenFilter || borderFilter || textDisplay) {
-          overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
-        }
-      }
-      
-      // Parse subcommands
-      let subcommands: Subcommand[] = [];
-      if (cmd.subcommands && Array.isArray(cmd.subcommands)) {
-        subcommands = cmd.subcommands.map((sub: any) => {
-          let subOverlay: Overlay | undefined = undefined;
-          if (sub.overlay) {
-            let fullScreenFilter: FullScreenFilter | undefined = undefined;
-            if (sub.overlay.fullScreenFilter) {
-              fullScreenFilter = new FullScreenFilter(sub.overlay.fullScreenFilter.fillStyle);
-            }
-            
-            let borderFilter: BorderFilter | undefined = undefined;
-            if (sub.overlay.borderFilter) {
-              borderFilter = new BorderFilter(
-                sub.overlay.borderFilter.topMarginPct,
-                sub.overlay.borderFilter.bottomMarginPct,
-                sub.overlay.borderFilter.fillStyle,
-                sub.overlay.borderFilter.leftMarginPct || 0,
-                sub.overlay.borderFilter.rightMarginPct || 0
-              );
-            }
-            
-            let textDisplay: TextDisplay | undefined = undefined;
-            if (sub.overlay.textDisplay) {
-              textDisplay = new TextDisplay(
-                sub.overlay.textDisplay.content,
-                sub.overlay.textDisplay.alignment
-              );
-            }
-            
-            if (fullScreenFilter || borderFilter || textDisplay) {
-              subOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
-            }
-          }
-          return new Subcommand(sub.startMs, sub.endMs, sub.name, subOverlay);
-        });
-      }
-      
-      return new ProjectCommand(
-        cmd.asset,
-        cmd.positionMs,
-        cmd.startMs,
-        cmd.endMs,
-        cmd.volume,
-        cmd.speed,
-        cmd.name,
-        overlay,
-        cmd.disabled,
-        cmd.extendAudioSec,
-        subcommands
-      );
-    }), data.shortStartMs, data.shortEndMs);
+    return Project.fromJSON(data);
+  }
+
+  static fromJSON(data: any): Project {
+    const commands = data.commands.map((cmd: any) => ProjectCommand.fromJSON(cmd));
+    return new Project(data.title, commands, data.shortStartMs, data.shortEndMs);
   }
 }
 
@@ -253,107 +230,19 @@ export class TopLevelProject {
     });
   }
 
-  static fromData(data: any, currentUserId?: string): TopLevelProject {
-    // Check if data is already a TopLevelProject
-    if (data.project && data.metadata) {
-      const project = new Project(
-        data.project.title,
-        data.project.commands.map((cmd: any) => {
-          let overlay: Overlay | undefined = undefined;
-          if (cmd.overlay) {
-            let fullScreenFilter: FullScreenFilter | undefined = undefined;
-            if (cmd.overlay.fullScreenFilter) {
-              fullScreenFilter = new FullScreenFilter(cmd.overlay.fullScreenFilter.fillStyle);
-            }
-            
-            let borderFilter: BorderFilter | undefined = undefined;
-            if (cmd.overlay.borderFilter) {
-              borderFilter = new BorderFilter(
-                cmd.overlay.borderFilter.topMarginPct,
-                cmd.overlay.borderFilter.bottomMarginPct,
-                cmd.overlay.borderFilter.fillStyle,
-                cmd.overlay.borderFilter.leftMarginPct || 0,
-                cmd.overlay.borderFilter.rightMarginPct || 0
-              );
-            }
-            
-            let textDisplay: TextDisplay | undefined = undefined;
-            if (cmd.overlay.textDisplay) {
-              textDisplay = new TextDisplay(
-                cmd.overlay.textDisplay.content,
-                cmd.overlay.textDisplay.alignment
-              );
-            }
-            
-            if (fullScreenFilter || borderFilter || textDisplay) {
-              overlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
-            }
-          }
-          
-          // Parse subcommands
-          let subcommands: Subcommand[] = [];
-          if (cmd.subcommands && Array.isArray(cmd.subcommands)) {
-            subcommands = cmd.subcommands.map((sub: any) => {
-              let subOverlay: Overlay | undefined = undefined;
-              if (sub.overlay) {
-                let fullScreenFilter: FullScreenFilter | undefined = undefined;
-                if (sub.overlay.fullScreenFilter) {
-                  fullScreenFilter = new FullScreenFilter(sub.overlay.fullScreenFilter.fillStyle);
-                }
-                
-                let borderFilter: BorderFilter | undefined = undefined;
-                if (sub.overlay.borderFilter) {
-                  borderFilter = new BorderFilter(
-                    sub.overlay.borderFilter.topMarginPct,
-                    sub.overlay.borderFilter.bottomMarginPct,
-                    sub.overlay.borderFilter.fillStyle,
-                    sub.overlay.borderFilter.leftMarginPct || 0,
-                    sub.overlay.borderFilter.rightMarginPct || 0
-                  );
-                }
-                
-                let textDisplay: TextDisplay | undefined = undefined;
-                if (sub.overlay.textDisplay) {
-                  textDisplay = new TextDisplay(
-                    sub.overlay.textDisplay.content,
-                    sub.overlay.textDisplay.alignment
-                  );
-                }
-                
-                if (fullScreenFilter || borderFilter || textDisplay) {
-                  subOverlay = new Overlay(fullScreenFilter, borderFilter, textDisplay);
-                }
-              }
-              return new Subcommand(sub.startMs, sub.endMs, sub.name, subOverlay);
-            });
-          }
-          
-          return new ProjectCommand(
-            cmd.asset,
-            cmd.positionMs,
-            cmd.startMs,
-            cmd.endMs,
-            cmd.volume,
-            cmd.speed,
-            cmd.name,
-            overlay,
-            cmd.disabled,
-            cmd.extendAudioSec,
-            subcommands
-          );
-        }),
-        data.project.shortStartMs,
-        data.project.shortEndMs
-      );
-      const metadata = new Metadata(
-        data.metadata.id,
-        data.metadata.owner,
-        data.metadata.createdAt,
-        data.metadata.lastEditedAt
-      );
-      return new TopLevelProject(project, metadata);
+  static fromJSON(data: any): TopLevelProject {
+    if (!data.project || !data.metadata) {
+      throw new Error('Invalid project data format');
     }
+
+    const project = Project.fromJSON(data.project);
+    const metadata = new Metadata(
+      data.metadata.id,
+      data.metadata.owner,
+      data.metadata.createdAt,
+      data.metadata.lastEditedAt
+    );
     
-    throw new Error('Invalid project data format');
+    return new TopLevelProject(project, metadata);
   }
 }

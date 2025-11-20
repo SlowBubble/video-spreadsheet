@@ -203,12 +203,7 @@ export class Editor {
   async loadProject(id: string): Promise<Project> {
     const data = await this.dao.get(id);
     if (data) {
-      // Get current user ID for legacy project conversion
-      const currentUser = getCurrentUser();
-      const currentUserId = currentUser?.uid || '';
-      
-      // Convert data to TopLevelProject (handles both new and legacy formats)
-      this.topLevelProject = TopLevelProject.fromData(data, currentUserId);
+      this.topLevelProject = TopLevelProject.fromJSON(data);
       return this.topLevelProject.project;
     }
     
@@ -2132,7 +2127,7 @@ export class Editor {
       onSave: async (value) => {
         try {
           // Import only the Project part
-          const importedProject = Project.fromJSON(value);
+          const importedProject = Project.fromJSONString(value);
           
           // Update the current project but keep metadata
           this.topLevelProject.project = importedProject;
@@ -2165,7 +2160,7 @@ export class Editor {
     
     this.undoManager.undo();
     const stateJson = this.undoManager.getCurrentState();
-    this.topLevelProject.project = Project.fromJSON(stateJson);
+    this.topLevelProject.project = Project.fromJSONString(stateJson);
     return true;
   }
 
@@ -2174,7 +2169,7 @@ export class Editor {
     
     this.undoManager.redo();
     const stateJson = this.undoManager.getCurrentState();
-    this.topLevelProject.project = Project.fromJSON(stateJson);
+    this.topLevelProject.project = Project.fromJSONString(stateJson);
     return true;
   }
 
@@ -2204,8 +2199,8 @@ export class Editor {
     const oldJsonString = this.undoManager.getCurrentState();
     
     try {
-      const oldProject = Project.fromJSON(oldJsonString);
-      const newProject = Project.fromJSON(newJsonString);
+      const oldProject = Project.fromJSONString(oldJsonString);
+      const newProject = Project.fromJSONString(newJsonString);
       const oldCommands = oldProject.getEnabledCommands();
       const newCommands = newProject.getEnabledCommands();
       
