@@ -99,6 +99,7 @@ export class Overlay {
 }
 
 export class ProjectCommand {
+  id: number;
   asset: string;
   positionMs: number;
   startMs: number;
@@ -122,7 +123,8 @@ export class ProjectCommand {
     overlay?: Overlay,
     disabled?: boolean,
     extendAudioSec?: number,
-    subcommands?: Subcommand[]
+    subcommands?: Subcommand[],
+    id?: number
   ) {
     this.asset = asset;
     this.positionMs = positionMs;
@@ -133,6 +135,7 @@ export class ProjectCommand {
     this.name = name || '';
     this.extendAudioSec = extendAudioSec !== undefined && extendAudioSec >= 0 ? extendAudioSec : 0;
     this.subcommands = subcommands || [];
+    this.id = id || 0; // Will be assigned by Project.ensureCommandIds()
     if (overlay) {
       this.overlay = overlay;
     }
@@ -158,7 +161,8 @@ export class ProjectCommand {
       overlay,
       data.disabled,
       data.extendAudioSec,
-      subcommands
+      subcommands,
+      data.id
     );
   }
 }
@@ -174,6 +178,7 @@ export class Project {
     this.commands = commands;
     if (shortStartMs !== undefined) this.shortStartMs = shortStartMs;
     if (shortEndMs !== undefined) this.shortEndMs = shortEndMs;
+    this.ensureCommandIds();
   }
 
   serialize(): string {
@@ -187,6 +192,25 @@ export class Project {
 
   getEnabledCommands(): ProjectCommand[] {
     return this.commands.filter(cmd => !cmd.disabled);
+  }
+
+  // Ensure all commands have unique IDs
+  ensureCommandIds(): void {
+    // Find the highest existing ID
+    let maxId = 0;
+    this.commands.forEach(cmd => {
+      if (cmd.id > 0) {
+        maxId = Math.max(maxId, cmd.id);
+      }
+    });
+
+    // Assign IDs to commands that don't have one (id === 0)
+    this.commands.forEach(cmd => {
+      if (!cmd.id || cmd.id === 0) {
+        maxId++;
+        cmd.id = maxId;
+      }
+    });
   }
 
   static fromJSONString(json: string): Project {

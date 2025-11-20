@@ -1168,7 +1168,7 @@ export class Editor {
       name = existingCmd.name + '*';
     }
     
-    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 0, 100, name, undefined, undefined, 0);
+    return new ProjectCommand(assetUrl, currentMs, startMs, endMs, 0, 100, name, undefined, undefined, 0, [], 0);
   }
 
   removeAsset() {
@@ -1564,6 +1564,7 @@ export class Editor {
           const parsedCmd = JSON.parse(clipboardText);
           const newCmd = ProjectCommand.fromJSON(parsedCmd);
           this.project.commands.push(newCmd);
+          this.project.ensureCommandIds();
           showBanner('Pasted row!', {
             id: 'paste-banner',
             position: 'bottom',
@@ -1586,6 +1587,7 @@ export class Editor {
         if (assetUrl !== '') {
           const newCmd = this.createCommandFromAssetUrl(assetUrl);
           this.project.commands.push(newCmd);
+          this.project.ensureCommandIds();
           showBanner('Pasted!', {
             id: 'paste-banner',
             position: 'bottom',
@@ -1672,6 +1674,7 @@ export class Editor {
         const newCmd = ProjectCommand.fromJSON(parsedCmd);
         // Insert below the current command
         this.project.commands.splice(rowType.cmdIdx + 1, 0, newCmd);
+        this.project.ensureCommandIds();
         
         // Move cursor to the newly pasted row (accounting for subcommands of current command)
         this.selectedRow += (1 + cmd.subcommands.length);
@@ -2008,11 +2011,13 @@ export class Editor {
           if (assetUrl.trim() === '') {
             // Empty asset URL creates a black screen
             const currentMs = this.replayManager.getCurrentPosition() || 0;
-            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 100, 'Black', undefined, undefined, 0, []);
+            const newCmd = new ProjectCommand('', currentMs, 0, 4000, 0, 100, 'Black', undefined, undefined, 0, [], 0);
             this.project.commands.push(newCmd);
+            this.project.ensureCommandIds();
           } else {
             const newCmd = this.createCommandFromAssetUrl(assetUrl.trim());
             this.project.commands.push(newCmd);
+            this.project.ensureCommandIds();
           }
         }
       }

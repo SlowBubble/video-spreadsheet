@@ -2,22 +2,18 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
+# m12
 
-# m11f (done)
+# m12a
+- For each command, add an number field id. If the id does not exist or is 0, then set it to the next smallest number that is not in use among all the commands.
 
-alt+up for subcommand
-
-# m11g (done)
-- copy-paste the overlay, excluding TextDisplay
-- cmd+c cmd+v append row
-
-# m11h (done)
-- Need to refactor fromJSON to be available all classes used inside Project
-  - See if this is possible: there are many instances of `new ProjectCommand` with lots of args, but I want to see if we have fromJSON individually, we can avoid expanding like this.
+# m12b
+- Instead of specifying start and end for the youtube player, load the entire video
+- Instead of needsReplayManagerReinit check, just have a set of indices of what youtube player has 
 
 # wishlist
 - alwaysTether defaults to true as an Editor field.
-- instead of needsReplayManagerReinit check, just have a map in replayer to store what players are loaded and the duration and load new players as needed.
+
 
 - Allow editing pos 1 column
   - `enter`, `alt+left` and `alt+right`

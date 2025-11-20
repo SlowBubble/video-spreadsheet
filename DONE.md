@@ -1,4 +1,16 @@
 
+# m11f (done)
+
+alt+up for subcommand
+
+# m11g (done)
+- copy-paste the overlay, excluding TextDisplay
+- cmd+c cmd+v append row
+
+# m11h (done)
+- Need to refactor fromJSON to be available all classes used inside Project
+  - See if this is possible: there are many instances of `new ProjectCommand` with lots of args, but I want to see if we have fromJSON individually, we can avoid expanding like this.
+  
 # m11b (done)
 
 - Implement left and right border using the shortcut `v`, similar to what `b` is doing with top and bottom border.
