@@ -2,7 +2,7 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# m12c
+# m12c (done)
 - track the startMs and endMs of each yt player using cmdId
 - refactor the loading of each yt player into a method
   - console.log the cmdId of the yt player being reloaded and done reloading
@@ -11,13 +11,14 @@
 
 # wishlist
 - alwaysTether defaults to true as an Editor field.
-
-
 - Allow editing pos 1 column
   - `enter`, `alt+left` and `alt+right`
 - Add links back to Dur by computing the footage end time in seconds (round down)
 - Add links for the subcommands based on the parent command
+- Animate underlined box
+
 - Add `d` shortcut to get debug info based on the current play
+- see if we need to add buffer to the start/end of yt players (yagni)
 
 - better shortcuts for borders in various directions.
   - shift+arrow to increase border, shift+cmd+arrow to decrease border
