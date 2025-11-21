@@ -19,7 +19,7 @@ export function getDao(): IDao {
   return new FirestoreDao();
 }
 
-const columns = ['✅', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'Dur', 'Vol', 'Speed', 'Text', 'Fill'];
+const columns = ['[hName]', 'Asset', 'Pos 0', 'Pos 1', 'Start', 'Dur', 'Vol', 'Speed', 'Text', 'Fill'];
 
 // Inverse of the following:
 // Translate a timeString that can look like 1:23 to 60 * 1 + 23
@@ -142,6 +142,7 @@ export class Editor {
   autoTether: boolean = true;
   idToPos0: Map<number, number> = new Map(); // Maps id to Pos 0 (positionMs)
   idToPos1: Map<number, number> = new Map(); // Maps id to Pos 1 (end position)
+  idToHName: Map<number, string> = new Map(); // Maps id to hierarchical name
 
   get project(): Project {
     return this.topLevelProject.project;
@@ -188,6 +189,7 @@ export class Editor {
     this.selectedRow = 0;
     this.selectedCol = 0;
     this.computeTetherMaps();
+    this.computeHNames();
     this.renderTable();
     this.initReplayManager();
     this.undoManager = new UndoManager(this.project.serialize());
@@ -210,6 +212,193 @@ export class Editor {
         
         this.idToPos0.set(subCmd.id, subAbsoluteStart);
         this.idToPos1.set(subCmd.id, subAbsoluteEnd);
+      });
+    });
+  }
+
+  computeHNames(): void {
+    this.idToHName.clear();
+    
+    // Collect all rows (commands and subcommands) with their positions
+    interface RowInfo {
+      id: number;
+      positionMs: number;
+      durationMs: number;
+      isCommand: boolean;
+    }
+    
+    const rows: RowInfo[] = [];
+    
+    this.project.commands.forEach(cmd => {
+      const cmdStart = cmd.positionMs;
+      const cmdEnd = computeCommandEndTimeMs(cmd);
+      rows.push({
+        id: cmd.id,
+        positionMs: cmdStart,
+        durationMs: cmdEnd - cmdStart,
+        isCommand: true
+      });
+      
+      cmd.subcommands.forEach(subCmd => {
+        const rate = speedToRate(cmd.speed);
+        const subStartOffset = subCmd.startMs - cmd.startMs;
+        const subEndOffset = subCmd.endMs - cmd.startMs;
+        const subAbsoluteStart = cmd.positionMs + (subStartOffset / rate);
+        const subAbsoluteEnd = cmd.positionMs + (subEndOffset / rate);
+        
+        rows.push({
+          id: subCmd.id,
+          positionMs: subAbsoluteStart,
+          durationMs: subAbsoluteEnd - subAbsoluteStart,
+          isCommand: false
+        });
+      });
+    });
+    
+    // Compute containment relationships
+    const CONTAINMENT_PCT = 75;
+    
+    // For each pair of rows, check containment
+    const containedIn = new Map<number, Set<number>>(); // Maps id to set of ids it's contained in
+    const contains = new Map<number, Set<number>>(); // Maps id to set of ids it contains
+    
+    rows.forEach(rowA => {
+      containedIn.set(rowA.id, new Set());
+      contains.set(rowA.id, new Set());
+    });
+    
+    rows.forEach(rowA => {
+      rows.forEach(rowB => {
+        if (rowA.id === rowB.id) return;
+        
+        // Check if rowA overlaps with rowB for > 75% of rowA's duration
+        const overlapStart = Math.max(rowA.positionMs, rowB.positionMs);
+        const overlapEnd = Math.min(
+          rowA.positionMs + rowA.durationMs,
+          rowB.positionMs + rowB.durationMs
+        );
+        const overlapDuration = Math.max(0, overlapEnd - overlapStart);
+        const overlapPct = (overlapDuration / rowA.durationMs) * 100;
+        
+        if (overlapPct > CONTAINMENT_PCT) {
+          containedIn.get(rowA.id)!.add(rowB.id);
+          contains.get(rowB.id)!.add(rowA.id);
+        }
+      });
+    });
+    
+    // Determine parent-child relationships
+    const parents = new Map<number, number>(); // Maps child id to parent id
+    const children = new Map<number, Set<number>>(); // Maps parent id to set of child ids
+    
+    rows.forEach(row => {
+      children.set(row.id, new Set());
+    });
+    
+    rows.forEach(rowA => {
+      const containedInSet = containedIn.get(rowA.id)!;
+      
+      // Find the parent: the row that contains rowA but is not contained by rowA
+      for (const rowBId of containedInSet) {
+        const rowBContainedIn = containedIn.get(rowBId)!;
+        
+        // If rowA is contained in rowB but rowB is not contained in rowA, rowB is parent
+        if (!rowBContainedIn.has(rowA.id)) {
+          parents.set(rowA.id, rowBId);
+          children.get(rowBId)!.add(rowA.id);
+          break; // Only one parent
+        }
+      }
+    });
+    
+    // Identify roots (rows without parents)
+    const roots = rows.filter(row => !parents.has(row.id));
+    
+    // Group roots by siblings (mutually contained)
+    const rootGroups: number[][] = [];
+    const processed = new Set<number>();
+    
+    roots.forEach(root => {
+      if (processed.has(root.id)) return;
+      
+      const siblingGroup = [root.id];
+      processed.add(root.id);
+      
+      // Find all siblings of this root
+      const rootContainedIn = containedIn.get(root.id)!;
+      rootContainedIn.forEach(otherId => {
+        if (!parents.has(otherId) && !processed.has(otherId)) {
+          // Check if they're mutual siblings
+          const otherContainedIn = containedIn.get(otherId)!;
+          if (otherContainedIn.has(root.id)) {
+            siblingGroup.push(otherId);
+            processed.add(otherId);
+          }
+        }
+      });
+      
+      rootGroups.push(siblingGroup);
+    });
+    
+    // Sort root groups by minimum positionMs
+    rootGroups.sort((a, b) => {
+      const minPosA = Math.min(...a.map(id => rows.find(r => r.id === id)!.positionMs));
+      const minPosB = Math.min(...b.map(id => rows.find(r => r.id === id)!.positionMs));
+      return minPosA - minPosB;
+    });
+    
+    // Sort siblings within each group by positionMs
+    rootGroups.forEach(group => {
+      group.sort((a, b) => {
+        const posA = rows.find(r => r.id === a)!.positionMs;
+        const posB = rows.find(r => r.id === b)!.positionMs;
+        return posA - posB;
+      });
+    });
+    
+    // Assign hNames to roots
+    const letters = 'abcdefghijklmnopqrstuvwxyz';
+    rootGroups.forEach((group, groupIdx) => {
+      const baseNumber = (groupIdx + 1).toString();
+      
+      group.forEach((id, siblingIdx) => {
+        if (siblingIdx === 0) {
+          this.idToHName.set(id, baseNumber);
+        } else {
+          const letter = letters[siblingIdx - 1] || `z${siblingIdx - 1}`;
+          this.idToHName.set(id, baseNumber + letter);
+        }
+      });
+    });
+    
+    // Process children recursively in order
+    const processChildren = (parentId: number, parentHName: string) => {
+      const childIds = Array.from(children.get(parentId) || []);
+      
+      // Sort children by positionMs
+      childIds.sort((a, b) => {
+        const posA = rows.find(r => r.id === a)!.positionMs;
+        const posB = rows.find(r => r.id === b)!.positionMs;
+        return posA - posB;
+      });
+      
+      // Assign hNames to children
+      childIds.forEach((childId, idx) => {
+        if (this.idToHName.has(childId)) return; // Already named
+        
+        const childHName = `${parentHName}-${idx + 1}`;
+        this.idToHName.set(childId, childHName);
+        
+        // Recursively process this child's children
+        processChildren(childId, childHName);
+      });
+    };
+    
+    // Process all roots and their descendants
+    rootGroups.forEach(group => {
+      group.forEach(rootId => {
+        const rootHName = this.idToHName.get(rootId)!;
+        processChildren(rootId, rootHName);
       });
     });
   }
@@ -446,8 +635,10 @@ export class Editor {
       const cmd = this.project.commands[rowType.cmdIdx];
       
       switch (colIdx) {
-        case 0: // Checkbox (enabled/disabled)
-          return cmd.disabled ? '☐' : '☑';
+        case 0: // Checkbox (enabled/disabled) with hName
+          const hName = this.idToHName.get(cmd.id);
+          const checkbox = cmd.disabled ? '☐' : '☑';
+          return hName && !cmd.disabled ? hName : checkbox;
         case 1: // Asset
           return cmd.name ? cmd.name : cmd.asset;
         case 2: // Pos 0 (start position)
@@ -477,8 +668,10 @@ export class Editor {
       const subCmd = cmd.subcommands[rowType.subIdx];
       
       switch (colIdx) {
-        case 0: // Checkbox (enabled/disabled)
-          return subCmd.disabled ? '☐' : '☑';
+        case 0: // Checkbox (enabled/disabled) with hName
+          const hName = this.idToHName.get(subCmd.id);
+          const checkbox = subCmd.disabled ? '☐' : '☑';
+          return hName && !subCmd.disabled ? hName : checkbox;
         case 1: // Show subcommand name with indent
           return `  ↳ ${subCmd.name}`;
         case 2: // Pos 0 (absolute start position in timeline)
@@ -820,6 +1013,16 @@ export class Editor {
       const isSubcommand = rowType && rowType.type === 'subcommand';
       const cells: string[] = [];
       
+      // Check if this row should have bold styling (hName without dash)
+      let shouldBeBold = false;
+      if (rowType && rowType.type !== 'empty') {
+        const id = rowType.type === 'command' 
+          ? this.project.commands[rowType.cmdIdx].id
+          : this.project.commands[rowType.cmdIdx].subcommands[rowType.subIdx].id;
+        const hName = this.idToHName.get(id);
+        shouldBeBold = hName !== undefined && !hName.includes('-');
+      }
+      
       for (let colIdx = 0; colIdx < columns.length; colIdx++) {
         const isSelected = rowIdx === this.selectedRow && colIdx === this.selectedCol;
         const cellValue = this.getDisplayValue(rowIdx, colIdx);
@@ -844,7 +1047,10 @@ export class Editor {
         // Right-align time, volume, and speed columns (Pos 0, Pos 1, Start, Dur, Vol, Speed)
         const textAlign = (colIdx >= 2 && colIdx <= 7) ? 'text-align: right;' : '';
         
-        cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px; background-color: ${bgColor}; ${textAlign}">
+        // Bold font for first two columns if hName has no dash
+        const fontWeight = (shouldBeBold && colIdx <= 1) ? 'font-weight: bold;' : '';
+        
+        cells.push(`<td style="border: 2px solid ${isSelected ? 'black' : '#ccc'}; padding: 4px; background-color: ${bgColor}; ${textAlign} ${fontWeight}">
           ${cellContent || '&nbsp;'}
         </td>`);
       }
