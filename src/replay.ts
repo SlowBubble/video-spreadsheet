@@ -132,6 +132,75 @@ export class ReplayManager {
     return params.get('present') === '1';
   }
 
+  isShortMode(): boolean {
+    const params = getHashParams();
+    return params.get('short') === '1';
+  }
+
+  applySmartPositioning(overlays: Overlay[]) {
+    if (!this.isShortMode() || !this.container) return;
+    
+    // Find the first overlay with a non-zero left or right borderFilter
+    let leftMarginPct = 0;
+    let rightMarginPct = 0;
+    
+    for (const overlay of overlays) {
+      if (overlay.borderFilter) {
+        leftMarginPct = overlay.borderFilter.leftMarginPct || 0;
+        rightMarginPct = overlay.borderFilter.rightMarginPct || 0;
+        
+        // Only apply positioning if there's a non-zero left or right border
+        if (leftMarginPct > 0 || rightMarginPct > 0) {
+          break;
+        }
+      }
+    }
+    
+    // If no non-zero left/right borders found, center the player like default present mode
+    if (leftMarginPct === 0 && rightMarginPct === 0) {
+      const defaultWidth = 854;
+      const windowWidth = window.innerWidth;
+      const offset = Math.round((defaultWidth - windowWidth) / 2);
+      this.container.style.left = `-${offset}px`;
+      return;
+    }
+    
+    // Calculate the middle of the visible area (between left and right borders)
+    // Player width is 854px
+    const playerWidth = 854;
+    const leftBorderPx = (playerWidth * leftMarginPct) / 100;
+    const rightBorderPx = (playerWidth * rightMarginPct) / 100;
+    const visibleAreaLeft = leftBorderPx;
+    const visibleAreaRight = playerWidth - rightBorderPx;
+    const visibleAreaMiddle = (visibleAreaLeft + visibleAreaRight) / 2;
+    
+    // Calculate the middle of the browser window
+    const windowWidth = window.innerWidth;
+    const windowMiddle = windowWidth / 2;
+    
+    // Calculate how much to shift the player to align visible area middle with window middle
+    // We want to shift the container so that visibleAreaMiddle aligns with windowMiddle
+    // If visibleAreaMiddle is at 512px and windowMiddle is at 427px,
+    // we need to shift the player LEFT by 85px (leftPosition = -85)
+    let leftPosition = windowMiddle - visibleAreaMiddle;
+    
+    // Constrain the position so the player border doesn't enter the browser window
+    // The player should be positioned so its edges are not visible
+    // Left edge at position 0 should not be visible: leftPosition <= 0
+    // Right edge at position playerWidth should not be visible: leftPosition + playerWidth >= windowWidth
+    //   which means: leftPosition >= windowWidth - playerWidth
+    const minLeftPosition = windowWidth - playerWidth; // Can't shift too far left
+    const maxLeftPosition = 0; // Can't shift too far right
+    
+    // Only apply constraints if they make sense (when window is narrower than player)
+    if (windowWidth < playerWidth) {
+      leftPosition = Math.max(minLeftPosition, Math.min(maxLeftPosition, leftPosition));
+    }
+    
+    // Apply the position
+    this.container.style.left = `${leftPosition}px`;
+  }
+
   showInitBanner() {
     // Don't show banner in present mode
     if (this.isPresentMode()) return;
@@ -274,7 +343,11 @@ export class ReplayManager {
     // Clear canvas first
     this.clearOverlay();
     
-    if (overlays.length === 0) return;
+    if (overlays.length === 0) {
+      // Reset positioning when no overlays
+      this.applySmartPositioning([]);
+      return;
+    }
     
     // Draw all overlays in order
     overlays.forEach(overlay => {
@@ -299,6 +372,9 @@ export class ReplayManager {
         this.drawText(overlay.textDisplay.content, overlay.textDisplay.alignment);
       }
     });
+    
+    // Apply smart positioning based on overlays
+    this.applySmartPositioning(overlays);
   }
 
   constructor(replayDiv: HTMLDivElement, commands: any[], getYouTubeId: (url: string) => string | null) {
@@ -329,11 +405,20 @@ export class ReplayManager {
       replayDiv.style.padding = '0';
       
       // Center the iframe horizontally by offsetting it
+      // In short mode, positioning will be dynamically adjusted based on overlays
       const defaultWidth = 854;
       const windowWidth = window.innerWidth;
       const offset = Math.round((defaultWidth - windowWidth) / 2);
       container.style.position = 'relative';
-      container.style.left = `-${offset}px`;
+      
+      // Only apply default centering if not in short mode
+      // Short mode will dynamically adjust positioning
+      const isShortMode = getHashParams().get('short') === '1';
+      if (!isShortMode) {
+        container.style.left = `-${offset}px`;
+      } else {
+        container.style.left = '0px';
+      }
       container.style.margin = '0';
     } else {
       container.style.margin = '0 auto';

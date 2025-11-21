@@ -11,7 +11,7 @@
 # m12d
 - When opening with the "Short" button, add a short=1 url param
 - When short=1, enabled this feature:
-  - For a subcommand, if there is non-zero left or right borderFilter, then for that time period during the replay, position the corresponding yt player so that the visible area of the window is closer to the middle of the left and right border, but don't move it so far that the border of the yt player is moved into the browser window.
+  - For a subcommand, if there is non-zero left or right borderFilter, then for that time period during the replay, position the corresponding yt player so that the middle of the browser window width is closer to the middle of the left and right of the borderFilter, but don't move it so far that the border of the yt player is moved into the browser window.
 
 # wishlist
 - alwaysTether defaults to true as an Editor field.

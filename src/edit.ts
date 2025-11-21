@@ -677,7 +677,7 @@ export class Editor {
         const height = Math.round(defaultHeight * (percent / 100));
         
         const currentHash = window.location.hash;
-        const newHash = `${currentHash}&present=1`;
+        const newHash = `${currentHash}&present=1&short=1`;
         window.open(newHash, '_blank', `width=${width},height=${height}`);
       };
     }
