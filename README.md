@@ -4,8 +4,10 @@
 
 
 # m12g
-- Allow editing pos 1 column
+- Allow editing the  `Pos 1` column, which will just modify endMs (not positionMs or startMs)
   - `enter`, `alt+left` and `alt+right`
+
+# m12h
 - Add id for subcommands similar to command id (make sure they don't clash with both other command ids and subcommand ids)
 - alwaysTether defaults to true as an Editor field; use shift+t to toggle it
   - color things that are tethered with (different shades of) blue font color

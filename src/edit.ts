@@ -1268,8 +1268,24 @@ export class Editor {
           duration: 800
         });
       } else if (this.selectedCol === 3) {
-        // Pos 1 column - not editable, do nothing
-        return;
+        // Pos 1 column - adjust end position (modifies endMs)
+        const currentEndTime = computeCommandEndTimeMs(cmd);
+        const newEndTime = Math.max(cmd.positionMs, currentEndTime + deltaMs);
+        
+        // Calculate what endMs should be to achieve this end position
+        // newEndTime = cmd.positionMs + (cmd.endMs - cmd.startMs) / rate
+        // (newEndTime - cmd.positionMs) * rate = cmd.endMs - cmd.startMs
+        // cmd.endMs = cmd.startMs + (newEndTime - cmd.positionMs) * rate
+        const rate = speedToRate(cmd.speed);
+        const newEndMs = cmd.startMs + (newEndTime - cmd.positionMs) * rate;
+        cmd.endMs = Math.max(cmd.startMs, newEndMs);
+        
+        showBanner(`End Position: ${msToTimeString(newEndTime)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
       } else if (this.selectedCol === 4) {
         // Start column
         cmd.startMs = Math.max(0, cmd.startMs + deltaMs);
@@ -1314,8 +1330,25 @@ export class Editor {
           duration: 800
         });
       } else if (this.selectedCol === 3) {
-        // Pos 1 column - not editable, do nothing
-        return;
+        // Pos 1 column - adjust absolute end position (modifies subcommand endMs)
+        // Calculate current absolute end position
+        const rate = speedToRate(cmd.speed);
+        const currentEndOffset = subCmd.endMs - cmd.startMs;
+        const currentAbsoluteEnd = cmd.positionMs + (currentEndOffset / rate);
+        
+        // Apply delta to absolute position
+        const newAbsoluteEnd = Math.max(cmd.positionMs, currentAbsoluteEnd + deltaMs);
+        
+        // Convert back to relative endMs
+        const newEndMs = cmd.startMs + (newAbsoluteEnd - cmd.positionMs) * rate;
+        subCmd.endMs = Math.max(subCmd.startMs, newEndMs);
+        
+        showBanner(`Subcommand End Position: ${msToTimeString(newAbsoluteEnd)}`, {
+          id: 'adjust-banner',
+          position: 'bottom',
+          color: 'blue',
+          duration: 800
+        });
       } else if (this.selectedCol === 4) {
         // Start column
         subCmd.startMs = Math.max(0, subCmd.startMs + deltaMs);
@@ -1685,14 +1718,22 @@ export class Editor {
       }
       cmd.positionMs = Math.max(0, value);
     } else if (this.selectedCol === 3) {
-      // Pos 1 column - not editable, disallow paste
-      showBanner('Cannot paste: Pos 1 is not editable', {
-        id: 'paste-banner',
-        position: 'bottom',
-        color: 'red',
-        duration: 1500
-      });
-      return;
+      // Pos 1 column - parse as number and modify endMs
+      const value = Number(clipboardText);
+      if (isNaN(value)) {
+        showBanner('Failed: Invalid number', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'red',
+          duration: 1500
+        });
+        return;
+      }
+      const newEndTime = Math.max(cmd.positionMs, value);
+      // Calculate what endMs should be to achieve this end position
+      const rate = speedToRate(cmd.speed);
+      const newEndMs = cmd.startMs + (newEndTime - cmd.positionMs) * rate;
+      cmd.endMs = Math.max(cmd.startMs, newEndMs);
     } else if (this.selectedCol === 4) {
       // Start column - parse as number
       const value = Number(clipboardText);
@@ -1836,8 +1877,21 @@ export class Editor {
           cmd.positionMs = this.timeStringToMs(newValue);
         }
       } else if (this.selectedCol === 3) {
-        // Pos 1 column - not editable
-        return;
+        // Pos 1 column - edit end position (modifies endMs)
+        const currentEndTime = computeCommandEndTimeMs(cmd);
+        const currentValue = msToEditString(currentEndTime);
+        const newValue = prompt('Edit End Position:', currentValue);
+        if (newValue !== null) {
+          const newEndTime = this.timeStringToMs(newValue);
+          // Calculate what endMs should be to achieve this end position
+          // newEndTime = cmd.positionMs + (cmd.endMs - cmd.startMs) / rate
+          // newEndTime - cmd.positionMs = (cmd.endMs - cmd.startMs) / rate
+          // (newEndTime - cmd.positionMs) * rate = cmd.endMs - cmd.startMs
+          // cmd.endMs = cmd.startMs + (newEndTime - cmd.positionMs) * rate
+          const rate = speedToRate(cmd.speed);
+          const newEndMs = cmd.startMs + (newEndTime - cmd.positionMs) * rate;
+          cmd.endMs = Math.max(cmd.startMs, newEndMs);
+        }
       } else if (this.selectedCol === 4) {
         // Start column
         const currentValue = msToEditString(cmd.startMs);
@@ -1929,8 +1983,23 @@ export class Editor {
           subCmd.startMs = newStartMs;
         }
       } else if (this.selectedCol === 3) {
-        // Pos 1 column - not editable (calculated value)
-        return;
+        // Pos 1 column - edit absolute end position (modifies subcommand endMs)
+        // Calculate current absolute end position
+        const rate = speedToRate(cmd.speed);
+        const currentEndOffset = subCmd.endMs - cmd.startMs;
+        const currentAbsoluteEnd = cmd.positionMs + (currentEndOffset / rate);
+        
+        const currentValue = msToEditString(currentAbsoluteEnd);
+        const newValue = prompt('Edit Subcommand Absolute End Position:', currentValue);
+        if (newValue !== null) {
+          const newAbsoluteEnd = this.timeStringToMs(newValue);
+          // Convert absolute position back to relative endMs
+          // newAbsoluteEnd = cmd.positionMs + (newEndMs - cmd.startMs) / rate
+          // (newAbsoluteEnd - cmd.positionMs) * rate = newEndMs - cmd.startMs
+          // newEndMs = cmd.startMs + (newAbsoluteEnd - cmd.positionMs) * rate
+          const newEndMs = cmd.startMs + (newAbsoluteEnd - cmd.positionMs) * rate;
+          subCmd.endMs = Math.max(subCmd.startMs, newEndMs);
+        }
       } else if (this.selectedCol === 4) {
         // Start column - edit subcommand start time
         const currentValue = msToEditString(subCmd.startMs);
