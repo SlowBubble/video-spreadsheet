@@ -8,6 +8,12 @@
   - `enter`, `alt+left` and `alt+right`
 
 # m12h
+- Add a home button next to "Edit Short" to go back to the home page.
+- Add links back for the Start column to the subcommand row based on the parent command
+- Add links back to Dur by using endMs in seconds (round down)
+  - Should work for subcommand rows also
+
+# m12i
 - Add id for subcommands similar to command id (make sure they don't clash with both other command ids and subcommand ids)
 - alwaysTether defaults to true as an Editor field; use shift+t to toggle it
   - color things that are tethered with (different shades of) blue font color
@@ -19,8 +25,7 @@
   - After making the adjustments, then compute the new idToPos0 and idToPos1 again and use these to update the Editor's field, and display a banner about how many tethered values has changed.
 
 # wishlist
-- Add links back to Dur by computing the footage end time in seconds (round down)
-- Add links for the subcommands based on the parent command
+
 
 - `h` to hide the table (for smaller screens)
 - Add a home button.

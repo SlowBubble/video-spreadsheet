@@ -336,9 +336,28 @@ export class Editor {
         }
       }
       
-      // For Dur column, just show the duration (no link)
+      // For Dur column, create clickable link using endMs
       if (colIdx === 5) {
-        return cellValue;
+        const timeMs = cmd.endMs;
+        const timeInSeconds = Math.floor(timeMs / 1000);
+        
+        // Get the asset URL and remove existing 't' parameter
+        const assetUrl = cmd.asset;
+        if (!assetUrl) return cellValue;
+        
+        try {
+          const url = new URL(assetUrl);
+          // Remove existing 't' parameter
+          url.searchParams.delete('t');
+          // Add new 't' parameter with the time value
+          url.searchParams.set('t', `${timeInSeconds}s`);
+          
+          const linkUrl = url.toString();
+          return `<a href="${linkUrl}" target="_blank" style="color: black; text-decoration: underline;">${cellValue}</a>`;
+        } catch (e) {
+          // If URL parsing fails, just return the cell value
+          return cellValue;
+        }
       }
       
       // For Fill column, create a canvas with overlay preview
@@ -363,6 +382,54 @@ export class Editor {
           : cmd.positionMs + (endOffset / rate);
         const dimStyle = colIdx === 3 ? 'opacity: 0.5;' : '';
         return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
+      }
+      
+      // For Start column, create clickable link using parent command's asset
+      if (colIdx === 4) {
+        const timeMs = subCmd.startMs;
+        const timeInSeconds = Math.floor(timeMs / 1000);
+        
+        // Get the parent command's asset URL
+        const assetUrl = cmd.asset;
+        if (!assetUrl) return cellValue;
+        
+        try {
+          const url = new URL(assetUrl);
+          // Remove existing 't' parameter
+          url.searchParams.delete('t');
+          // Add new 't' parameter with the time value
+          url.searchParams.set('t', `${timeInSeconds}s`);
+          
+          const linkUrl = url.toString();
+          return `<a href="${linkUrl}" target="_blank" style="color: black; text-decoration: underline;">${cellValue}</a>`;
+        } catch (e) {
+          // If URL parsing fails, just return the cell value
+          return cellValue;
+        }
+      }
+      
+      // For Dur column, create clickable link using endMs
+      if (colIdx === 5) {
+        const timeMs = subCmd.endMs;
+        const timeInSeconds = Math.floor(timeMs / 1000);
+        
+        // Get the parent command's asset URL
+        const assetUrl = cmd.asset;
+        if (!assetUrl) return cellValue;
+        
+        try {
+          const url = new URL(assetUrl);
+          // Remove existing 't' parameter
+          url.searchParams.delete('t');
+          // Add new 't' parameter with the time value
+          url.searchParams.set('t', `${timeInSeconds}s`);
+          
+          const linkUrl = url.toString();
+          return `<a href="${linkUrl}" target="_blank" style="color: black; text-decoration: underline;">${cellValue}</a>`;
+        } catch (e) {
+          // If URL parsing fails, just return the cell value
+          return cellValue;
+        }
       }
       
       // For Fill column, create a canvas with overlay preview
@@ -584,8 +651,9 @@ export class Editor {
         <div style="margin-top: 12px;">
           <button id="shortcuts-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Shortcuts</button>
           <button id="present-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Present</button>
-          <button id="short-btn" style="padding: 8px 16px; cursor: pointer;">Short</button>
+          <button id="short-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Short</button>
           <button id="edit-short-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Edit Short</button>
+          <button id="home-btn" style="padding: 8px 16px; cursor: pointer;">Home</button>
         </div>
       </div>
       ${getShortcutsModalHtml()}
@@ -616,6 +684,14 @@ export class Editor {
     if (editShortBtn) {
       editShortBtn.onclick = () => {
         this.showEditShortConfigModal();
+      };
+    }
+
+    const homeBtn = document.getElementById('home-btn');
+    if (homeBtn) {
+      homeBtn.onclick = () => {
+        window.location.hash = '';
+        window.location.reload();
       };
     }
 
