@@ -2,10 +2,10 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# m12i
+# m12i (done)
 - Add id for subcommands similar to command id (make sure they don't clash with both other command ids and subcommand ids)
 
-# m12j
+# m12j (done)
 - autoTether defaults to true as an Editor field; use shift+t to toggle it
 - Design autoTether work
   - When the pos 0 or pos 1 change for a row and another row has the same old value, modify the positionMs of that other row to keep that value matching
@@ -15,6 +15,8 @@
   - After making the adjustments, then compute the new idToPos0 and idToPos1 again and use these to update the Editor's field, and display a banner about how many additional values has changed if >= 1 values are updated as a result of the tethering.
 - How do users know which things are auto-tethered: make the cells in pos 0 and pos 1 that are tethered to something else have dark blue font color
 
+# m12k
+- Design color coding for base, glue and adornment
 
 # wishlist
 - `h` to hide the table (for smaller screens)

@@ -139,6 +139,9 @@ export class Editor {
   dao: IDao;
   numDecimalPlacesForTimeDisplay: number = 0;
   rowTypes: RowType[] = []; // Maps visual row index to command/subcommand
+  autoTether: boolean = true;
+  idToPos0: Map<number, number> = new Map(); // Maps id to Pos 0 (positionMs)
+  idToPos1: Map<number, number> = new Map(); // Maps id to Pos 1 (end position)
 
   get project(): Project {
     return this.topLevelProject.project;
@@ -184,9 +187,220 @@ export class Editor {
     // project is already set via topLevelProject in loadProject
     this.selectedRow = 0;
     this.selectedCol = 0;
+    this.computeTetherMaps();
     this.renderTable();
     this.initReplayManager();
     this.undoManager = new UndoManager(this.project.serialize());
+  }
+
+  computeTetherMaps(): void {
+    this.idToPos0.clear();
+    this.idToPos1.clear();
+    
+    this.project.commands.forEach(cmd => {
+      this.idToPos0.set(cmd.id, cmd.positionMs);
+      this.idToPos1.set(cmd.id, computeCommandEndTimeMs(cmd));
+      
+      cmd.subcommands.forEach(subCmd => {
+        const rate = speedToRate(cmd.speed);
+        const subStartOffset = subCmd.startMs - cmd.startMs;
+        const subEndOffset = subCmd.endMs - cmd.startMs;
+        const subAbsoluteStart = cmd.positionMs + (subStartOffset / rate);
+        const subAbsoluteEnd = cmd.positionMs + (subEndOffset / rate);
+        
+        this.idToPos0.set(subCmd.id, subAbsoluteStart);
+        this.idToPos1.set(subCmd.id, subAbsoluteEnd);
+      });
+    });
+  }
+
+  applyAutoTether(): number {
+    if (!this.autoTether) return 0;
+    
+    const oldIdToPos0 = new Map(this.idToPos0);
+    const oldIdToPos1 = new Map(this.idToPos1);
+    
+    // Compute new maps
+    this.computeTetherMaps();
+    
+    let updatedCount = 0;
+    
+    // Check for changes in Pos 0
+    for (const [id, newPos0] of this.idToPos0.entries()) {
+      const oldPos0 = oldIdToPos0.get(id);
+      if (oldPos0 !== undefined && oldPos0 !== newPos0) {
+        // This id's Pos 0 changed from oldPos0 to newPos0
+        // Find other ids that had the same oldPos0 and update them
+        for (const [otherId, otherOldPos0] of oldIdToPos0.entries()) {
+          if (otherId !== id && otherOldPos0 === oldPos0) {
+            // Update this other id's positionMs to match newPos0
+            this.updatePositionMsForId(otherId, newPos0);
+            updatedCount++;
+          }
+        }
+        
+        // Also check in oldIdToPos1
+        for (const [otherId, otherOldPos1] of oldIdToPos1.entries()) {
+          if (otherId !== id && otherOldPos1 === oldPos0) {
+            // Update this other id's positionMs to match newPos0
+            this.updatePositionMsForId(otherId, newPos0);
+            updatedCount++;
+          }
+        }
+      }
+    }
+    
+    // Check for changes in Pos 1
+    for (const [id, newPos1] of this.idToPos1.entries()) {
+      const oldPos1 = oldIdToPos1.get(id);
+      if (oldPos1 !== undefined && oldPos1 !== newPos1) {
+        // This id's Pos 1 changed from oldPos1 to newPos1
+        // Find other ids that had the same oldPos1 and update them
+        for (const [otherId, otherOldPos0] of oldIdToPos0.entries()) {
+          if (otherId !== id && otherOldPos0 === oldPos1) {
+            // Update this other id's positionMs to match newPos1
+            this.updatePositionMsForId(otherId, newPos1);
+            updatedCount++;
+          }
+        }
+        
+        // Also check in oldIdToPos1
+        for (const [otherId, otherOldPos1] of oldIdToPos1.entries()) {
+          if (otherId !== id && otherOldPos1 === oldPos1) {
+            // Update this other id's positionMs to match newPos1
+            this.updatePositionMsForId(otherId, newPos1);
+            updatedCount++;
+          }
+        }
+      }
+    }
+    
+    // Recompute maps after adjustments
+    if (updatedCount > 0) {
+      this.computeTetherMaps();
+    }
+    
+    return updatedCount;
+  }
+
+  applyAutoTetherAndNotify(): void {
+    const tetherUpdates = this.applyAutoTether();
+    if (tetherUpdates > 0) {
+      showBanner(`Auto-tether updated ${tetherUpdates} position${tetherUpdates > 1 ? 's' : ''}`, {
+        id: 'tether-update-banner',
+        position: 'bottom',
+        color: 'blue',
+        duration: 2000
+      });
+    }
+  }
+
+  updatePositionMsForId(id: number, newPositionMs: number): void {
+    // Find the command or subcommand with this id and update its positionMs
+    for (const cmd of this.project.commands) {
+      if (cmd.id === id) {
+        cmd.positionMs = newPositionMs;
+        return;
+      }
+      
+      for (const subCmd of cmd.subcommands) {
+        if (subCmd.id === id) {
+          // For subcommands, we need to adjust startMs to achieve the desired absolute position
+          const rate = speedToRate(cmd.speed);
+          const desiredOffset = (newPositionMs - cmd.positionMs) * rate;
+          const currentDuration = subCmd.endMs - subCmd.startMs;
+          subCmd.startMs = cmd.startMs + desiredOffset;
+          subCmd.endMs = subCmd.startMs + currentDuration;
+          return;
+        }
+      }
+    }
+  }
+
+  getTetheredIds(targetPos: number): Set<number> {
+    const tethered = new Set<number>();
+    
+    // Check which ids have this position in Pos 0 or Pos 1
+    for (const [id, pos0] of this.idToPos0.entries()) {
+      if (pos0 === targetPos) {
+        tethered.add(id);
+      }
+    }
+    
+    for (const [id, pos1] of this.idToPos1.entries()) {
+      if (pos1 === targetPos) {
+        tethered.add(id);
+      }
+    }
+    
+    return tethered;
+  }
+
+  isPositionTethered(id: number, isPos0: boolean): boolean {
+    const targetPos = isPos0 ? this.idToPos0.get(id) : this.idToPos1.get(id);
+    if (targetPos === undefined) return false;
+    
+    const tethered = this.getTetheredIds(targetPos);
+    // It's tethered if more than one id shares this position
+    return tethered.size > 1;
+  }
+
+  getTetherGroups(): Map<number, number> {
+    // Returns a map from position value to color index
+    const positionCounts = new Map<number, number>();
+    
+    // Count how many ids share each position
+    for (const pos0 of this.idToPos0.values()) {
+      positionCounts.set(pos0, (positionCounts.get(pos0) || 0) + 1);
+    }
+    
+    for (const pos1 of this.idToPos1.values()) {
+      positionCounts.set(pos1, (positionCounts.get(pos1) || 0) + 1);
+    }
+    
+    // Filter to only tethered positions (count > 1)
+    const tetheredPositions: number[] = [];
+    for (const [pos, count] of positionCounts.entries()) {
+      if (count > 1) {
+        tetheredPositions.push(pos);
+      }
+    }
+    
+    // Sort positions in ascending order
+    tetheredPositions.sort((a, b) => a - b);
+    
+    // Assign color indices
+    const positionToColorIndex = new Map<number, number>();
+    tetheredPositions.forEach((pos, idx) => {
+      positionToColorIndex.set(pos, idx);
+    });
+    
+    return positionToColorIndex;
+  }
+
+  getTetherColor(id: number, isPos0: boolean): string | null {
+    // Don't show tether colors when auto-tether is disabled
+    if (!this.autoTether) return null;
+    
+    const targetPos = isPos0 ? this.idToPos0.get(id) : this.idToPos1.get(id);
+    if (targetPos === undefined) return null;
+    
+    if (!this.isPositionTethered(id, isPos0)) return null;
+    
+    const positionToColorIndex = this.getTetherGroups();
+    const colorIndex = positionToColorIndex.get(targetPos);
+    if (colorIndex === undefined) return null;
+    
+    const totalGroups = positionToColorIndex.size;
+    
+    // Generate a grayish hue color
+    // Use hue range from 30 (yellowish) to 210 (blueish) for variety
+    // Keep saturation low for grayish appearance
+    const hue = 30 + (colorIndex / Math.max(1, totalGroups - 1)) * 180;
+    const saturation = 25; // Low saturation for grayish
+    const lightness = 80; // Light for background
+    
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
   }
 
   getEnabledCommands(): ProjectCommand[] {
@@ -308,8 +522,9 @@ export class Editor {
       // For Pos 0 and Pos 1 columns, create clickable buttons
       if (colIdx === 2 || colIdx === 3) {
         const timeMs = colIdx === 2 ? cmd.positionMs : computeCommandEndTimeMs(cmd);
-        const dimStyle = colIdx === 3 ? 'opacity: 0.5;' : '';
-        return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
+        const tetherColor = this.getTetherColor(cmd.id, colIdx === 2);
+        const tetherStyle = tetherColor ? `background-color: ${tetherColor};` : '';
+        return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${tetherStyle}">${cellValue}</button>`;
       }
       
       // For Start column, create clickable link
@@ -380,8 +595,9 @@ export class Editor {
         const timeMs = colIdx === 2 
           ? cmd.positionMs + (startOffset / rate)
           : cmd.positionMs + (endOffset / rate);
-        const dimStyle = colIdx === 3 ? 'opacity: 0.5;' : '';
-        return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${dimStyle}">${cellValue}</button>`;
+        const tetherColor = this.getTetherColor(subCmd.id, colIdx === 2);
+        const tetherStyle = tetherColor ? `background-color: ${tetherColor};` : '';
+        return `<button class="time-seek-btn" data-time-ms="${timeMs}" style="padding: 4px 8px; cursor: pointer; ${tetherStyle}">${cellValue}</button>`;
       }
       
       // For Start column, create clickable link using parent command's asset
@@ -641,7 +857,7 @@ export class Editor {
         <table border="1" style="width:100%; text-align:left; border-collapse: collapse;">
           <thead>
             <tr>
-              ${columns.map((col, idx) => `<th style="${idx === 3 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
+              ${columns.map((col) => `<th>${col}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
@@ -752,6 +968,10 @@ export class Editor {
               this.selectedCol = colIdx;
               // Trigger edit mode (same as pressing Enter)
               this.handleEnterKey();
+              
+              // Apply auto-tether before rendering
+              this.applyAutoTetherAndNotify();
+              
               this.renderTable();
               this.maybeSave();
             });
@@ -964,6 +1184,22 @@ export class Editor {
     } else if (matchKey(e, 'cmd+shift+s')) {
       this.cloneProject();
       return; // Don't render or save, we're navigating away
+    } else if (matchKey(e, 'shift+t')) {
+      this.autoTether = !this.autoTether;
+      
+      // Recompute tether maps when re-enabling to capture current positions
+      if (this.autoTether) {
+        this.computeTetherMaps();
+      }
+      
+      showBanner(`Auto-tether ${this.autoTether ? 'enabled' : 'disabled'}`, {
+        id: 'tether-banner',
+        position: 'bottom',
+        color: this.autoTether ? 'green' : 'blue',
+        duration: 1500
+      });
+      this.renderTable();
+      return;
     } else if (matchKey(e, 'cmd+s')) {
       // Force save even if nothing changed
       forceSave = true;
@@ -982,6 +1218,10 @@ export class Editor {
       return;
     }
     e.preventDefault();
+    
+    // Apply auto-tether before rendering
+    this.applyAutoTetherAndNotify();
+    
     this.renderTable();
     this.maybeSave(forceSave);
   }
@@ -2261,6 +2501,7 @@ export class Editor {
     this.undoManager.undo();
     const stateJson = this.undoManager.getCurrentState();
     this.topLevelProject.project = Project.fromJSONString(stateJson);
+    this.computeTetherMaps(); // Recompute after state change
     return true;
   }
 
@@ -2270,6 +2511,7 @@ export class Editor {
     this.undoManager.redo();
     const stateJson = this.undoManager.getCurrentState();
     this.topLevelProject.project = Project.fromJSONString(stateJson);
+    this.computeTetherMaps(); // Recompute after state change
     return true;
   }
 
