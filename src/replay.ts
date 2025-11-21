@@ -417,8 +417,6 @@ export class ReplayManager {
     const endSec = cmd.endMs / 1000;
     const extendAudioSec = cmd.extendAudioSec || 0;
     
-    console.log(`[loadPlayer] Loading player for cmdId=${cmdId}, startMs=${cmd.startMs}, endMs=${cmd.endMs}`);
-    
     // Check if div already exists, if not create it
     let div = document.getElementById(`yt-player-edit-${cmdId}`);
     if (!div) {
