@@ -3,7 +3,7 @@
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
 
-# m12f
+# m12g
 - Allow editing pos 1 column
   - `enter`, `alt+left` and `alt+right`
 - Add id for subcommands similar to command id (make sure they don't clash with both other command ids and subcommand ids)
@@ -20,6 +20,8 @@
 - Add links back to Dur by computing the footage end time in seconds (round down)
 - Add links for the subcommands based on the parent command
 
+- `h` to hide the table (for smaller screens)
+- Add a home button.
 - Add `d` shortcut to get debug info based on the current play
 - Animate underlined box (yagni)
 - load yt players on demand (yagni)
