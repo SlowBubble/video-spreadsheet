@@ -477,8 +477,8 @@ export class Editor {
       const subCmd = cmd.subcommands[rowType.subIdx];
       
       switch (colIdx) {
-        case 0: // Empty for subcommands
-          return '';
+        case 0: // Checkbox (enabled/disabled)
+          return subCmd.disabled ? '☐' : '☑';
         case 1: // Show subcommand name with indent
           return `  ↳ ${subCmd.name}`;
         case 2: // Pos 0 (absolute start position in timeline)
@@ -2272,7 +2272,16 @@ export class Editor {
       const cmd = this.project.commands[rowType.cmdIdx];
       const subCmd = cmd.subcommands[rowType.subIdx];
       
-      if (this.selectedCol === 1) {
+      if (this.selectedCol === 0) {
+        // Checkbox column - toggle disabled state
+        subCmd.disabled = subCmd.disabled ? undefined : true;
+        showBanner(subCmd.disabled ? 'Subcommand disabled' : 'Subcommand enabled', {
+          id: 'toggle-banner',
+          position: 'bottom',
+          color: subCmd.disabled ? 'red' : 'green',
+          duration: 800
+        });
+      } else if (this.selectedCol === 1) {
         // Edit subcommand name
         const newName = prompt('Edit subcommand name:', subCmd.name);
         if (newName !== null) {

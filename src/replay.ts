@@ -604,6 +604,11 @@ export class ReplayManager {
       // Add subcommand events
       if (cmd.subcommands && Array.isArray(cmd.subcommands)) {
         cmd.subcommands.forEach((subCmd: any, subIdx: number) => {
+          // Skip disabled subcommands
+          if (subCmd.disabled) {
+            return;
+          }
+          
           // Calculate absolute time for subcommand based on command's position and speed
           const subStartOffset = subCmd.startMs - cmd.startMs;
           const subEndOffset = subCmd.endMs - cmd.startMs;

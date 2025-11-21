@@ -26,8 +26,9 @@ export class Subcommand {
   endMs: number;
   name: string;
   overlay?: Overlay;
+  disabled?: boolean;
 
-  constructor(startMs: number, endMs: number, name: string, overlay?: Overlay, id?: number) {
+  constructor(startMs: number, endMs: number, name: string, overlay?: Overlay, id?: number, disabled?: boolean) {
     this.startMs = startMs;
     this.endMs = endMs;
     this.name = name;
@@ -35,11 +36,14 @@ export class Subcommand {
     if (overlay) {
       this.overlay = overlay;
     }
+    if (disabled !== undefined) {
+      this.disabled = disabled;
+    }
   }
 
   static fromJSON(data: any): Subcommand {
     const overlay = Overlay.fromJSON(data.overlay);
-    return new Subcommand(data.startMs, data.endMs, data.name, overlay, data.id);
+    return new Subcommand(data.startMs, data.endMs, data.name, overlay, data.id, data.disabled);
   }
 }
 

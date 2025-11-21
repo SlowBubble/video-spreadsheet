@@ -1,4 +1,11 @@
 
+# m12k
+- Add a disabled field for subcommand and have it displayed and toggled and interpreted the same way as command.
+  - Added `disabled?: boolean` field to Subcommand class
+  - Display checkbox in column 0 for subcommands (☑ for enabled, ☐ for disabled)
+  - Toggle disabled state by pressing Enter on column 0
+  - Filter out disabled subcommands in replay logic (skip creating ADD_OVERLAY/REMOVE_OVERLAY events)
+
 # m12g
 - Allow editing the  `Pos 1` column, which will just modify endMs (not positionMs or startMs)
   - `enter`, `alt+left` and `alt+right`
