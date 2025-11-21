@@ -659,7 +659,7 @@ export class Editor {
         const defaultWidth = 854;
         const defaultHeight = 1520;
         
-        const percentInput = prompt('Enter window size as % of default (854x1520):', '100');
+        const percentInput = prompt('Enter window size as % of default (854x1520):', '60');
         if (percentInput === null) return; // User cancelled
         
         const percent = parseFloat(percentInput);
