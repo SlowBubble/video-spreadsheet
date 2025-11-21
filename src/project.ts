@@ -21,15 +21,17 @@ export class ShortConfig {
 }
 
 export class Subcommand {
+  id: number;
   startMs: number;
   endMs: number;
   name: string;
   overlay?: Overlay;
 
-  constructor(startMs: number, endMs: number, name: string, overlay?: Overlay) {
+  constructor(startMs: number, endMs: number, name: string, overlay?: Overlay, id?: number) {
     this.startMs = startMs;
     this.endMs = endMs;
     this.name = name;
+    this.id = id || 0; // Will be assigned by Project.ensureCommandIds()
     if (overlay) {
       this.overlay = overlay;
     }
@@ -37,7 +39,7 @@ export class Subcommand {
 
   static fromJSON(data: any): Subcommand {
     const overlay = Overlay.fromJSON(data.overlay);
-    return new Subcommand(data.startMs, data.endMs, data.name, overlay);
+    return new Subcommand(data.startMs, data.endMs, data.name, overlay, data.id);
   }
 }
 
@@ -211,14 +213,20 @@ export class Project {
     return this.commands.filter(cmd => !cmd.disabled);
   }
 
-  // Ensure all commands have unique IDs
+  // Ensure all commands and subcommands have unique IDs
   ensureCommandIds(): void {
-    // Find the highest existing ID
+    // Find the highest existing ID across both commands and subcommands
     let maxId = 0;
     this.commands.forEach(cmd => {
       if (cmd.id > 0) {
         maxId = Math.max(maxId, cmd.id);
       }
+      // Check subcommand IDs too
+      cmd.subcommands.forEach(subCmd => {
+        if (subCmd.id > 0) {
+          maxId = Math.max(maxId, subCmd.id);
+        }
+      });
     });
 
     // Assign IDs to commands that don't have one (id === 0)
@@ -227,6 +235,14 @@ export class Project {
         maxId++;
         cmd.id = maxId;
       }
+      
+      // Assign IDs to subcommands that don't have one
+      cmd.subcommands.forEach(subCmd => {
+        if (!subCmd.id || subCmd.id === 0) {
+          maxId++;
+          subCmd.id = maxId;
+        }
+      });
     });
   }
 
