@@ -516,20 +516,6 @@ export class Editor {
     // Remove present-mode class if not in present mode
     document.body.classList.remove('present-mode');
     
-    // Override body and #app default styles to allow full width layout
-    document.body.style.display = 'block';
-    document.body.style.margin = '0';
-    document.body.style.padding = '0';
-    document.body.style.overflow = 'hidden';
-    document.body.style.height = '100vh';
-    
-    const appDiv = document.querySelector<HTMLDivElement>('#app')!;
-    appDiv.style.maxWidth = 'none';
-    appDiv.style.margin = '0';
-    appDiv.style.padding = '0';
-    appDiv.style.textAlign = 'left';
-    appDiv.style.height = '100vh';
-    
     const editIcon = `<span id="edit-title" style="cursor:pointer; margin-right:8px;" title="Edit title">✏️</span>`;
     const titleHtml = `<div style="display:flex; align-items:center; font-size:2em; font-weight:bold;">
       ${editIcon}<span>${this.project.title}</span>
@@ -577,42 +563,27 @@ export class Editor {
     }
 
     document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-      <div style="display: flex; width: 100%; height: 100vh;">
-        <!-- Left column: Table with independent scrolling (takes remaining space) -->
-        <div style="flex: 1; min-width: 0; height: 100vh; overflow: auto; padding: 16px; border-right: 1px solid #ccc;">
-          <table border="1" style="width:100%; text-align:left; border-collapse: collapse;">
-            <thead>
-              <tr>
-                ${columns.map((col, idx) => `<th style="${idx === 3 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${tableRows.join('')}
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- Right column: Title, replay, and buttons (fixed width for video player) -->
-        <div style="width: 886px; flex-shrink: 0; padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
-          ${titleHtml}
-          <div id="right-replay-container"></div>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <button id="shortcuts-btn" style="padding: 8px 16px; cursor: pointer;">Shortcuts</button>
-            <button id="present-btn" style="padding: 8px 16px; cursor: pointer;">Present</button>
-            <button id="short-btn" style="padding: 8px 16px; cursor: pointer;">Short</button>
-            <button id="edit-short-btn" style="padding: 8px 16px; cursor: pointer;">Edit Short</button>
-          </div>
+      <div>
+        ${titleHtml}
+        <table border="1" style="width:100%; text-align:left; border-collapse: collapse;">
+          <thead>
+            <tr>
+              ${columns.map((col, idx) => `<th style="${idx === 3 ? 'opacity: 0.5;' : ''}">${col}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows.join('')}
+          </tbody>
+        </table>
+        <div style="margin-top: 12px;">
+          <button id="shortcuts-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Shortcuts</button>
+          <button id="present-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Present</button>
+          <button id="short-btn" style="padding: 8px 16px; cursor: pointer;">Short</button>
+          <button id="edit-short-btn" style="padding: 8px 16px; cursor: pointer; margin-right: 8px;">Edit Short</button>
         </div>
       </div>
       ${getShortcutsModalHtml()}
     `;
-
-    // Move the replay container into the right column
-    const rightReplayContainer = document.getElementById('right-replay-container');
-    if (rightReplayContainer && this.replayDiv) {
-      rightReplayContainer.appendChild(this.replayDiv);
-      this.replayDiv.style.marginBottom = '0';
-    }
 
     const editBtn = document.getElementById('edit-title');
     if (editBtn) {
