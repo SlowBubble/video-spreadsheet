@@ -1,3 +1,14 @@
+
+# m12g
+- Allow editing the  `Pos 1` column, which will just modify endMs (not positionMs or startMs)
+  - `enter`, `alt+left` and `alt+right`
+
+# m12h
+- Add a home button next to "Edit Short" to go back to the home page.
+- Add links back for the Start column to the subcommand row based on the parent command
+- Add links back to Dur by using endMs in seconds (round down)
+  - Should work for subcommand rows also
+  
 # m12c (done)
 - track the startMs and endMs of each yt player using cmdId
 - refactor the loading of each yt player into a method
