@@ -14,11 +14,15 @@
   - For a subcommand, if there is non-zero left or right borderFilter, then for that time period during the replay, position the corresponding yt player so that the middle of the browser window width is closer to the middle of the left and right of the borderFilter, but don't move it so far that the border of the yt player is moved into the browser window.
 
 # m12e
-- Persist Short window size; make it editable from the "Edit Short" button instead of the "Short" button
-- Allow editing pos 1 column
-  - `enter`, `alt+left` and `alt+right`
+- In Project, create a ShortConfig field containing shortStartMs, shortEndMs, pctOfFullWidth
+  - Have logic to copy the current field shortStartMs, shortEndMs into the ShortConfig when loading in JSON, but add a TODO to remove that code once we migrate data over.
+- Persist Short window percentage in pctOfFullWidth
+  - Make it editable from the "Edit Short" button instead of the "Short" button
+  - With 3 fields to edit, it is easier to just edit the ShortConfig entirely as a JSON in a textarea modal
 
 # m12f
+- Allow editing pos 1 column
+  - `enter`, `alt+left` and `alt+right`
 - Add id for subcommands similar to command id (make sure they don't clash with both other command ids and subcommand ids)
 - alwaysTether defaults to true as an Editor field; use shift+t to toggle it
   - color things that are tethered with (different shades of) blue font color

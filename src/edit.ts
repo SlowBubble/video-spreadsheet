@@ -1,5 +1,5 @@
 import './style.css';
-import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay, Overlay, TopLevelProject, Metadata, Subcommand } from './project';
+import { Project, ProjectCommand, FullScreenFilter, BorderFilter, TextDisplay, Overlay, TopLevelProject, Metadata, Subcommand, ShortConfig } from './project';
 import { matchKey } from '../tsModules/key-match/key_match';
 import { ReplayManager } from './replay';
 import { getShortcutsModalHtml, setupShortcutsModal } from './shortcutsDoc';
@@ -609,47 +609,7 @@ export class Editor {
     const editShortBtn = document.getElementById('edit-short-btn');
     if (editShortBtn) {
       editShortBtn.onclick = () => {
-        // Get current values or defaults
-        const currentStartSec = this.project.shortStartMs !== undefined ? this.project.shortStartMs / 1000 : 0;
-        const currentEndSec = this.project.shortEndMs !== undefined ? this.project.shortEndMs / 1000 : 60;
-        const defaultValue = `${currentStartSec} ${currentEndSec}`;
-        
-        const input = prompt('Enter start and finish times in seconds (e.g., "0 60"):', defaultValue);
-        if (input !== null) {
-          const parts = input.trim().split(/\s+/);
-          if (parts.length === 2) {
-            const startSec = parseFloat(parts[0]);
-            const endSec = parseFloat(parts[1]);
-            
-            if (!isNaN(startSec) && !isNaN(endSec) && startSec >= 0 && endSec > startSec) {
-              // Store in project
-              this.project.shortStartMs = startSec * 1000;
-              this.project.shortEndMs = endSec * 1000;
-              this.saveProject();
-              
-              showBanner(`Short range set: ${startSec}s - ${endSec}s`, {
-                id: 'short-set-banner',
-                position: 'bottom',
-                color: 'green',
-                duration: 2000
-              });
-            } else {
-              showBanner('Invalid times: must be numbers with end > start', {
-                id: 'short-error-banner',
-                position: 'bottom',
-                color: 'red',
-                duration: 2000
-              });
-            }
-          } else {
-            showBanner('Invalid format: enter two numbers separated by space', {
-              id: 'short-error-banner',
-              position: 'bottom',
-              color: 'red',
-              duration: 2000
-            });
-          }
-        }
+        this.showEditShortConfigModal();
       };
     }
 
@@ -659,19 +619,8 @@ export class Editor {
         const defaultWidth = 854;
         const defaultHeight = 1520;
         
-        const percentInput = prompt('Enter window size as % of default (854x1520):', '60');
-        if (percentInput === null) return; // User cancelled
-        
-        const percent = parseFloat(percentInput);
-        if (isNaN(percent) || percent <= 0) {
-          showBanner('Invalid percentage value', {
-            id: 'short-error-banner',
-            position: 'bottom',
-            color: 'red',
-            duration: 2000
-          });
-          return;
-        }
+        // Use pctOfFullWidth from shortConfig if available, otherwise default to 60
+        const percent = this.project.shortConfig?.pctOfFullWidth || 60;
         
         const width = Math.round(defaultWidth * (percent / 100));
         const height = Math.round(defaultHeight * (percent / 100));
@@ -774,14 +723,24 @@ export class Editor {
         if (this.replayManager.isPlaying) {
           this.replayManager.pauseReplay();
         } else {
-          // In present mode, use shortStartMs and shortEndMs if available
+          // Check if short mode is enabled via URL param
+          const params = getHashParams();
+          const isShortMode = params.get('short') === '1';
+          
           let resumeTime = this.replayManager.pausedAtMs;
           let endTime: number | undefined = undefined;
           
-          if (this.project.shortStartMs !== undefined && this.project.shortEndMs !== undefined) {
-            // Play from shortStartMs to shortEndMs
-            resumeTime = this.project.shortStartMs;
-            endTime = this.project.shortEndMs;
+          // Only use shortConfig if short=1 in URL params
+          if (isShortMode) {
+            if (this.project.shortConfig) {
+              // Play from shortStartMs to shortEndMs
+              resumeTime = this.project.shortConfig.shortStartMs;
+              endTime = this.project.shortConfig.shortEndMs;
+            } else if (this.project.shortStartMs !== undefined && this.project.shortEndMs !== undefined) {
+              // Fallback to old fields for backward compatibility
+              resumeTime = this.project.shortStartMs;
+              endTime = this.project.shortEndMs;
+            }
           }
           
           this.replayManager.startReplay(resumeTime, this.getEnabledCommands(), endTime);
@@ -2318,6 +2277,83 @@ export class Editor {
         } catch (error) {
           showBanner('Invalid JSON format', {
             id: 'overlay-error-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 2000
+          });
+        }
+      }
+    });
+  }
+
+  showEditShortConfigModal() {
+    // Get current shortConfig or create default
+    const currentConfig = this.project.shortConfig || new ShortConfig(0, 60000, 60);
+    
+    // Create user-friendly representation
+    const userFriendlyConfig = {
+      startTime: msToEditString(currentConfig.shortStartMs),
+      stopTime: msToEditString(currentConfig.shortEndMs),
+      pctOfFullWidth: currentConfig.pctOfFullWidth
+    };
+    
+    const configJson = JSON.stringify(userFriendlyConfig, null, 2);
+    
+    showTextareaModal({
+      title: 'Edit Short Config JSON',
+      initialValue: configJson,
+      maxWidth: '600px',
+      minHeight: '200px',
+      onModalStateChange: (isOpen) => {
+        this.isModalOpen = isOpen;
+      },
+      onSave: (value) => {
+        try {
+          const newConfigData = JSON.parse(value);
+          
+          // Validate the data structure
+          if (typeof newConfigData.startTime !== 'string' || 
+              typeof newConfigData.stopTime !== 'string' || 
+              typeof newConfigData.pctOfFullWidth !== 'number') {
+            throw new Error('Invalid field types');
+          }
+          
+          // Convert time strings to milliseconds
+          const shortStartMs = this.timeStringToMs(newConfigData.startTime);
+          const shortEndMs = this.timeStringToMs(newConfigData.stopTime);
+          
+          // Validate the values
+          if (shortStartMs < 0 || 
+              shortEndMs <= shortStartMs || 
+              newConfigData.pctOfFullWidth <= 0) {
+            throw new Error('Invalid field values');
+          }
+          
+          // Create new ShortConfig with converted values
+          const newConfig = new ShortConfig(
+            shortStartMs,
+            shortEndMs,
+            newConfigData.pctOfFullWidth
+          );
+          
+          // Update project
+          this.project.shortConfig = newConfig;
+          
+          // Also update the old fields for backward compatibility
+          this.project.shortStartMs = newConfig.shortStartMs;
+          this.project.shortEndMs = newConfig.shortEndMs;
+          
+          this.saveProject();
+          
+          showBanner('Short config updated!', {
+            id: 'short-config-banner',
+            position: 'bottom',
+            color: 'green',
+            duration: 1500
+          });
+        } catch (error) {
+          showBanner('Invalid JSON format or values', {
+            id: 'short-config-error-banner',
             position: 'bottom',
             color: 'red',
             duration: 2000
