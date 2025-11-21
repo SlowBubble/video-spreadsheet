@@ -19,7 +19,25 @@
 Add a disabled field for subcommand and have it displayed and toggled and interpreted the same way as command.
 
 # m12l
-- Add a field called hName for command and subcommand
+- Have a method that generates hNames for all rows when the Editor first load and store the result in an internal field..
+  - Display hName in the first column (the checkbox column) only if available and the row is not disabled; leave it unchanged otherwise.
+## How to compute hName for each row
+- Let 75 be containment percentage
+- Definition:
+  - If rowA overlaps with rowB for > 75% of rowA's duration, then rowA is considered to be contained in rowB.
+  - If rowA is contained in rowB and vice versa, then rowA and rowB are siblings.
+  - If rowA is contained in rowB but not vice versa, then rowB is a parent of rowA and rowA is a child of rowB.
+  - rows that don't have parents are considered roots
+- Compute all the containment relationship
+  - Can track things via command/subcommand ids
+- hName convention
+  - Start with roots grouped by siblings and sort these groups by min positionMs
+    - hName for the first root group of siblings is '1', '1a', '1b', ...
+    - hName for the second root group of siblings is '2', '2a', '2b', ...
+  - Then iterate through the children of the roots in the above order, '1', '1a', ... and name the children (ordered by positionMs) of '1' as '1-1', '1-2', ...
+    - Name the child of '1a' that hasn't been named previously as '1a-1', '1a-2'.
+    - Continue with the rest until everything is named.
+
 
 # wishlist
 - Design color coding for base, glue and adornment
