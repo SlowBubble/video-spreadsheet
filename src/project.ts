@@ -190,15 +190,11 @@ export class ProjectCommand {
 export class Project {
   title: string;
   commands: ProjectCommand[];
-  shortStartMs?: number;
-  shortEndMs?: number;
   shortConfig?: ShortConfig;
 
-  constructor(title: string, commands: ProjectCommand[], shortStartMs?: number, shortEndMs?: number, shortConfig?: ShortConfig) {
+  constructor(title: string, commands: ProjectCommand[], shortConfig?: ShortConfig) {
     this.title = title;
     this.commands = commands;
-    if (shortStartMs !== undefined) this.shortStartMs = shortStartMs;
-    if (shortEndMs !== undefined) this.shortEndMs = shortEndMs;
     if (shortConfig) this.shortConfig = shortConfig;
     this.ensureCommandIds();
   }
@@ -207,8 +203,6 @@ export class Project {
     return JSON.stringify({
       title: this.title,
       commands: this.commands,
-      shortStartMs: this.shortStartMs,
-      shortEndMs: this.shortEndMs,
       shortConfig: this.shortConfig,
     });
   }
@@ -243,18 +237,8 @@ export class Project {
 
   static fromJSON(data: any): Project {
     const commands = data.commands.map((cmd: any) => ProjectCommand.fromJSON(cmd));
-    
-    // TODO: Remove this migration code once data is migrated
-    // Migrate old shortStartMs/shortEndMs to shortConfig if shortConfig doesn't exist
-    let shortConfig: ShortConfig | undefined = undefined;
-    if (data.shortConfig) {
-      shortConfig = ShortConfig.fromJSON(data.shortConfig);
-    } else if (data.shortStartMs !== undefined && data.shortEndMs !== undefined) {
-      // Migrate old fields to new ShortConfig
-      shortConfig = new ShortConfig(data.shortStartMs, data.shortEndMs, 60);
-    }
-    
-    return new Project(data.title, commands, data.shortStartMs, data.shortEndMs, shortConfig);
+    const shortConfig = data.shortConfig ? ShortConfig.fromJSON(data.shortConfig) : undefined;
+    return new Project(data.title, commands, shortConfig);
   }
 }
 

@@ -731,16 +731,10 @@ export class Editor {
           let endTime: number | undefined = undefined;
           
           // Only use shortConfig if short=1 in URL params
-          if (isShortMode) {
-            if (this.project.shortConfig) {
-              // Play from shortStartMs to shortEndMs
-              resumeTime = this.project.shortConfig.shortStartMs;
-              endTime = this.project.shortConfig.shortEndMs;
-            } else if (this.project.shortStartMs !== undefined && this.project.shortEndMs !== undefined) {
-              // Fallback to old fields for backward compatibility
-              resumeTime = this.project.shortStartMs;
-              endTime = this.project.shortEndMs;
-            }
+          if (isShortMode && this.project.shortConfig) {
+            // Play from shortStartMs to shortEndMs
+            resumeTime = this.project.shortConfig.shortStartMs;
+            endTime = this.project.shortConfig.shortEndMs;
           }
           
           this.replayManager.startReplay(resumeTime, this.getEnabledCommands(), endTime);
@@ -2338,10 +2332,6 @@ export class Editor {
           
           // Update project
           this.project.shortConfig = newConfig;
-          
-          // Also update the old fields for backward compatibility
-          this.project.shortStartMs = newConfig.shortStartMs;
-          this.project.shortEndMs = newConfig.shortEndMs;
           
           this.saveProject();
           

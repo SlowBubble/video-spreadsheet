@@ -14,12 +14,10 @@ Created a `ShortConfig` class to consolidate short video settings and made it ed
 
 ### 2. Updated Project Class (src/project.ts)
 - Added `shortConfig?: ShortConfig` field to Project class
-- Updated constructor to accept shortConfig parameter
-- Updated `serialize()` to include shortConfig
-- Added migration logic in `fromJSON()`:
-  - If `shortConfig` exists in JSON, use it
-  - Otherwise, if old `shortStartMs`/`shortEndMs` exist, migrate them to new ShortConfig with default 60% width
-  - Added TODO comment to remove migration code after data migration
+- Removed old `shortStartMs` and `shortEndMs` fields
+- Updated constructor to only accept shortConfig parameter
+- Updated `serialize()` to only include shortConfig
+- Simplified `fromJSON()` to directly load shortConfig without migration logic
 
 ### 3. Updated Edit Short Button (src/edit.ts)
 - Changed "Edit Short" button to open a textarea modal
@@ -30,7 +28,7 @@ Created a `ShortConfig` class to consolidate short video settings and made it ed
   - Keeps underlying `ShortConfig` unchanged (still uses `shortStartMs` and `shortEndMs`)
   - Validates JSON structure and field types
   - Validates field values (startMs >= 0, endMs > startMs, pctOfFullWidth > 0)
-  - Updates both `shortConfig` and old fields for backward compatibility
+  - Updates `shortConfig` directly
   - Shows success/error banners
 
 ### 4. Updated Short Button (src/edit.ts)
@@ -42,9 +40,8 @@ Created a `ShortConfig` class to consolidate short video settings and made it ed
 - Updated space key handler in present mode to check for `short=1` URL param
 - Only uses shortConfig when `short=1` is present in URL
 - In regular present mode (without `short=1`), plays normally from paused position
-- Falls back to old shortStartMs/shortEndMs fields for backward compatibility
 
-## Backward Compatibility
-- Old `shortStartMs` and `shortEndMs` fields are still maintained
-- Migration logic automatically converts old data to new format
-- Fallback logic ensures old projects still work
+## Migration Complete
+- Old `shortStartMs` and `shortEndMs` fields have been removed
+- Migration code has been removed
+- All projects now use the new `ShortConfig` structure

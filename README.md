@@ -2,23 +2,6 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
-# m12c (done)
-- track the startMs and endMs of each yt player using cmdId
-- refactor the loading of each yt player into a method
-  - console.log the cmdId of the yt player being reloaded and done reloading
-- instead of needsReplayManagerReinit loading every players, just see if the given cmdId has startMs and endMs outside of the loaded yt players, and if so load that.
-
-# m12d (done)
-- When opening with the "Short" button, add a short=1 url param
-- When short=1, enabled this feature:
-  - For a subcommand, if there is non-zero left or right borderFilter, then for that time period during the replay, position the corresponding yt player so that the middle of the browser window width is closer to the middle of the left and right of the borderFilter, but don't move it so far that the border of the yt player is moved into the browser window.
-
-# m12e
-- In Project, create a ShortConfig field containing shortStartMs, shortEndMs, pctOfFullWidth
-  - Have logic to copy the current field shortStartMs, shortEndMs into the ShortConfig when loading in JSON, but add a TODO to remove that code once we migrate data over.
-- Persist Short window percentage in pctOfFullWidth
-  - Make it editable from the "Edit Short" button instead of the "Short" button
-  - With 3 fields to edit, it is easier to just edit the ShortConfig entirely as a JSON in a textarea modal
 
 # m12f
 - Allow editing pos 1 column
