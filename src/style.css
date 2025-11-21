@@ -46,6 +46,25 @@ h1 {
   text-align: center;
 }
 
+#replay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  background: inherit;
+  margin: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  width: 854px;
+  height: 480px;
+}
+
+#app {
+  max-width: 854px;
+  margin-left: 870px; /* 854px + 16px gap */
+  padding: 2rem;
+  text-align: center;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

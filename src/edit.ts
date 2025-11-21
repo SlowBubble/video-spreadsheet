@@ -151,15 +151,22 @@ export class Editor {
     
     const isPresentMode = params.get('present') === '1';
     
-    // Create persistent replay container at the top of the body
+    // Create persistent replay container at the top left of the viewport
     let replayDiv = document.getElementById('replay-container') as HTMLDivElement;
     if (!replayDiv) {
       replayDiv = document.createElement('div');
       replayDiv.id = 'replay-container';
-      if (!isPresentMode) {
-        replayDiv.style.marginBottom = '24px';
-      }
-      document.body.insertBefore(replayDiv, document.body.firstChild);
+      // Style for fixed top left
+      replayDiv.style.position = 'fixed';
+      replayDiv.style.top = '0';
+      replayDiv.style.left = '0';
+      replayDiv.style.zIndex = '100';
+      replayDiv.style.background = 'inherit';
+      replayDiv.style.margin = '0';
+      replayDiv.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+      replayDiv.style.width = '854px';
+      replayDiv.style.height = '480px';
+      document.body.appendChild(replayDiv);
     }
     this.replayDiv = replayDiv;
     
