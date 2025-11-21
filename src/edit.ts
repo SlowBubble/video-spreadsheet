@@ -705,17 +705,34 @@ export class Editor {
     
     // In present mode, only allow space and number keys
     if (isPresentMode) {
+      // Check if short mode is enabled via URL param
+      const params = getHashParams();
+      const isShortMode = params.get('short') === '1';
+      
       if (matchKey(e, '0')) {
         this.replayManager.stopReplay();
-        // Resume playing from the beginning
-        this.replayManager.startReplay(0, this.getEnabledCommands());
+        // In short mode, start from shortStartMs; otherwise from beginning
+        let startTime = 0;
+        if (isShortMode && this.project.shortConfig) {
+          startTime = this.project.shortConfig.shortStartMs;
+        }
+        this.replayManager.startReplay(startTime, this.getEnabledCommands());
         e.preventDefault();
       } else if (matchKey(e, '1') || matchKey(e, '2') || matchKey(e, '3') || matchKey(e, '4') || 
                  matchKey(e, '5') || matchKey(e, '6') || matchKey(e, '7') || matchKey(e, '8') || matchKey(e, '9')) {
         const digit = parseInt(e.key);
         const enabledCommands = this.getEnabledCommands();
-        const totalDuration = this.replayManager.getTotalDuration(enabledCommands);
-        const targetTime = (digit / 10) * totalDuration;
+        
+        let startTime = 0;
+        let duration = this.replayManager.getTotalDuration(enabledCommands);
+        
+        // In short mode, use short range instead of full duration
+        if (isShortMode && this.project.shortConfig) {
+          startTime = this.project.shortConfig.shortStartMs;
+          duration = this.project.shortConfig.shortEndMs - this.project.shortConfig.shortStartMs;
+        }
+        
+        const targetTime = startTime + (digit / 10) * duration;
         this.replayManager.stopReplay();
         this.replayManager.startReplay(targetTime, enabledCommands);
         e.preventDefault();
@@ -723,10 +740,6 @@ export class Editor {
         if (this.replayManager.isPlaying) {
           this.replayManager.pauseReplay();
         } else {
-          // Check if short mode is enabled via URL param
-          const params = getHashParams();
-          const isShortMode = params.get('short') === '1';
-          
           let resumeTime = this.replayManager.pausedAtMs;
           let endTime: number | undefined = undefined;
           

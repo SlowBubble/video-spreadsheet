@@ -40,6 +40,10 @@ Created a `ShortConfig` class to consolidate short video settings and made it ed
 - Updated space key handler in present mode to check for `short=1` URL param
 - Only uses shortConfig when `short=1` is present in URL
 - In regular present mode (without `short=1`), plays normally from paused position
+- Updated 0-9 number key shortcuts to respect short range:
+  - Key `0`: Jumps to shortStartMs (in short mode) or beginning (in regular mode)
+  - Keys `1-9`: Jump to percentage positions within the short range (in short mode) or full duration (in regular mode)
+  - Example in short mode with range 10s-70s: pressing `5` jumps to 40s (50% of the 60s range)
 
 ## Migration Complete
 - Old `shortStartMs` and `shortEndMs` fields have been removed
