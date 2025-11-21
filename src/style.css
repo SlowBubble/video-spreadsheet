@@ -24,8 +24,7 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
+  display: block;
   min-width: 320px;
   min-height: 100vh;
 }
@@ -39,30 +38,19 @@ h1 {
   line-height: 1.1;
 }
 
-#app {
-  max-width: 854px;
+/* Home page styling - centered content */
+body:not(.edit-mode) #app {
+  max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
 }
 
-#replay-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 100;
-  background: inherit;
-  margin: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  width: 854px;
-  height: 480px;
-}
-
-#app {
-  max-width: 854px;
-  margin-left: 870px; /* 854px + 16px gap */
+/* Edit page styling - content pushed to the right to make room for replay container */
+body.edit-mode #app {
+  margin-left: 870px;
   padding: 2rem;
-  text-align: center;
+  text-align: left;
 }
 
 .logo {
@@ -103,6 +91,13 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+#replay-container {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: #242424;
 }
 
 @media (prefers-color-scheme: light) {

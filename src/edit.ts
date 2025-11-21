@@ -145,11 +145,10 @@ export class Editor {
   }
 
   constructor() {
-    const params = getHashParams();
-    
     this.dao = getDao();
     
-    const isPresentMode = params.get('present') === '1';
+    // Add edit-mode class to body
+    document.body.classList.add('edit-mode');
     
     // Create persistent replay container at the top left of the viewport
     let replayDiv = document.getElementById('replay-container') as HTMLDivElement;

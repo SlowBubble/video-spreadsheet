@@ -32,6 +32,9 @@ async function getProjects(dao: IDao): Promise<{ id: string, title: string, last
 }
 
 async function renderHome(user: User | null) {
+  // Remove edit-mode class to ensure home page is centered
+  document.body.classList.remove('edit-mode');
+  
   // Get opacity from URL parameter, default to 0 if not specified
   const params = getHashParams();
   const dimOpacity = params.has('opacity') ? params.get('opacity') : '0';
