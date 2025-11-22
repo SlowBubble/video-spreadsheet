@@ -36,12 +36,23 @@ When users request replay before all YouTube players are loaded, instead of disa
 - **Color:** yellow
 - **Duration:** 5000ms (5 seconds)
 
+## Additional Changes
+
+### Removed: `showInitBanner()` method
+- Previously showed "Player loaded!" banner when all players were ready
+- No longer needed since users can start replay immediately
+
+### Removed: State tracking variables
+- `playersReadyCount` - removed from class properties
+- `totalPlayersExpected` - removed from class properties
+- These are now local variables in the `onYouTubeIframeAPIReady` callback
+
 ## User Experience
 1. User clicks replay before players are loaded
-2. Yellow banner appears at top: "Waiting for players to load..."
-3. Banner remains visible while players initialize
+2. Yellow banner appears at top: "Waiting for players to load..." (5 seconds)
+3. System polls every 100ms for player initialization
 4. Once all players are ready:
-   - Banner disappears
+   - Banner is removed (if still visible)
    - Replay starts automatically from the requested position
 
 ## Testing Considerations

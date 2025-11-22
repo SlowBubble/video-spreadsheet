@@ -118,8 +118,6 @@ export class ReplayManager {
   _intervalId: any = null;
   _stepTimeoutId: any = null;
   isInitialized: boolean = false;
-  playersReadyCount: number = 0;
-  totalPlayersExpected: number = 0;
   getYouTubeId: ((url: string) => string | null) | null = null;
 
   isDebugMode(): boolean {
@@ -201,17 +199,7 @@ export class ReplayManager {
     this.container.style.left = `${leftPosition}px`;
   }
 
-  showInitBanner() {
-    // Don't show banner in present mode
-    if (this.isPresentMode()) return;
-    
-    showBanner('Player loaded!', {
-      id: 'init-banner',
-      position: 'top',
-      color: 'green',
-      duration: 2000
-    });
-  }
+
 
   clearOverlay() {
     if (!this.overlayCanvas) return;
@@ -456,19 +444,18 @@ export class ReplayManager {
     const onYouTubeIframeAPIReady = () => {
       this.players = new Map();
       this.playerRanges = new Map();
-      this.playersReadyCount = 0;
-      this.totalPlayersExpected = commands.filter((cmd: any) => getYouTubeId(cmd.asset) !== null).length;
+      const totalPlayersExpected = commands.filter((cmd: any) => getYouTubeId(cmd.asset) !== null).length;
+      let playersReadyCount = 0;
       
       commands.forEach((cmd: any) => {
         const ytId = getYouTubeId(cmd.asset);
         if (ytId) {
           this.loadPlayer(cmd, () => {
             // Track initialization progress
-            this.playersReadyCount++;
+            playersReadyCount++;
             
-            if (this.playersReadyCount === this.totalPlayersExpected) {
+            if (playersReadyCount === totalPlayersExpected) {
               this.isInitialized = true;
-              this.showInitBanner();
             }
           });
         }
