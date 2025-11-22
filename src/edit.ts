@@ -613,6 +613,8 @@ export class Editor {
     const data = await this.dao.get(id);
     if (data) {
       this.topLevelProject = TopLevelProject.fromJSON(data);
+      // Regenerate all IDs on load to ensure uniqueness and clean state
+      this.topLevelProject.project.regenerateAllIds();
       return this.topLevelProject.project;
     }
     

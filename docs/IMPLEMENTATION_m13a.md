@@ -55,9 +55,41 @@ When users request replay before all YouTube players are loaded, instead of disa
    - Banner is removed (if still visible)
    - Replay starts automatically from the requested position
 
+## Additional Fix: ID Regeneration
+
+### Problem
+When copying/pasting commands from other projects, duplicate IDs could occur, causing player initialization issues.
+
+### Solution
+
+**Modified: `src/project.ts`**
+
+1. **Enhanced `ensureCommandIds()`**: Now detects and fixes duplicate IDs, not just missing IDs
+   - Tracks all used IDs in a Set
+   - Detects duplicates and marks them for reassignment
+   - Assigns new unique IDs to duplicates and missing IDs
+
+2. **Added `regenerateAllIds()`**: Regenerates all IDs from scratch starting at 1
+   - Called on project load to ensure clean state
+   - IDs are sequential: 1, 2, 3, etc.
+   - Safe to change IDs across reloads since they're only used internally
+
+**Modified: `src/edit.ts`**
+
+- `loadProject()` now calls `regenerateAllIds()` after loading project data
+- Ensures all projects start with clean, unique, sequential IDs
+
+### New Player Loading Banners
+
+When adding a new asset/command:
+- **Loading banner**: "Loading player..." (blue, 800ms) - shown immediately
+- **Success banner**: "Player loaded!" (green, 800ms) - shown when ready
+
 ## Testing Considerations
 - Test with slow network connections to verify banner appears
 - Verify banner is removed once players load
 - Ensure replay starts correctly after waiting
 - Test with resume positions (resumeFromMs parameter)
 - Test with endMs parameter
+- Test copying/pasting commands from other projects
+- Verify no duplicate ID issues after paste operations

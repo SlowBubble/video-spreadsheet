@@ -444,8 +444,19 @@ export class ReplayManager {
     const onYouTubeIframeAPIReady = () => {
       this.players = new Map();
       this.playerRanges = new Map();
-      const totalPlayersExpected = commands.filter((cmd: any) => getYouTubeId(cmd.asset) !== null).length;
+      
+      // Count unique command IDs with YouTube assets to avoid duplicate ID issues
+      const uniqueCmdIds = new Set<number>();
+      commands.forEach((cmd: any) => {
+        const ytId = getYouTubeId(cmd.asset);
+        if (ytId) {
+          uniqueCmdIds.add(cmd.id);
+        }
+      });
+      const totalPlayersExpected = uniqueCmdIds.size;
       let playersReadyCount = 0;
+      
+      console.log(`[Constructor] Expecting ${totalPlayersExpected} unique players`);
       
       commands.forEach((cmd: any) => {
         const ytId = getYouTubeId(cmd.asset);
@@ -453,9 +464,11 @@ export class ReplayManager {
           this.loadPlayer(cmd, () => {
             // Track initialization progress
             playersReadyCount++;
+            console.log(`[Constructor] Player ready: ${playersReadyCount}/${totalPlayersExpected}`);
             
             if (playersReadyCount === totalPlayersExpected) {
               this.isInitialized = true;
+              console.log('[Constructor] All players initialized!');
             }
           });
         }
@@ -488,6 +501,22 @@ export class ReplayManager {
     const startSec = cmd.startMs / 1000;
     const endSec = cmd.endMs / 1000;
     const extendAudioSec = cmd.extendAudioSec || 0;
+    
+    // Check if this is a new player being added (not initial load)
+    const isNewPlayer = !this.players.has(cmdId) && this.isInitialized;
+    
+    // If adding a new player after initialization, mark as not initialized
+    if (isNewPlayer) {
+      this.isInitialized = false;
+      
+      // Show loading banner for new player
+      showBanner('Loading player...', {
+        id: 'player-loading-banner',
+        position: 'top',
+        color: 'blue',
+        duration: 800
+      });
+    }
     
     // Check if div already exists, if not create it
     let div = document.getElementById(`yt-player-edit-${cmdId}`);
@@ -535,6 +564,19 @@ export class ReplayManager {
           event.target.setPlaybackRate(rate);
           
           console.log(`[loadPlayer] Done loading player for cmdId=${cmdId}`);
+          
+          // If this was a new player, mark as initialized again and show success banner
+          if (isNewPlayer) {
+            this.isInitialized = true;
+            
+            // Show player loaded banner
+            showBanner('Player loaded!', {
+              id: 'player-loaded-banner',
+              position: 'top',
+              color: 'green',
+              duration: 800
+            });
+          }
           
           if (onReady) {
             onReady();

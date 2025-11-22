@@ -219,33 +219,62 @@ export class Project {
 
   // Ensure all commands and subcommands have unique IDs
   ensureCommandIds(): void {
-    // Find the highest existing ID across both commands and subcommands
+    // Track which IDs are already used
+    const usedIds = new Set<number>();
+    const itemsNeedingIds: Array<{ item: ProjectCommand | Subcommand; type: 'command' | 'subcommand' }> = [];
+    
+    // Find the highest existing ID and detect duplicates
     let maxId = 0;
     this.commands.forEach(cmd => {
       if (cmd.id > 0) {
         maxId = Math.max(maxId, cmd.id);
+        
+        // If ID is already used, mark this command for reassignment
+        if (usedIds.has(cmd.id)) {
+          itemsNeedingIds.push({ item: cmd, type: 'command' });
+        } else {
+          usedIds.add(cmd.id);
+        }
+      } else {
+        // No ID or invalid ID
+        itemsNeedingIds.push({ item: cmd, type: 'command' });
       }
+      
       // Check subcommand IDs too
       cmd.subcommands.forEach(subCmd => {
         if (subCmd.id > 0) {
           maxId = Math.max(maxId, subCmd.id);
+          
+          // If ID is already used, mark this subcommand for reassignment
+          if (usedIds.has(subCmd.id)) {
+            itemsNeedingIds.push({ item: subCmd, type: 'subcommand' });
+          } else {
+            usedIds.add(subCmd.id);
+          }
+        } else {
+          // No ID or invalid ID
+          itemsNeedingIds.push({ item: subCmd, type: 'subcommand' });
         }
       });
     });
 
-    // Assign IDs to commands that don't have one (id === 0)
+    // Assign new unique IDs to items that need them
+    itemsNeedingIds.forEach(({ item }) => {
+      maxId++;
+      item.id = maxId;
+      usedIds.add(maxId);
+    });
+  }
+
+  // Regenerate all IDs from scratch (useful on project load to ensure clean state)
+  regenerateAllIds(): void {
+    let nextId = 1;
+    
     this.commands.forEach(cmd => {
-      if (!cmd.id || cmd.id === 0) {
-        maxId++;
-        cmd.id = maxId;
-      }
+      cmd.id = nextId++;
       
-      // Assign IDs to subcommands that don't have one
       cmd.subcommands.forEach(subCmd => {
-        if (!subCmd.id || subCmd.id === 0) {
-          maxId++;
-          subCmd.id = maxId;
-        }
+        subCmd.id = nextId++;
       });
     });
   }
