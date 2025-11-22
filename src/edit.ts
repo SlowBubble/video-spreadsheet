@@ -2019,6 +2019,18 @@ export class Editor {
       } else if (this.selectedCol === 1) {
         // Name
         textToCopy = subCmd.name;
+      } else if (this.selectedCol === 2) {
+        // Pos 0 (absolute start position) - store as ms integer string
+        const rate = speedToRate(cmd.speed);
+        const subStartOffset = subCmd.startMs - cmd.startMs;
+        const subAbsoluteStart = cmd.positionMs + (subStartOffset / rate);
+        textToCopy = subAbsoluteStart.toString();
+      } else if (this.selectedCol === 3) {
+        // Pos 1 (absolute end position) - store as ms integer string
+        const rate = speedToRate(cmd.speed);
+        const subEndOffset = subCmd.endMs - cmd.startMs;
+        const subAbsoluteEnd = cmd.positionMs + (subEndOffset / rate);
+        textToCopy = subAbsoluteEnd.toString();
       } else if (this.selectedCol === 4) {
         // Start
         textToCopy = subCmd.startMs.toString();
@@ -2133,7 +2145,56 @@ export class Editor {
       const cmd = this.project.commands[rowType.cmdIdx];
       const subCmd = cmd.subcommands[rowType.subIdx];
       
-      if (this.selectedCol === 9) {
+      if (this.selectedCol === 2) {
+        // Pos 0 (absolute start position) - convert to relative startMs
+        const value = Number(clipboardText);
+        if (isNaN(value)) {
+          showBanner('Failed: Invalid number', {
+            id: 'paste-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 1500
+          });
+          return;
+        }
+        // Convert absolute position to relative startMs
+        // subAbsoluteStart = cmd.positionMs + (subStartOffset / rate)
+        // subStartOffset = (subAbsoluteStart - cmd.positionMs) * rate
+        // subCmd.startMs = cmd.startMs + subStartOffset
+        const rate = speedToRate(cmd.speed);
+        const subStartOffset = (value - cmd.positionMs) * rate;
+        subCmd.startMs = cmd.startMs + subStartOffset;
+        
+        showBanner('Pasted!', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'green',
+          duration: 500
+        });
+      } else if (this.selectedCol === 3) {
+        // Pos 1 (absolute end position) - convert to relative endMs
+        const value = Number(clipboardText);
+        if (isNaN(value)) {
+          showBanner('Failed: Invalid number', {
+            id: 'paste-banner',
+            position: 'bottom',
+            color: 'red',
+            duration: 1500
+          });
+          return;
+        }
+        // Convert absolute position to relative endMs
+        const rate = speedToRate(cmd.speed);
+        const subEndOffset = (value - cmd.positionMs) * rate;
+        subCmd.endMs = cmd.startMs + subEndOffset;
+        
+        showBanner('Pasted!', {
+          id: 'paste-banner',
+          position: 'bottom',
+          color: 'green',
+          duration: 500
+        });
+      } else if (this.selectedCol === 9) {
         // Fill column - paste overlay (excluding TextDisplay)
         try {
           const parsedOverlay = JSON.parse(clipboardText);
@@ -2183,7 +2244,7 @@ export class Editor {
           });
         }
       } else {
-        showBanner('Paste not supported for subcommands yet', {
+        showBanner('Paste not supported for this column', {
           id: 'paste-banner',
           position: 'bottom',
           color: 'yellow',
