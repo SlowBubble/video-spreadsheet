@@ -3,10 +3,19 @@
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
 
-# m13a
+# m14a
 
 - Box overlay
   - Need better UX for specifying the position of the box.
+
+# m13a
+- When users request replay, instead of dis-allowing it, make it play after all the players are loaded
+  - Show a banner that says waiting
+
+# m13b
+- instead of waiting for all the players to load
+  - Look at which commands/subcommands contains the specified resume time
+  - If the yt players for all those are already loaded, then you can start the reply instead of blocking.
 
 # wishlist
 - Design color coding for base, glue and adornment
