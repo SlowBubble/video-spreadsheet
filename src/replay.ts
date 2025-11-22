@@ -1090,12 +1090,27 @@ export class ReplayManager {
     
     // Check if players are initialized
     if (!this.isInitialized) {
-      showBanner('Loading is not finished.', {
+      showBanner('Waiting for players to load...', {
         id: 'loading-banner',
         position: 'top',
         color: 'yellow',
-        duration: 2000
+        duration: 5000
       });
+      
+      // Poll for initialization and start replay when ready
+      const checkInterval = setInterval(() => {
+        if (this.isInitialized) {
+          clearInterval(checkInterval);
+          // Remove the waiting banner
+          const banner = document.getElementById('loading-banner');
+          if (banner) {
+            banner.remove();
+          }
+          // Start replay
+          this.startReplay(resumeFromMs, enabledCommands, endMs);
+        }
+      }, 100); // Check every 100ms
+      
       return;
     }
     
