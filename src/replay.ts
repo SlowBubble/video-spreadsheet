@@ -75,11 +75,13 @@ function getActionPriority(action: PlanAction): number {
 class PlayVideoAction extends PlanAction {
   volume: number;
   playbackRate: number;
+  startMs: number;
 
-  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, volume: number, playbackRate: number) {
+  constructor(replayPositionMs: number, cmdIdx: number, debugAssetName: string, volume: number, playbackRate: number, startMs: number) {
     super(replayPositionMs, cmdIdx, debugAssetName, 'PlayVideoAction');
     this.volume = volume;
     this.playbackRate = playbackRate;
+    this.startMs = startMs;
   }
 }
 
@@ -136,6 +138,11 @@ export class ReplayManager {
   isShortMode(): boolean {
     const params = getHashParams();
     return params.get('short') === '1';
+  }
+
+  isSlowMode(): boolean {
+    const params = getHashParams();
+    return params.get('slow') === '1';
   }
 
   applySmartPositioning(overlays: Overlay[]) {
@@ -476,6 +483,13 @@ export class ReplayManager {
             if (playersReadyCount === totalPlayersExpected) {
               this.isInitialized = true;
               console.log('[Constructor] All players initialized!');
+              
+              // Start slow-loading if enabled
+              if (this.isSlowMode()) {
+                this.slowLoadVideos(commands).catch((err) => {
+                  console.error('[Constructor] Error during slow-loading:', err);
+                });
+              }
             }
           });
         }
@@ -613,6 +627,74 @@ export class ReplayManager {
     return false;
   }
 
+  async slowLoadVideos(commands: any[]): Promise<void> {
+    if (!this.isSlowMode()) return;
+    
+    console.log('[slowLoadVideos] Starting slow-loading process');
+    
+    // Filter commands that need slow-loading
+    const eligibleCommands = commands.filter((cmd: any) => {
+      const duration = cmd.endMs - cmd.startMs;
+      return cmd.startMs >= 2000 && duration < 11000;
+    });
+    
+    if (eligibleCommands.length === 0) {
+      console.log('[slowLoadVideos] No eligible commands for slow-loading');
+      return;
+    }
+    
+    console.log(`[slowLoadVideos] Found ${eligibleCommands.length} eligible commands`);
+    
+    // Process each command sequentially
+    for (const cmd of eligibleCommands) {
+      const player = this.players.get(cmd.id);
+      if (!player) continue;
+      
+      const slowStartMs = cmd.startMs - 2000;
+      const slowStartSec = slowStartMs / 1000;
+      const slowEndSec = cmd.endMs / 1000;
+      
+      console.log(`[slowLoadVideos] Slow-loading cmd=${cmd.name} from ${slowStartSec}s to ${slowEndSec}s`);
+      
+      // Show banner for this video
+      showBanner(`Slow-loading video ${cmd.name || cmd.id}...`, {
+        id: 'slow-load-banner',
+        position: 'top',
+        color: 'blue',
+        duration: 0 // Keep showing until we update it
+      });
+      
+      // Seek to 2000ms earlier
+      player.seekTo(slowStartSec);
+      player.setVolume(100);
+      player.setPlaybackRate(0.5);
+      player.playVideo();
+      
+      // Wait until the video reaches endMs
+      await new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          const currentTime = player.getCurrentTime();
+          if (currentTime >= slowEndSec) {
+            clearInterval(checkInterval);
+            player.pauseVideo();
+            console.log(`[slowLoadVideos] Finished slow-loading cmdId=${cmd.id}`);
+            resolve();
+          }
+        }, 100); // Check every 100ms
+      });
+    }
+    
+    // Show completion banner
+    showBanner('Slow-loading complete!', {
+      id: 'slow-load-banner',
+      position: 'top',
+      color: 'green',
+      duration: 2000
+    });
+    
+    console.log('[slowLoadVideos] All slow-loading complete');
+  }
+
 
 
   private createOpEvts(enabledCommands: any[]): OpEvt[] {
@@ -733,7 +815,7 @@ export class ReplayManager {
           const cmd = enabledCommands[evt.cmdIdx];
           const assetName = this.getCommandName(evt.cmdIdx, enabledCommands);
           const rate = speedToRate(cmd.speed);
-          actions.push(new PlayVideoAction(group.timeMs, evt.cmdIdx, assetName, cmd.volume, rate));
+          actions.push(new PlayVideoAction(group.timeMs, evt.cmdIdx, assetName, cmd.volume, rate, cmd.startMs));
         }
       });
     });
@@ -1035,7 +1117,7 @@ export class ReplayManager {
       const cmd = enabledCommands[playAction.cmdIdx];
       const player = this.players.get(cmd.id);
       if (player) {
-        const startSec = cmd.startMs / 1000;
+        const startSec = playAction.startMs / 1000;
         player.seekTo(startSec);
         player.setVolume(playAction.volume);
         player.setPlaybackRate(playAction.playbackRate);

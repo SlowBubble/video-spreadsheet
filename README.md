@@ -5,15 +5,18 @@
 # m14a (done)
 - for non-short present mode, use a bigger player
 
-# m14b
+# m14b (done)
 In preparation for m14c, do the following clean-up, which should be a no-op to the user
 - Have PlayVideoAction take in a startMs field and have the replayer use that field to do a seek before playing the underlying video.
 
 # m14c
 
-for non-short present mode, do this extra step when loading the video
-
-- set the start to be 1 secon
+Add a slow=1 url param and when enabled, do this slow-loading step when loading the videos
+- Only do this slow-loading for each asset whose startMs >= 1000 and endMs < startMs - 16000, by
+  - loading 1000ms earlier than the specified time
+  - setting the playback rate to 0.5 and full volume and playing the video until reaching endMs
+    - This allows the video to likely load with a higher resolution
+    - Do this slow loading sequentially instead of doing it at the same time for all the videos
 
 # m13b
 
