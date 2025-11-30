@@ -1099,7 +1099,7 @@ export class Editor {
     if (presentBtn) {
       presentBtn.onclick = () => {
         const currentHash = window.location.hash;
-        const newHash = `${currentHash}&present=1`;
+        const newHash = `${currentHash}&present=1&slow=1`;
         window.open(newHash, '_blank', 'width=1920,height=1130');
       };
     }

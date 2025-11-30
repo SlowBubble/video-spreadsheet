@@ -631,11 +631,11 @@ export class ReplayManager {
     if (!this.isSlowMode()) return;
     
     console.log('[slowLoadVideos] Starting slow-loading process');
-    
+    const rewindMs = 5000;
     // Filter commands that need slow-loading
     const eligibleCommands = commands.filter((cmd: any) => {
       const duration = cmd.endMs - cmd.startMs;
-      return cmd.startMs >= 2000 && duration < 11000;
+      return cmd.startMs >= rewindMs && duration < 11000;
     });
     
     if (eligibleCommands.length === 0) {
@@ -650,7 +650,7 @@ export class ReplayManager {
       const player = this.players.get(cmd.id);
       if (!player) continue;
       
-      const slowStartMs = cmd.startMs - 2000;
+      const slowStartMs = cmd.startMs - rewindMs;
       const slowStartSec = slowStartMs / 1000;
       const slowEndSec = cmd.endMs / 1000;
       
@@ -664,10 +664,19 @@ export class ReplayManager {
         duration: 0 // Keep showing until we update it
       });
       
-      // Seek to 2000ms earlier
+      // Make this video visible and hide black screen
+      const div = document.getElementById(`yt-player-edit-${cmd.id}`);
+      if (div) {
+        div.style.display = 'block';
+      }
+      if (this.blackDiv) {
+        this.blackDiv.style.display = 'none';
+      }
+      
+      // Seek to rewindMs earlier
       player.seekTo(slowStartSec);
       player.setVolume(100);
-      player.setPlaybackRate(0.5);
+      player.setPlaybackRate(0.75);
       player.playVideo();
       
       // Wait until the video reaches endMs
@@ -682,6 +691,16 @@ export class ReplayManager {
           }
         }, 100); // Check every 100ms
       });
+      
+      // Hide this video after loading
+      if (div) {
+        div.style.display = 'none';
+      }
+    }
+    
+    // Show black screen again after all loading is complete
+    if (this.blackDiv) {
+      this.blackDiv.style.display = 'block';
     }
     
     // Show completion banner
