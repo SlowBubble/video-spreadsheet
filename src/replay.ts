@@ -119,6 +119,9 @@ export class ReplayManager {
   _stepTimeoutId: any = null;
   isInitialized: boolean = false;
   getYouTubeId: ((url: string) => string | null) | null = null;
+  playerWidth: number = 854;
+  playerHeight: number = 480;
+  fontSize: number = 36;
 
   isDebugMode(): boolean {
     const params = getHashParams();
@@ -156,16 +159,14 @@ export class ReplayManager {
     
     // If no non-zero left/right borders found, center the player like default present mode
     if (leftMarginPct === 0 && rightMarginPct === 0) {
-      const defaultWidth = 854;
       const windowWidth = window.innerWidth;
-      const offset = Math.round((defaultWidth - windowWidth) / 2);
+      const offset = Math.round((this.playerWidth - windowWidth) / 2);
       this.container.style.left = `-${offset}px`;
       return;
     }
     
     // Calculate the middle of the visible area (between left and right borders)
-    // Player width is 854px
-    const playerWidth = 854;
+    const playerWidth = this.playerWidth;
     const leftBorderPx = (playerWidth * leftMarginPct) / 100;
     const rightBorderPx = (playerWidth * rightMarginPct) / 100;
     const visibleAreaLeft = leftBorderPx;
@@ -251,7 +252,7 @@ export class ReplayManager {
     if (!ctx) return;
     
     // Set text properties
-    const fontSize = 36;
+    const fontSize = this.fontSize;
     const lineHeight = fontSize * 1.2; // 20% spacing between lines
     ctx.font = `${fontSize}px sans-serif`;
     ctx.fillStyle = 'white';
@@ -375,16 +376,24 @@ export class ReplayManager {
     this.getYouTubeId = getYouTubeId;
     
     const isPresentMode = this.isPresentMode();
+    const isShortMode = getHashParams().get('short') === '1';
+    
+    // Use larger dimensions only for present mode (non-short)
+    this.playerWidth = isPresentMode && !isShortMode ? 1920 : 854;
+    this.playerHeight = isPresentMode && !isShortMode ? 1080 : 480;
+    this.fontSize = isPresentMode && !isShortMode ? 84 : 36;
+    const playerWidth = this.playerWidth;
+    const playerHeight = this.playerHeight;
     
     // Container for players and black screen
     const container = document.createElement('div');
     container.style.position = 'relative';
-    container.style.width = '854px';
+    container.style.width = `${playerWidth}px`;
     // In debug mode, allow container to grow vertically for multiple players
     if (this.isDebugMode()) {
-      container.style.minHeight = '480px';
+      container.style.minHeight = `${playerHeight}px`;
     } else {
-      container.style.height = '480px';
+      container.style.height = `${playerHeight}px`;
     }
     
     // In present mode, center the iframe based on window width
@@ -394,14 +403,12 @@ export class ReplayManager {
       
       // Center the iframe horizontally by offsetting it
       // In short mode, positioning will be dynamically adjusted based on overlays
-      const defaultWidth = 854;
       const windowWidth = window.innerWidth;
-      const offset = Math.round((defaultWidth - windowWidth) / 2);
+      const offset = Math.round((playerWidth - windowWidth) / 2);
       container.style.position = 'relative';
       
       // Only apply default centering if not in short mode
       // Short mode will dynamically adjust positioning
-      const isShortMode = getHashParams().get('short') === '1';
       if (!isShortMode) {
         container.style.left = `-${offset}px`;
       } else {
@@ -428,13 +435,13 @@ export class ReplayManager {
     
     // Overlay canvas for filters, text, etc.
     const overlayCanvas = document.createElement('canvas');
-    overlayCanvas.width = 854;
-    overlayCanvas.height = 480;
+    overlayCanvas.width = playerWidth;
+    overlayCanvas.height = playerHeight;
     overlayCanvas.style.position = 'absolute';
     overlayCanvas.style.top = '0';
     overlayCanvas.style.left = '0';
-    overlayCanvas.style.width = '854px';
-    overlayCanvas.style.height = '480px';
+    overlayCanvas.style.width = `${playerWidth}px`;
+    overlayCanvas.style.height = `${playerHeight}px`;
     overlayCanvas.style.pointerEvents = 'none'; // Allow clicks to pass through
     overlayCanvas.style.zIndex = '10'; // Higher than iframes
     container.appendChild(overlayCanvas);
@@ -544,8 +551,8 @@ export class ReplayManager {
     }
     
     const player = new (window as any).YT.Player(div.id, {
-      width: '854',
-      height: '480',
+      width: this.playerWidth.toString(),
+      height: this.playerHeight.toString(),
       videoId: ytId,
       playerVars: {
         autoplay: 0,

@@ -1100,7 +1100,7 @@ export class Editor {
       presentBtn.onclick = () => {
         const currentHash = window.location.hash;
         const newHash = `${currentHash}&present=1`;
-        window.open(newHash, '_blank', 'width=854,height=530');
+        window.open(newHash, '_blank', 'width=1920,height=1130');
       };
     }
 
