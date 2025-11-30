@@ -2,6 +2,18 @@
 
 - Build a spreadsheet editor which is a video director that instructs the browser how to play out the desired video.
 
+# m14a (done)
+- for non-short present mode, use a bigger player
+
+# m14b
+In preparation for m14c, do the following clean-up, which should be a no-op to the user
+- Have PlayVideoAction take in a startMs field and have the replayer use that field to do a seek before playing the underlying video.
+
+# m14c
+
+for non-short present mode, do this extra step when loading the video
+
+- set the start to be 1 secon
 
 # m13b
 

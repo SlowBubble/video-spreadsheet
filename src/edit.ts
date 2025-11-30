@@ -43,15 +43,15 @@ function msToTimeString(ms: number, decimalPlaces: number = 1): string {
   }
 }
 
-// Convert ms to time string for editing (shows actual precision without rounding)
+// Convert ms to time string for editing (shows up to 2 decimal places)
 function msToEditString(ms: number): string {
   const totalSeconds = ms / 1000;
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
   
-  // Remove trailing zeros and decimal point if not needed
-  const sFormatted = s.toString().replace(/\.?0+$/, '');
+  // Format to 2 decimal places, then remove trailing zeros and decimal point if not needed
+  const sFormatted = s.toFixed(2).replace(/\.?0+$/, '');
   
   if (h > 0) {
     return `${h}:${m.toString().padStart(2, '0')}:${sFormatted.padStart(2, '0')}`;
