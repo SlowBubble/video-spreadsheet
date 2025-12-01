@@ -631,11 +631,12 @@ export class ReplayManager {
     if (!this.isSlowMode()) return;
     
     console.log('[slowLoadVideos] Starting slow-loading process');
-    const rewindMs = 5000;
+    const rewindMs = 6000;
+    const maxDurAllowed = 16000;
     // Filter commands that need slow-loading
     const eligibleCommands = commands.filter((cmd: any) => {
       const duration = cmd.endMs - cmd.startMs;
-      return cmd.startMs >= rewindMs && duration < 11000;
+      return cmd.startMs >= rewindMs && duration < maxDurAllowed;
     });
     
     if (eligibleCommands.length === 0) {
@@ -652,7 +653,7 @@ export class ReplayManager {
       
       const slowStartMs = cmd.startMs - rewindMs;
       const slowStartSec = slowStartMs / 1000;
-      const slowEndSec = cmd.endMs / 1000;
+      const slowEndSec = cmd.endMs/ 1000;
       
       console.log(`[slowLoadVideos] Slow-loading cmd=${cmd.name} from ${slowStartSec}s to ${slowEndSec}s`);
       
@@ -686,7 +687,7 @@ export class ReplayManager {
           if (currentTime >= slowEndSec) {
             clearInterval(checkInterval);
             player.pauseVideo();
-            console.log(`[slowLoadVideos] Finished slow-loading cmdId=${cmd.id}`);
+            console.log(`[slowLoadVideos] Finished slow-loading cmd=${cmd.name}`);
             resolve();
           }
         }, 100); // Check every 100ms
@@ -1090,6 +1091,8 @@ export class ReplayManager {
     });
   }
 
+
+
   executeActions(actions: PlanAction[], enabledCommands: any[]) {
     const debugMode = this.isDebugMode();
     
@@ -1428,8 +1431,57 @@ export class ReplayManager {
         const visibleIdx = mostRecentDisplayAction ? mostRecentDisplayAction.cmdIdx : -1;
         this.seekAndPlayAllActiveVideos(resumeFromMs, visibleIdx, enabledCommands);
       } else {
-        // Normal playback: execute all actions
-        this.executeActions(actions, enabledCommands);
+        // Normal playback: prepare and execute all actions
+        if (this.isSlowMode()) {
+          // In slow mode, compensate for seek lag by executing actions with timing offsets:
+          // - PlayVideoAction: Execute immediately (at time T)
+          // - DisplayAction/OverlayAction: Execute after 200ms (at time T+200ms) 
+          //   This gives the video 200ms to seek and buffer before becoming visible
+          // - PauseVideoAction: Execute after 500ms (at time T+500ms)
+          //   This gives the video an extra 300ms to finish playing
+          
+          const playActions = actions.filter(a => a instanceof PlayVideoAction) as PlayVideoAction[];
+          const pauseActions = actions.filter(a => a instanceof PauseVideoAction) as PauseVideoAction[];
+          const displayAndOverlayActions = actions.filter(a => 
+            a instanceof DisplayAction || a instanceof OverlayAction
+          );
+          
+          // Execute play actions immediately - video starts seeking/playing
+          playActions.forEach(playAction => {
+            const cmd = enabledCommands[playAction.cmdIdx];
+            const player = this.players.get(cmd.id);
+            if (player) {
+              const startSec = playAction.startMs / 1000;
+              player.seekTo(startSec);
+              player.setVolume(playAction.volume);
+              player.setPlaybackRate(playAction.playbackRate);
+              player.playVideo();
+            }
+          });
+          
+          // Execute display/overlay actions after 200ms - video becomes visible with overlays
+          setTimeout(() => {
+            if (!this.isPlaying) return;
+            this.executeActions(displayAndOverlayActions, enabledCommands);
+          }, 200);
+          
+          // Execute pause actions after 500ms - video stops
+          if (pauseActions.length > 0) {
+            setTimeout(() => {
+              if (!this.isPlaying) return;
+              pauseActions.forEach(pauseAction => {
+                const cmd = enabledCommands[pauseAction.cmdIdx];
+                const player = this.players.get(cmd.id);
+                if (player) {
+                  player.pauseVideo();
+                }
+              });
+            }, 500);
+          }
+        } else {
+          // Normal mode: execute all actions together
+          this.executeActions(actions, enabledCommands);
+        }
       }
       
       this._intervalId && clearInterval(this._intervalId);
